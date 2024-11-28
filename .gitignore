@@ -1,0 +1,63 @@
+# Ignore .pre-commit-config.yaml
+.pre-commit-config.yaml
+
+
+# ----- Avionics Embedded Gitignore ----- #
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+build/
+Debug/*
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+
+# CubeMX
+*.tmp
+STM32L152-Discovery.elf.launch
+.mxproject
+.dep/
+
+# Other
+*.d
+*.su
+*.bin
+*.list
+*.map
+.fuse*
+
+# IDE
+.metadata
+.settings
+[Rr]elease
+[Dd]ebug
+*.launch
+
+# VS2022
+.vs/

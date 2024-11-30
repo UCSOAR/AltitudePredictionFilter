@@ -366,22 +366,6 @@ void HALO::stateUpdate() {
 // ------------------------------------------------
 
 // Prediction--------------------------------------
-void HALO::prediction() {
-  // initialize scenario to default model-A(vg)
-
-  // given the Madgwick acc, velo, alt
-
-  // MatrixXf sigmaPoints(2*N+1, 3);
-  // sigmaPoints.setZero(2*N+1, 3);
-
-  // calculate sigma points
-  // sigmaPoints = calculateSigmaPoints();
-
-  // interpolate between 2 models
-
-  // predict scenario t+1 based on interpolated values
-}
-
 void HALO::calculateSigmaPoints() {
   // std::cout << "X0: " << X0 << std::endl;
   // std::cout << " ---- Predict Step ---- \n" << std::endl;
@@ -701,7 +685,6 @@ void HALO::calculateSigmaPoints() {
   this->projErrorTime +=
       std::chrono::duration_cast<std::chrono::duration<double>>(
           std::chrono::high_resolution_clock::now() - projErrorStart);
-
 #endif
 
   MatrixXf Pprediction(3, 3);
@@ -733,39 +716,6 @@ void HALO::calculateSigmaPoints() {
   this->sigPoints = sigmaPoints;
 
   // std::cout << " ---- End Predict Step ---- \n" << std::endl;
-}
-
-// Function to interpolate between two nearest scenarios
-float HALO::interpolateScenarios(VectorXf& X_in,
-                                 std::vector<Scenario>& scenarios) {
-  // Find the nearest 2 scenarios to the current state for each measure
-  // auto predicted_acc = findNearestScenarios(scenarios, X_in(0), X_in(1),
-  // 'a'); auto predicted_velo = findNearestScenarios(scenarios, X_in(0),
-  // X_in(1), 'v'); auto predicted_alt = findNearestScenarios(scenarios,
-  // X_in(0), X_in(1), 'h');
-
-  // Interpolate between the two scenarios
-  // float interpolated_acc = interpolate(X_in(1), predicted_acc[0].first,
-  // predicted_acc[1].first); float interpolated_velo = interpolate(X_in(2),
-  // predicted_velo[0].first, predicted_velo[1].first); float interpolated_alt =
-  // interpolate(X_in(3), predicted_alt[0].first, predicted_alt[1].first);
-
-  // X_in << interpolated_acc, interpolated_velo, interpolated_alt;
-
-  // // Save the interpolated scenarios for the next iteration
-  // Scenario scenario1(predicted_acc[0].second, predicted_velo[0].second,
-  // predicted_alt[0].second); Scenario scenario2(predicted_acc[1].second,
-  // predicted_velo[1].second, predicted_alt[1].second);
-
-  // Store the scenarios in a vector or any other suitable data structure
-  std::vector<Scenario> nextScenarios;
-  // nextScenarios.push_back(scenario1);
-  // nextScenarios.push_back(scenario2);
-
-  // predictNextValues(time, nextScenarios);
-
-  // return X_in;
-  return 0;
 }
 
 // Function to calculate the Euclidean distance between two 3D vectors
@@ -1037,13 +987,11 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
   // find current vector (by index) and future vector (by time)
   int indexFirst = distances[lowestDistanceIndex].second.first;
-  // printf("indexFirst: %d\n", indexFirst);
   Scenario* scenario1 =
       &scenarios->at(distances[lowestDistanceIndex].second.second);
   std::vector<float> currentVector1 = scenario1->evaluateVectorAt(indexFirst);
   float deltaTime = 0.333333;
   float nextTimeStep = currentVector1[3] + deltaTime;
-  // printf("time %f, delta %f\n", currentVector1[3], deltaTime);
   std::vector<float> futureVector1 =
       scenario1->evaluateVectorAtTime(nextTimeStep);
 
@@ -1109,47 +1057,12 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 }
 
 /**
- * @brief Interpolates between two values based on a given x value
- */
-// float HALO::interpolate(float x, float scenario1Distance, float
-// scenario2Distance) {
-//     // Get gains for scenarios
-//     std::vector<float> gains = getGains(x, scenario1Distance,
-//     scenario2Distance);
-//
-//     double gain1 = gains[0];
-//     double gain2 = 1.0 - gain1;
-//
-//     return gain1 * scenario1Distance + gain2 * scenario2Distance;
-// }
-
-/**
- * @brief Get gains for scenarios
- */
-// std::vector<float> HALO::getGains(float x, float scenario1Distance, float
-// scenario2Distance) {
-//     float gain1 = 1.0 / std::abs(x - scenario1Distance);
-//     float gain2 = 1.0 - gain1;
-//     this->scenarioWeights = {gain1, gain2};
-//     return {gain1, gain2};
-// }
-
-/**
- * @brief Interpolates between two scenarios based on the gains
- */
-// float interpolateWithgains(float gain1, float gain2, float scenario1Distance,
-// float scenario2Distance) {
-//     return gain1 * scenario1Distance + gain2 * scenario2Distance;
-// }
-
-/**
  * @brief Predicts the next values based on the interpolated scenarios
  */
 VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
                                  VectorXf& X_in) {
   std::vector<float> gainV1 = {0, 0, 0};
   std::vector<float> gainV2 = {0, 0, 0};
-  // vectors = vector1, vector1Future, vector2, vector2Future
   std::vector<float> vector1 = vectors[0];
   std::vector<float> vector1Future = vectors[1];
 
@@ -1159,45 +1072,34 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   bool vector1Further = false;
 
   for (int i = 0; i < 3; i++) {
-    // printf("[%d], v1 (%f), v2 (%f)\n", i, vector1[i], vector2[i]);
-
     float distance = std::abs(vector1[i] - vector2[i]);
 
     if (distance < 1) {
+      // similar so defaulting
       gainV1[i] = 0.5;
       gainV2[i] = 0.5;
-      // printf("similar vectors gains default");
     } else {
       if (vector1[i] > X_in(i)) {
-        // printf("---below v1----\n");
         // below vector1
         if (vector2[i] > X_in(i)) {
           // point below both lines
           both = true;
           if (vector1[i] > vector2[i]) {
             // vector1 on top
-            // printf("point below both, v1 on top\n\n");
             vector1Further = true;
           } else {
             vector1Further = false;
-            // printf("point below both, v2 on top\n\n");
           }
-        } else {
-          // point between lines
-          // printf("point between lines\n\n");
         }
       } else {
         if (vector2[i] > X_in(i)) {
           // point between lines
-          // printf("point between\n");
         } else {
           // point above both lines
           if (vector1[i] < vector2[i]) {
             vector1Further = true;
-            // printf("point above both lines, vector1 further\n\n");
           } else {
             vector1Further = false;
-            // printf("point above both lines, vector2 further\n\n");
           }
           both = true;
         }
@@ -1225,16 +1127,13 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
           gainV1[i] = 1 - (relativeFactor / (relativeFactor + 1));
         }
 
-        // printf("gainV1[%d]: %f\n", i, gainV1[i]);
         gainV2[i] = 1 - gainV1[i];
       } else {
         // point between lines
         // ------------------------------------------------------------
-        // printf("distance: %f\n", distance);
         gainV1[i] =
             1 - (std::abs(vector1[i] - X_in(i)) /
                  distance);  // get distance between vector1 and current state
-        // printf("gainV1[%d]: %f\n", i, gainV1[i]);
         gainV2[i] = 1 - gainV1[i];
         //--------------------------------------------------------------------------------
       }
@@ -1257,11 +1156,6 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
     this->prevGain2 = gainV2;
     this->firstTimeForPoint = 0;
   }
-
-  // printf("prevGain1 (%f,%f,%f), gainV1 (%f,%f,%f)\n", this->prevGain1[0],
-  // this->prevGain1[1], this->prevGain1[2], gainV1[0], gainV1[1], gainV1[2]);
-  // printf("prevGain1 (%f,%f,%f), gainV2 (%f,%f,%f)\n", this->prevGain2[0],
-  // this->prevGain2[1], this->prevGain2[2], gainV2[0], gainV2[1], gainV2[2]);
 
 #ifdef LOGON
 
@@ -1333,8 +1227,6 @@ void HALO::setStateVector(float filteredAcc, float filteredVelo,
   /** X_in = [acceleration, velocity, altitude] */
   this->X = X_in;
 
-  // std::cout << "X from Everest: \n" << this->X << std::endl;
-
   this->stateUpdate();
 }
 
@@ -1392,16 +1284,6 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
           std::chrono::high_resolution_clock::now() - getScenario);
 
 #endif
-
-  // for(Scenario scenario : scenarios){
-  //     printf("Scenario\n");
-  //     for(std::vector<float> vec : scenario.getLists()){
-  //         for(float value : vec){
-  //             printf("%f ", value);
-  //         }
-  //         printf("\n");
-  //     }
-  // }
 
   if (std::isnan(X(0)) || std::isnan(X(1)) || std::isnan(X(2))) {
     FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
@@ -1462,99 +1344,5 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
   return Xprediction;
 }
-
-// int main(){
-//     // only able to measure angle and extrapolate for velocity
-//     MatrixXf X0(6, 1);
-//     X0 << 400, 0, 0, -300, 0, 0;
-
-//     int deltaT = 1;
-
-//     MatrixXf F(6 , 6);
-//     F << 1, deltaT, 0.5 * std::pow(deltaT,2), 0, 0, 0,
-//          0, 1, deltaT, 0, 0, 0,
-//          0, 0, 1, 0, 0, 0,
-//          0, 0, 0, 1, deltaT, 0.5 * std::pow(deltaT, 2),
-//          0, 0, 0, 0, 1, deltaT,
-//          0, 0, 0, 0, 0, 1;
-
-//     MatrixXf X(2, 35);
-//     X << 502.55, 477.34, 457.21, 442.94, 427.27, 406.05, 400.73, 377.32,
-//     360.27, 345.93, 333.34, 328.07, 315.48,
-//                             301.41, 302.87, 304.25, 294.46, 294.29, 299.38,
-//                             299.37, 300.68, 304.1, 301.96, 300.3, 301.9,
-//                             296.7, 297.07, 295.29, 296.31, 300.62, 292.3,
-//                             298.11, 298.07, 298.92, 298.04,
-
-//         -0.9316, -0.8977, -0.8512, -0.8114, -0.7853, -0.7392, -0.7052,
-//         -0.6478, -0.59, -0.5183, -0.4698, -0.3952, -0.3026,
-//                             -0.2445, -0.1626, -0.0937, 0.0085, 0.0856,
-//                             0.1675, 0.2467, 0.329, 0.4149, 0.504, 0.5934,
-//                             0.667, 0.7537, 0.8354,
-//                             0.9195, 1.0039, 1.0923, 1.1546, 1.2564, 1.3274, 1.409,
-//                             1.5011;
-
-//     MatrixXf P(6, 6);
-//     P <<500, 0, 0, 0, 0, 0,
-//         0, 500, 0, 0, 0, 0,
-//         0, 0, 500, 0, 0, 0,
-//         0, 0, 0, 500, 0, 0,
-//         0, 0, 0, 0, 500, 0,
-//         0, 0, 0, 0, 0, 500;
-
-//     VectorXf Z_in(2,1);
-//     Z_in << 0, 0;
-
-//     MatrixXf Q(6,6);
-//     Q << 0.25, 0.5, 0.5, 0, 0, 0,
-//             0.5, 1, 1, 0, 0, 0,
-//             0.5, 1, 1, 0, 0, 0,
-//             0, 0, 0, 0.25, 0.5, 0.5,
-//             0, 0, 0, 0.5, 1, 1,
-//             0, 0, 0, 0.5, 1, 1;
-
-//     Q = Q * std::pow(0.2, 2);
-
-//     std::cout << "Q:\n" << Q << std::endl;
-
-//     std::cout << "X:\n" << X << std::endl;
-
-//     // Open a file for writing
-//     std::ofstream outFile("filtered_values_2D_HALO.csv");
-
-//     // Check if the file is open
-//     if (!outFile.is_open()) {
-//         std::cerr << "Failed to open filtered_values_2D.csv" << std::endl;
-//         return 1;
-//     }
-
-//     // Write the header to the file
-//     outFile << "Time,X,Y,XVelo,YVelo\n";
-
-//     HALO halo = HALO();
-
-//     halo.init(X0, P, Q, Z_in, F);
-
-//     VectorXf X1(2,1);
-//     halo.X = X1;
-
-//     for(int i = 0; i < 35; i++){
-//         std::cout << "\n\nIteration: " << i + 1 << std::endl;
-
-//         halo.X << X(0, i), X(1, i);
-
-//         halo.stateUpdate();
-
-//         // Write the filtered values to the file
-//         outFile << i << "," << halo.X0(0) << "," << halo.X0(3) << "," <<
-//         halo.X0(1) << "," << halo.X0(4) << "\n";
-//     }
-
-//     // Close the file
-//     outFile.close();
-
-//     return 0;
-
-// }
 
 #endif

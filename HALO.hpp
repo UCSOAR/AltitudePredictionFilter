@@ -51,37 +51,7 @@ struct Scenario {
 
   Scenario(std::vector<std::vector<float>> beforeList,
            std::vector<std::vector<float>> afterList, int Name)
-      : BeforeList(beforeList), AfterList(afterList), name(Name) {
-    // FILE *file = fopen("Sims.txt", "w+"); // Open the file for appending or
-    // create it if it doesn't exist if (!file) {
-    //     fprintf(stderr, "Error opening Sims.txt...exiting\n");
-    //     exit(1);
-    // }
-
-    // printf("%d\n", name);
-
-    // Print the first part
-    // std::cout << "First Part:" << std::endl;
-    // fprintf(file, "%s\n", "First Part:");
-    for (const auto &vec : BeforeList) {
-      for (float value : vec) {
-        // std::cout << value << " ";
-        //  printf("%f", value);
-      }
-      // std::cout << std::endl;
-    }
-
-    // Print the second part
-    // std::cout << "Second Part:" << std::endl;
-    // fprintf(file, "%s\n", "Second Part:");
-    for (const auto &vec : AfterList) {
-      for (float value : vec) {
-        // std::cout << value << " ";
-        //  fprintf(file, "%f,%f,%f,%f\n", value);
-      }
-      // std::cout << std::endl;
-    }
-  }
+      : BeforeList(beforeList), AfterList(afterList), name(Name) {}
 
   // Function to find the vector and split the list
   std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>>
@@ -130,32 +100,13 @@ struct Scenario {
   }
 
   void createTree() {
-    // auto [firstPart, secondPart] = findAndSplitVector(list);
     std::vector<std::vector<float>> beforeVectorofVectors;
     std::vector<std::vector<float>> afterVectorofVectors;
 
-    // //std::vector<float> vector = {BeforeList[0][0], BeforeList[0][1],
-    // BeforeList[0][2], BeforeList[0][3]}; std::vector<float> vector =
-    // BeforeList[0]; std::cout << "BeforeList: " << BeforeList.size() <<
-    // std::endl; std::cout << "vector: " << vector[0] << " " << vector[1] << "
-    // " << vector[2] << " " << vector[3] << std::endl;
-
-    // // std::cout << "beforeList: " << BeforeList[0](0) << " " <<
-    // BeforeList[0][1] << " " << BeforeList[0][2] << " " << BeforeList[0][3] <<
-    // std::endl;
-
     for (int i = 0; i < BeforeList.size(); i++) {
-      //     std::cout << "BeforeList: " << BeforeList[i][0] << " " <<
-      //     BeforeList[i][1] << " " << BeforeList[i][2] << " " <<
-      //     BeforeList[i][3] << std::endl;
       std::vector<float> vect = {BeforeList[i][0], BeforeList[i][1],
                                  BeforeList[i][2]};
-      //     std::cout << "vect" << vect[0] << " " << vect[1] << " " << vect[2]
-      //     << " " << vect[3] << std::endl;
       beforeVectorofVectors.push_back(vect);
-      //     std::cout << "BeforeList: " << BeforeList[i][0] << " " <<
-      //     BeforeList[i][1] << " " << BeforeList[i][2] << " " <<
-      //     BeforeList[i][3] << std::endl;
     }
 
     for (int i = 0; i < AfterList.size(); i++) {
@@ -163,13 +114,6 @@ struct Scenario {
                                  AfterList[i][2]};
       afterVectorofVectors.push_back(vect);
     }
-
-    // for(const auto& vec : AfterList){
-    //     for(float value : vec){
-    //         printf("%f ", value);
-    //     }
-    //     printf("\n");
-    // }
 
     treeBefore = KDTree(beforeVectorofVectors);
     treeAfter = KDTree(afterVectorofVectors);
@@ -181,20 +125,8 @@ struct Scenario {
    */
   std::vector<std::vector<float>> *getLists() {
     if (isBeforeApogeeBool) {
-      // for(std::vector<float> vec : BeforeList){
-      //     for(float value : vec){
-      //         printf("%f ", value);
-      //     }
-      //     printf("\n");
-      // }
       return &BeforeList;
     } else {
-      // for(std::vector<float> vec : AfterList){
-      //     for(float value : vec){
-      //         printf("%f ", value);
-      //     }
-      //     printf("after\n");
-      // }
       return &AfterList;
     }
   }
@@ -235,79 +167,8 @@ struct Scenario {
 
     vect = list->at(binarySearch((*list), time));
 
-    // for(size_t i = 0; i < list->size(); i++){
-    //     // std::vector<float> vect = {0,0,0,0};
-    //     int valueIndex = 0;
-
-    //     for(float value : list->at(i)){
-    //         vect[valueIndex] = value;
-    //         valueIndex++;
-    //     }
-
-    //     if(time < vect[3]){
-    //         break;
-    //     }
-
-    //     index++;
-
-    //     // printf("Considered: (%f)", vect[3]);
-    // }
-
-    // while(time > list[index][2]){
-    //     printf("Considered: (%f)", list[index][2]);
-    //     index++;
-    // }
-
     return vect;
   }
-
-  // state machine on apogee
-  // float evaluateAcceleration(float time) {
-  //     float measuredAcceleration = measurement[0];
-
-  //     if(isBeforeApogeeBool){
-  //         // evaluate acceleration at timestep before apogee by using the
-  //         coefficients at 3rd degree polynomial return beforeApogeeAccel[0] *
-  //         pow(time, 3) + beforeApogeeAccel[1] * pow(time, 2)
-  //         + beforeApogeeAccel[2] * time + beforeApogeeAccel[3];
-  //     }
-  //     else{
-  //         // evaluate acceleration at timestep after apogee by using the
-  //         coefficients at 3rd degree polynomial return afterApogeeAccel[0] *
-  //         pow(time, 3) + afterApogeeAccel[1] * pow(time, 2)
-  //         + afterApogeeAccel[2] * time + afterApogeeAccel[3];
-  //     }
-  // }
-
-  // float evaluateVelocity(float time){
-  //     if(isBeforeApogeeBool){
-  //         // evaluate velocity at timestep before apogee by using the
-  //         coefficients at 3rd degree polynomial return beforeApogeeVelo[0] *
-  //         pow(time, 3) + beforeApogeeVelo[1] * pow(time, 2)
-  //         + beforeApogeeVelo[2] * time + beforeApogeeVelo[3];
-  //     }
-  //     else{
-  //         // evaluate velocity at timestep after apogee by using the
-  //         coefficients at 3rd degree polynomial return afterApogeeVelo[0] *
-  //         pow(time, 3) + afterApogeeVelo[1] * pow(time, 2)
-  //         + afterApogeeVelo[2] * time + afterApogeeVelo[3];
-  //     }
-  // }
-
-  // float evaluateAltitude(float time){
-  //     if(isBeforeApogeeBool){
-  //         // evaluate altitude at timestep before apogee by using the
-  //         coefficients at 3rd degree polynomial return beforeApogeeAlt[0] *
-  //         pow(time, 3) + beforeApogeeAlt[1] * pow(time, 2) +
-  //         beforeApogeeAlt[2] * time + beforeApogeeAlt[3];
-  //     }
-  //     else{
-  //         // evaluate altitude at timestep after apogee by using the
-  //         coefficients at 3rd degree polynomial return afterApogeeAlt[0] *
-  //         pow(time, 3) + afterApogeeAlt[1] * pow(time, 2) + afterApogeeAlt[2]
-  //         * time + afterApogeeAlt[3];
-  //     }
-  // }
 };
 
 /**
@@ -331,8 +192,6 @@ class HALO {
 
   float fAccel, fVelo, fAlt, GPS_Alt;
 
-  // static void setFilteredValues(float FAccel, float fVelo, float fAlt);
-
   float getFAlt();
 
   float getFVelo();
@@ -343,20 +202,13 @@ class HALO {
 
   void setAlt(float gps_alt);
 
-  // std::vector<float> getGains(float x, float scenario1Distance, float
-  // scenario2Distance);
-
   VectorXf predictNextValues(std::vector<std::vector<float>> &vectors,
                              VectorXf &X_in);
 
   void setStateVector(float filteredAcc, float filteredVelo, float filteredAlt);
 
-  float interpolate(float x, float scenario1Distance, float scenario2Distance);
-
   std::vector<std::vector<float>> findNearestScenarios(
       std::vector<Scenario> *scenarios, VectorXf &measurement);
-
-  float interpolateScenarios(VectorXf &X_in, std::vector<Scenario> &scenarios);
 
   void calculateSigmaPoints();
 
@@ -370,8 +222,6 @@ class HALO {
 
   float N1;
 
-  // MatrixXf predict(MatrixXf sigmaPoints);
-
   void init(MatrixXf &X0, MatrixXf &P0, MatrixXf Q_input, VectorXf &Z_input,
             MatrixXf &F);
 
@@ -383,7 +233,6 @@ class HALO {
     this->scenarios = scenarios;
   };
 
-  // TO DO: change to pass by reference
   std::vector<Scenario> *getScenarios() { return &this->scenarios; };
 
   std::vector<Scenario> scenarios;

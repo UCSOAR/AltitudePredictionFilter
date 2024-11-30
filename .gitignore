@@ -51,6 +51,7 @@ STM32L152-Discovery.elf.launch
 *.list
 *.map
 .fuse*
+*.txt
 
 # IDE
 .metadata

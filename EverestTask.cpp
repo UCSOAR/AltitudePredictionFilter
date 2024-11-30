@@ -285,8 +285,7 @@ void EverestTask::MadgwickWrapper(IMUData data) {
     // g Time: %f\n",
     //     data.gyroX, data.gyroY, data.gyroZ, data.accelX, data.accelY,
     //     data.accelZ, deltaTime);
-    // printf("Mag: (%.6f, %.6f, %.6f) uT\n", mag.axis.x, mag.axis.y,
-    // mag.axis.z);
+    printf("Mag: (%.6f, %.6f, %.6f) uT\n", mag.axis.x, mag.axis.y, mag.axis.z);
   }
 
   // Update gyroscope AHRS algorithm
@@ -525,6 +524,7 @@ void EverestTask::Baro_Update(const BarosData& Baro1, const BarosData& Baro2) {
     // SOAR_PRINT("Baro1: %.f Pa, Baro2: %.f Pa, Baro3: %.f Pa, RealBaro: %.f
     // m\n",
     //     baro1.pressure, baro2.pressure, baro3.pressure, realBaro.altitude);
+    printf("Baro1: %f Pa, Baro2: %f Pa\n", baro1.pressure, baro2.pressure);
   }
 }
 
@@ -1351,7 +1351,7 @@ int main() {
   FILE* predictedValues = fopen("predictedValues.txt", "a+");
 
   if (!predictedValues) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
+    fprintf(stderr, "Error opening predictedValues.txt...exiting\n");
     exit(1);
   }
 
@@ -1417,7 +1417,7 @@ int main() {
   FILE* sigmaPoints4 = fopen("sigmaPoints4.txt", "a+");
 
   if (!sigmaPoints4) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
+    fprintf(stderr, "Error opening sigmaPoints4.txt...exiting\n");
     exit(1);
   }
 
@@ -1428,7 +1428,7 @@ int main() {
   FILE* sigmaPoints5 = fopen("sigmaPoints5.txt", "a+");
 
   if (!sigmaPoints5) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
+    fprintf(stderr, "Error opening sigmaPoints5.txt...exiting\n");
     exit(1);
   }
 
@@ -1439,7 +1439,7 @@ int main() {
   FILE* sigmaPoints6 = fopen("sigmaPoints6.txt", "a+");
 
   if (!sigmaPoints6) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
+    fprintf(stderr, "Error opening sigmaPoints6.txt...exiting\n");
     exit(1);
   }
 
@@ -1450,7 +1450,7 @@ int main() {
   FILE* nearestScenarios = fopen("nearestScenarios.txt", "a+");
 
   if (!nearestScenarios) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
+    fprintf(stderr, "Error opening nearestScenarios.txt...exiting\n");
     exit(1);
   }
 
@@ -1556,9 +1556,9 @@ int main() {
   int i = 0;
   int numberOfScenarios = 6;
 
-  // std::vector<std::vector<std::vector<float>>> scenarioListofVectorsBefore =
-  // {{{}}, {{}}, {{}}, {{}}, {{}}, {{}}}; for(int i = 0; i < numberOfScenarios;
-  // i++){
+  std::vector<std::vector<std::vector<float>>> scenarioListofVectorsBefore = {
+      {{}}, {{}}, {{}}, {{}}, {{}}, {{}}};
+  // for(int i = 0; i < numberOfScenarios; i++){
   //     scenarioListofVectorsBefore. = howMany;
   // }
   float alt;
@@ -1567,137 +1567,114 @@ int main() {
   float time1;
   std::vector<float> temp = {0, 0, 0, 0};
 
-  // // skip header
-  // fgets(line, sizeof(line), simsFile);
+// skip header
+// fgets(line, sizeof(line), simsFile);
 
-  // while (fgets(line, sizeof(line), simsFile)) {
-  //     char *token = strtok(line, ",");
+// while (fgets(line, sizeof(line), simsFile)) {
+//     char *token = strtok(line, ",");
 
-  //     for(int i = 0; i < numberOfScenarios; i++){
-  //         alt = atof(token); // Convert the time value to float
-  //         token = strtok(NULL, ",");
-  //         velo = atof(token);
-  //         token = strtok(NULL, ",");
-  //         acc = atof(token);
-  //         token = strtok(NULL, ",");
-  //         time1 = atof(token);
-  //         token = strtok(NULL, ",");
+//     for(int i = 0; i < numberOfScenarios; i++){
+//         alt = atof(token); // Convert the time value to float
+//         token = strtok(NULL, ",");
+//         velo = atof(token);
+//         token = strtok(NULL, ",");
+//         acc = atof(token);
+//         token = strtok(NULL, ",");
+//         time1 = atof(token);
+//         token = strtok(NULL, ",");
 
-  //         temp = {alt, velo, acc, time1};
-  //         // printf("temp[%d] = (%f,%f,%f,%f)\n", i, temp[0], temp[1],
-  //         temp[2], temp[3]); if(temp[0] != 0 && temp[1] != 0 && temp[2] != 0
-  //         && temp[3] != 0){
-  //             scenarioListofVectorsBefore[i].push_back(temp);
-  //         }
+//         temp = {alt, velo, acc, time1};
+//         // printf("temp[%d] = (%f,%f,%f,%f)\n", i, temp[0], temp[1], temp[2],
+//         temp[3]); if(temp[0] != 0 && temp[1] != 0 && temp[2] != 0 && temp[3]
+//         != 0){
+//             scenarioListofVectorsBefore[i].push_back(temp);
+//         }
 
-  //     }
+//     }
 
-  //     // printf("\n");
+//     // printf("\n");
 
-  // }
+// }
 
-  // std::vector<std::vector<std::vector<float>>> scenarioListofVectorsAfter =
-  // {{{}}, {{}}, {{}}, {{}}, {{}}, {{}}};
+// std::vector<std::vector<std::vector<float>>> scenarioListofVectorsAfter =
+// {{{}}, {{}}, {{}}, {{}}, {{}}, {{}}};
 
-  // // skip header
-  // fgets(line, sizeof(line), simsAfterFile);
+// // skip header
+// fgets(line, sizeof(line), simsAfterFile);
 
-  // while (fgets(line, sizeof(line), simsAfterFile)) {
-  //     char *token = strtok(line, ",");
+// while (fgets(line, sizeof(line), simsAfterFile)) {
+//     char *token = strtok(line, ",");
 
-  //     for(int i = 0; i < numberOfScenarios; i++){
-  //         alt = atof(token); // Convert the time value to float
-  //         token = strtok(NULL, ",");
-  //         velo = atof(token);
-  //         token = strtok(NULL, ",");
-  //         acc = atof(token);
-  //         token = strtok(NULL, ",");
-  //         time1 = atof(token);
-  //         token = strtok(NULL, ",");
+//     for(int i = 0; i < numberOfScenarios; i++){
+//         alt = atof(token); // Convert the time value to float
+//         token = strtok(NULL, ",");
+//         velo = atof(token);
+//         token = strtok(NULL, ",");
+//         acc = atof(token);
+//         token = strtok(NULL, ",");
+//         time1 = atof(token);
+//         token = strtok(NULL, ",");
 
-  //         std::vector<float> temp = {alt, velo, acc, time1};
-  //         // printf("after temp[%d] = (%f,%f,%f,%f)\n", i, temp[0], temp[1],
-  //         temp[2], temp[3]); if(temp[0] != 0 && temp[1] != 0 && temp[2] != 0
-  //         && temp[3] != 0){
-  //             scenarioListofVectorsAfter[i].push_back(temp);
-  //         }
+//         std::vector<float> temp = {alt, velo, acc, time1};
+//         // printf("after temp[%d] = (%f,%f,%f,%f)\n", i, temp[0], temp[1],
+//         temp[2], temp[3]); if(temp[0] != 0 && temp[1] != 0 && temp[2] != 0 &&
+//         temp[3] != 0){
+//             scenarioListofVectorsAfter[i].push_back(temp);
+//         }
 
-  //     }
+//     }
 
-  //     // printf("\n");
-  // }
+//     // printf("\n");
+// }
 
-  // scenarioListofVectorsBefore[0].erase(scenarioListofVectorsBefore[0].begin());
-  // scenarioListofVectorsBefore[1].erase(scenarioListofVectorsBefore[1].begin());
-  // scenarioListofVectorsBefore[2].erase(scenarioListofVectorsBefore[2].begin());
-  // scenarioListofVectorsBefore[3].erase(scenarioListofVectorsBefore[3].begin());
-  // scenarioListofVectorsBefore[4].erase(scenarioListofVectorsBefore[4].begin());
-  // scenarioListofVectorsBefore[5].erase(scenarioListofVectorsBefore[5].begin());
+// scenarioListofVectorsBefore[0].erase(scenarioListofVectorsBefore[0].begin());
+// scenarioListofVectorsBefore[1].erase(scenarioListofVectorsBefore[1].begin());
+// scenarioListofVectorsBefore[2].erase(scenarioListofVectorsBefore[2].begin());
+// scenarioListofVectorsBefore[3].erase(scenarioListofVectorsBefore[3].begin());
+// scenarioListofVectorsBefore[4].erase(scenarioListofVectorsBefore[4].begin());
+// scenarioListofVectorsBefore[5].erase(scenarioListofVectorsBefore[5].begin());
 
-  // scenarioListofVectorsAfter[0].erase(scenarioListofVectorsAfter[0].begin());
-  // scenarioListofVectorsAfter[1].erase(scenarioListofVectorsAfter[1].begin());
-  // scenarioListofVectorsAfter[2].erase(scenarioListofVectorsAfter[2].begin());
-  // scenarioListofVectorsAfter[3].erase(scenarioListofVectorsAfter[3].begin());
-  // scenarioListofVectorsAfter[4].erase(scenarioListofVectorsAfter[4].begin());
-  // scenarioListofVectorsAfter[5].erase(scenarioListofVectorsAfter[5].begin());
+// scenarioListofVectorsAfter[0].erase(scenarioListofVectorsAfter[0].begin());
+// scenarioListofVectorsAfter[1].erase(scenarioListofVectorsAfter[1].begin());
+// scenarioListofVectorsAfter[2].erase(scenarioListofVectorsAfter[2].begin());
+// scenarioListofVectorsAfter[3].erase(scenarioListofVectorsAfter[3].begin());
+// scenarioListofVectorsAfter[4].erase(scenarioListofVectorsAfter[4].begin());
+// scenarioListofVectorsAfter[5].erase(scenarioListofVectorsAfter[5].begin());
 
-  std::vector<std::vector<float>> megaList;
+// create scenarios with before and after lists
+#ifdef TIMERON
 
-  // Helper lambda to add scenario index to each point
-  auto addScenarioIndex = [](const std::vector<std::vector<float>>& sim,
-                             int index) {
-    std::vector<std::vector<float>> result;
-    for (const auto& point : sim) {
-      std::vector<float> newPoint = {point.at(0), point.at(1), point.at(2)};
-      newPoint.push_back(static_cast<float>(index));
-      result.push_back(newPoint);
-      printf("newPoint: %f, %f, %f, %f\n", newPoint[0], newPoint[1],
-             newPoint[2], newPoint[3]);
-    }
+  std::chrono::high_resolution_clock::time_point treeCreation =
+      std::chrono::high_resolution_clock::now();
 
-    return result;
-  };
+#endif
 
-  // Combine all simulation data into one list with scenario index
-  auto sim1WithIndex = addScenarioIndex(sim1, 1);
-  auto sim2WithIndex = addScenarioIndex(sim2, 2);
-  auto sim3WithIndex = addScenarioIndex(sim3, 3);
-  auto sim4WithIndex = addScenarioIndex(sim4, 4);
-  auto sim5WithIndex = addScenarioIndex(sim5, 5);
-  auto sim6WithIndex = addScenarioIndex(sim6, 6);
-
-  megaList.insert(megaList.end(), sim1WithIndex.begin(), sim1WithIndex.end());
-  megaList.insert(megaList.end(), sim2WithIndex.begin(), sim2WithIndex.end());
-  megaList.insert(megaList.end(), sim3WithIndex.begin(), sim3WithIndex.end());
-  megaList.insert(megaList.end(), sim4WithIndex.begin(), sim4WithIndex.end());
-  megaList.insert(megaList.end(), sim5WithIndex.begin(), sim5WithIndex.end());
-  megaList.insert(megaList.end(), sim6WithIndex.begin(), sim6WithIndex.end());
-
-  // Create the mega tree
-  KDTree megaTree(megaList);
-
-  // create scenarios with before and after lists
   Scenario scenario1 = Scenario{sim1, sim1, 1};
-  // scenario1.createTree();
-  scenario1.passMegaTree(megaTree);
+  scenario1.createTree();
   Scenario scenario2 = Scenario{sim2, sim2, 2};
-  // scenario2.createTree();
-  scenario2.passMegaTree(megaTree);
+  scenario2.createTree();
   Scenario scenario3 = Scenario{sim3, sim3, 3};
-  // scenario3.createTree();
-  scenario3.passMegaTree(megaTree);
+  scenario3.createTree();
   Scenario scenario4 = Scenario{sim4, sim4, 4};
-  // scenario4.createTree();
-  scenario4.passMegaTree(megaTree);
+  scenario4.createTree();
   Scenario scenario5 = Scenario{sim5, sim5, 5};
-  // scenario5.createTree();
-  scenario5.passMegaTree(megaTree);
+  scenario5.createTree();
   Scenario scenario6 = Scenario{sim6, sim6, 6};
-  // scenario6.createTree();
-  scenario6.passMegaTree(megaTree);
+  scenario6.createTree();
 
   std::vector<Scenario> scenarios = {scenario1, scenario2, scenario3,
                                      scenario4, scenario5, scenario6};
+
+#ifdef TIMERON
+
+  std::chrono::high_resolution_clock::time_point treeCreationEnd =
+      std::chrono::high_resolution_clock::now();
+
+  std::chrono::duration<double> treeCreationTime =
+      std::chrono::duration_cast<std::chrono::duration<double>>(
+          treeCreationEnd - treeCreation);
+
+#endif
 
   float totalTime = 0;
 
@@ -1711,13 +1688,10 @@ int main() {
   halo.setScenarios(scenarios);
   halo.deltaTime = 1 / 3;
 
-  // printf("size of vector: %d\n", taberLaunch.size());
-
-  for (int i = 0; i < 555; i++) {
+  for (int i = 0; i < taberLaunch.size(); i++) {
     // Tokenize the line using strtok
     // Parse accelerometer readings (X, Y, Z)
-    float time = taberLaunch.at(i).at(0);
-    // printf("time: %f\n", time);
+    float time = taberLaunch[i][0];
     float accelX = taberLaunch[i][1];
     float accelY = taberLaunch[i][2];
     float accelZ = taberLaunch[i][3];
@@ -1732,14 +1706,8 @@ int main() {
     float magY = taberLaunch[i][8];
     float magZ = taberLaunch[i][9];
 
-    // printf("magX: %f, magY: %f, magZ: %f\n", magX, magY, magZ);
-    // printf("gyroX: %f, gyroY: %f, gyroZ: %f\n", gyroX, gyroY, gyroZ);
-    // printf("accelX: %f, accelY: %f, accelZ: %f\n", accelX, accelY, accelZ);
-
     // Parse pressure readings
     float pressure = baroData[i][1];
-
-    // printf("pressure: %f\n", pressure);
 
     IMUData sensorData = {
         time, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, magX, magY, magZ,
@@ -1757,9 +1725,11 @@ int main() {
 
     // if(howMany <= 13){
 
-    // printf("\n#%d
-    // Sample--------------------------------------------------------------------------\n\n",
-    // howMany);
+    printf(
+        "\n#%d "
+        "Sample----------------------------------------------------------------"
+        "----------\n\n",
+        howMany);
 
     // // Example: Print all sensor readings
     // if(debug == RAW || debug == ALL){
@@ -1935,6 +1905,9 @@ int main() {
   std::cout << "\t\t\t->vectorsTime:\t\t\t\t" << halo.vectorsTime.count()
             << std::endl;
   std::cout << "\t\t\t->push_backTime:\t\t\t" << halo.push_backTime.count()
+            << std::endl;
+
+  std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t" << treeCreationTime.count()
             << std::endl;
 #endif
 

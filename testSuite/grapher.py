@@ -1,20 +1,20 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Read the CSV file
-df = pd.read_csv("HALO.txt", delimiter=",")
-sims = pd.read_csv("beforeSimsF2_Short.csv")
-predictedValues = pd.read_csv("predictedValues.txt")
-gains = pd.read_csv("gains.txt")
-sigmaPoints = pd.read_csv("sigmaPoints.txt")
-sigmaPoints1 = pd.read_csv("sigmaPoints1.txt")
-sigmaPoints2 = pd.read_csv("sigmaPoints2.txt")
-sigmaPoints3 = pd.read_csv("sigmaPoints3.txt")
-sigmaPoints4 = pd.read_csv("sigmaPoints4.txt")
-sigmaPoints5 = pd.read_csv("sigmaPoints5.txt")
-sigmaPoints6 = pd.read_csv("sigmaPoints6.txt")
-nearestScenarios = pd.read_csv("nearestScenarios.txt")
-launch = pd.read_csv("taber_launch_formattedF.csv")
+# Read the CSV files
+df = pd.read_csv("testSuite/results/HALO.txt")
+sims = pd.read_csv("testSuite/data/beforeSimsF2_Short.csv")
+predictedValues = pd.read_csv("testSuite/results/predictedValues.txt")
+gains = pd.read_csv("testSuite/results/gains.txt")
+sigmaPoints = pd.read_csv("testSuite/results/sigmaPoints.txt")
+sigmaPoints1 = pd.read_csv("testSuite/results/sigmaPoints1.txt")
+sigmaPoints2 = pd.read_csv("testSuite/results/sigmaPoints2.txt")
+sigmaPoints3 = pd.read_csv("testSuite/results/sigmaPoints3.txt")
+sigmaPoints4 = pd.read_csv("testSuite/results/sigmaPoints4.txt")
+sigmaPoints5 = pd.read_csv("testSuite/results/sigmaPoints5.txt")
+sigmaPoints6 = pd.read_csv("testSuite/results/sigmaPoints6.txt")
+nearestScenarios = pd.read_csv("testSuite/results/nearestScenarios.txt")
+launch = pd.read_csv("testSuite/data/taber_launch_formattedF.csv")
 
 # plot Madgwick
 

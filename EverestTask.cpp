@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <ctime>
 #include <string.h>
+#include <direct.h>
+#include <cstdio>
+#include <cerrno>
 
 #include <vector>
 #include <fstream>
@@ -1264,214 +1267,93 @@ int main() {
   MatrixXf P0(3, 3);
   P0 << 50, 0, 0, 0, 0, 0, 0, 0, 0;
 
-// clear log files
+// create directory for results
 #ifdef LOGON
-  if (remove("gains.txt") == 0) {
-    std::cout << "File deleted successfully: " << "gains.txt" << std::endl;
-  } else {
-    std::perror("Error deleting file");
+  // Define the directory path
+  std::string directoryPath = "testSuite/results";
+
+  // Create the directory if it doesn't exist
+  if (_mkdir("testSuite") == -1) {
+    if (errno != EEXIST) {
+      std::cerr << "Error creating directory: testSuite" << std::endl;
+      return 1;
+    }
   }
 
-  if (remove("predictedValues.txt") == 0) {
-    std::cout << "File deleted successfully: " << "predictedValues.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
+  if (_mkdir(directoryPath.c_str()) == -1) {
+    if (errno != EEXIST) {
+      std::cerr << "Error creating directory: " << directoryPath << std::endl;
+      return 1;
+    }
   }
 
-  if (remove("log.txt") == 0) {
-    std::cout << "File deleted successfully: " << "log.txt" << std::endl;
-  } else {
-    std::perror("Error deleting file");
+  // File names
+  std::vector<std::string> fileNames = {"gains.txt",
+                                        "predictedValues.txt",
+                                        "log.txt",
+                                        "nearestScenarios.txt",
+                                        "nearestScenariosFormatted.txt",
+                                        "sigmaPoints.txt",
+                                        "sigmaPoints1.txt",
+                                        "sigmaPoints2.txt",
+                                        "sigmaPoints3.txt",
+                                        "sigmaPoints4.txt",
+                                        "sigmaPoints5.txt",
+                                        "sigmaPoints6.txt"};
+
+  // Deleting files
+  for (size_t i = 0; i < fileNames.size(); ++i) {
+    std::string filePath = directoryPath + "/" + fileNames[i];
+    if (std::remove(filePath.c_str()) == 0) {
+      std::cout << "File deleted successfully: " << fileNames[i] << std::endl;
+    } else {
+      std::perror("Error deleting file");
+    }
   }
 
-  if (remove("nearestScenarios.txt") == 0) {
-    std::cout << "File deleted successfully: " << "nearestScenarios.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
+  // Creating and writing to files
+  std::vector<std::pair<std::string, std::string>> filesToCreate = {
+      std::make_pair("predictedValues.txt",
+                     "s1_alt,s1_velo,s1_acc,s2_alt,s2_velo,s2_acc,s3_alt,s3_"
+                     "velo,s3_acc,s4_alt,s4_velo,s4_acc,s5_alt,s5_velo,s5_acc,"
+                     "s6_alt,s6_velo,s6_acc\n"),
+      std::make_pair("gains.txt", "gain_IMU,gain_Baro1,gain_Baro2\n"),
+      std::make_pair("sigmaPoints.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints1.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints2.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints3.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints4.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints5.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints6.txt", "alt,velo,acc\n"),
+      std::make_pair("nearestScenarios.txt",
+                     "lowestDistance,secondLowestDistance,firstScenario,"
+                     "SecondScenario\n")};
+
+  for (size_t i = 0; i < filesToCreate.size(); ++i) {
+    std::string filePath = directoryPath + "/" + filesToCreate[i].first;
+    FILE* file = fopen(filePath.c_str(), "a+");
+    if (file) {
+      fputs(filesToCreate[i].second.c_str(), file);
+      fclose(file);
+      std::cout << "File written: " << filesToCreate[i].first << std::endl;
+    } else {
+      fprintf(stderr, "Error opening %s...exiting\n",
+              filesToCreate[i].first.c_str());
+      exit(1);
+    }
   }
 
-  if (remove("nearestScenariosFormatted.txt") == 0) {
-    std::cout << "File deleted successfully: "
-              << "nearestScenariosFormatted.txt" << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  if (remove("sigmaPoints.txt") == 0) {
-    std::cout << "File deleted successfully: " << "sigmaPoints.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  if (remove("sigmaPoints1.txt") == 0) {
-    std::cout << "File deleted successfully: " << "sigmaPoints1.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  if (remove("sigmaPoints2.txt") == 0) {
-    std::cout << "File deleted successfully: " << "sigmaPoints2.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  if (remove("sigmaPoints3.txt") == 0) {
-    std::cout << "File deleted successfully: " << "sigmaPoints3.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  if (remove("sigmaPoints4.txt") == 0) {
-    std::cout << "File deleted successfully: " << "sigmaPoints4.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  if (remove("sigmaPoints5.txt") == 0) {
-    std::cout << "File deleted successfully: " << "sigmaPoints5.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  if (remove("sigmaPoints6.txt") == 0) {
-    std::cout << "File deleted successfully: " << "sigmaPoints6.txt"
-              << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  FILE* predictedValues = fopen("predictedValues.txt", "a+");
-
-  if (!predictedValues) {
-    fprintf(stderr, "Error opening predictedValues.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(
-      predictedValues,
-      "s1_alt,s1_velo,s1_acc,s2_alt,s2_velo,s2_acc,s3_alt,s3_velo,s3_acc,s4_"
-      "alt,s4_velo,s4_acc,s5_alt,s5_velo,s5_acc,s6_alt,s6_velo,s6_acc\n");
-
-  fclose(predictedValues);
-
-  FILE* gains = fopen("gains.txt", "a+");
-  if (!gains) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(gains, "gain_IMU,gain_Baro1,gain_Baro2\n");
-
-  fclose(gains);
-
-  FILE* sigmaPoints = fopen("sigmaPoints.txt", "a+");
-  if (!sigmaPoints) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(sigmaPoints, "alt,velo,acc\n");
-
-  fclose(sigmaPoints);
-
-  FILE* sigmaPoints1 = fopen("sigmaPoints1.txt", "a+");
-  if (!sigmaPoints1) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(sigmaPoints1, "alt,velo,acc\n");
-
-  fclose(sigmaPoints1);
-
-  FILE* sigmaPoints2 = fopen("sigmaPoints2.txt", "a+");
-
-  if (!sigmaPoints2) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(sigmaPoints2, "alt,velo,acc\n");
-
-  fclose(sigmaPoints2);
-
-  FILE* sigmaPoints3 = fopen("sigmaPoints3.txt", "a+");
-
-  if (!sigmaPoints3) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(sigmaPoints3, "alt,velo,acc\n");
-
-  fclose(sigmaPoints3);
-
-  FILE* sigmaPoints4 = fopen("sigmaPoints4.txt", "a+");
-
-  if (!sigmaPoints4) {
-    fprintf(stderr, "Error opening sigmaPoints4.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(sigmaPoints4, "alt,velo,acc\n");
-
-  fclose(sigmaPoints4);
-
-  FILE* sigmaPoints5 = fopen("sigmaPoints5.txt", "a+");
-
-  if (!sigmaPoints5) {
-    fprintf(stderr, "Error opening sigmaPoints5.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(sigmaPoints5, "alt,velo,acc\n");
-
-  fclose(sigmaPoints5);
-
-  FILE* sigmaPoints6 = fopen("sigmaPoints6.txt", "a+");
-
-  if (!sigmaPoints6) {
-    fprintf(stderr, "Error opening sigmaPoints6.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(sigmaPoints6, "alt,velo,acc\n");
-
-  fclose(sigmaPoints6);
-
-  FILE* nearestScenarios = fopen("nearestScenarios.txt", "a+");
-
-  if (!nearestScenarios) {
-    fprintf(stderr, "Error opening nearestScenarios.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(nearestScenarios,
-          "lowestDistance,secondLowestDistance,firstScenario,SecondScenario\n");
-
-  fclose(nearestScenarios);
-
-  // test purposes
-  FILE* file = fopen(
-      "HALO.txt",
-      "w+");  // Open the file for appending or create it if it doesn't exist
-  halo.file = file;
+  // Test purposes
+  FILE* file = fopen((directoryPath + "/HALO.txt").c_str(),
+                     "w+");  // Open the file for writing
   if (!file) {
     fprintf(stderr, "Error opening HALO.txt...exiting\n");
     exit(1);
   }
-
   fprintf(file,
-          "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_ALt, Halo_Velo, "
-          "Halo_accel\n");
+          "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
+          "Accel\n");
+  fclose(file);
 
 #endif
 

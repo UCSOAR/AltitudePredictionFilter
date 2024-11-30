@@ -15,6 +15,7 @@ sigmaPoints5 = pd.read_csv("testSuite/results/sigmaPoints5.txt")
 sigmaPoints6 = pd.read_csv("testSuite/results/sigmaPoints6.txt")
 nearestScenarios = pd.read_csv("testSuite/results/nearestScenarios.txt")
 launch = pd.read_csv("testSuite/data/taber_launch_formattedF.csv")
+input_data = pd.read_csv("testSuite/data/Imu_Baro.csv")
 
 # plot Madgwick
 
@@ -60,6 +61,9 @@ plt.title("Time vs Velo")
 plt.legend()
 plt.grid(True)
 
+input_data = input_data[20:]["accel_z"]
+# accel_z = input_data["accel_z"]
+
 # plot accel    (altimeter, everest, halo, gps, sigma, scenarios)
 plt.figure(figsize=(10, 6))
 # plt.plot(df['Time'], df['Altimeter_Acc'], label='Altimeter Acc')
@@ -73,6 +77,7 @@ plt.plot(sims["time_3"], sims["acc_3"], label="Scenarios Acc3")
 plt.plot(sims["time_4"], sims["acc_4"], label="Scenarios Acc4")
 plt.plot(sims["time_5"], sims["acc_5"], label="Scenarios Acc5")
 plt.plot(sims["time_6"], sims["acc_6"], label="Altimeter")
+plt.plot(df["Time"], input_data, label="IMU Raw Accel")
 plt.xlabel("Time")
 plt.ylabel("Acc")
 plt.title("Time vs Acc")

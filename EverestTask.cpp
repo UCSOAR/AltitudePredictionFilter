@@ -1343,7 +1343,6 @@ int main() {
     }
   }
 
-  // Test purposes
   FILE* file = fopen((directoryPath + "/HALO.txt").c_str(),
                      "w+");  // Open the file for writing
   if (!file) {
@@ -1353,7 +1352,6 @@ int main() {
   fprintf(file,
           "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
           "Accel\n");
-  fclose(file);
 
 #endif
 

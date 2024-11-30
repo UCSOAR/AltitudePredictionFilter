@@ -30,6 +30,7 @@
 #define alpha 0.1
 #define beta 2
 #define k 3 - dim  // 3 dimensions
+std::string directoryPath = "testSuite/results";
 
 using namespace Eigen;
 
@@ -448,51 +449,59 @@ void HALO::calculateSigmaPoints() {
   // std::cout << "before dynamics sPoints: \n" << sigmaPoints << std::endl;
 
 #ifdef LOGON
-  FILE* file = fopen("gains.txt", "a+");
+
+  FILE* file = fopen((directoryPath + "/gains.txt").c_str(), "a+");
   if (!file) {
     fprintf(stderr, "Error opening gains.txt...exiting\n");
     exit(1);
   }
 
-  FILE* sigmaPointsFile = fopen("sigmaPoints.txt", "a+");
+  FILE* sigmaPointsFile =
+      fopen((directoryPath + "/sigmaPoints.txt").c_str(), "a+");
   if (!sigmaPointsFile) {
     fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
     exit(1);
   }
 
-  FILE* sigmaPointsFile1 = fopen("sigmaPoints1.txt", "a+");
-  if (!sigmaPointsFile) {
-    fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
+  FILE* sigmaPointsFile1 =
+      fopen((directoryPath + "/sigmaPoints1.txt").c_str(), "a+");
+  if (!sigmaPointsFile1) {
+    fprintf(stderr, "Error opening sigmaPoints1.txt...exiting\n");
     exit(1);
   }
 
-  FILE* sigmaPointsFile2 = fopen("sigmaPoints2.txt", "a+");
-  if (!sigmaPointsFile) {
-    fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
+  FILE* sigmaPointsFile2 =
+      fopen((directoryPath + "/sigmaPoints2.txt").c_str(), "a+");
+  if (!sigmaPointsFile2) {
+    fprintf(stderr, "Error opening sigmaPoints2.txt...exiting\n");
     exit(1);
   }
 
-  FILE* sigmaPointsFile3 = fopen("sigmaPoints3.txt", "a+");
-  if (!sigmaPointsFile) {
-    fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
+  FILE* sigmaPointsFile3 =
+      fopen((directoryPath + "/sigmaPoints3.txt").c_str(), "a+");
+  if (!sigmaPointsFile3) {
+    fprintf(stderr, "Error opening sigmaPoints3.txt...exiting\n");
     exit(1);
   }
 
-  FILE* sigmaPointsFile4 = fopen("sigmaPoints4.txt", "a+");
-  if (!sigmaPointsFile) {
-    fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
+  FILE* sigmaPointsFile4 =
+      fopen((directoryPath + "/sigmaPoints4.txt").c_str(), "a+");
+  if (!sigmaPointsFile4) {
+    fprintf(stderr, "Error opening sigmaPoints4.txt...exiting\n");
     exit(1);
   }
 
-  FILE* sigmaPointsFile5 = fopen("sigmaPoints5.txt", "a+");
-  if (!sigmaPointsFile) {
-    fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
+  FILE* sigmaPointsFile5 =
+      fopen((directoryPath + "/sigmaPoints5.txt").c_str(), "a+");
+  if (!sigmaPointsFile5) {
+    fprintf(stderr, "Error opening sigmaPoints5.txt...exiting\n");
     exit(1);
   }
 
-  FILE* sigmaPointsFile6 = fopen("sigmaPoints6.txt", "a+");
-  if (!sigmaPointsFile) {
-    fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
+  FILE* sigmaPointsFile6 =
+      fopen((directoryPath + "/sigmaPoints6.txt").c_str(), "a+");
+  if (!sigmaPointsFile6) {
+    fprintf(stderr, "Error opening sigmaPoints6.txt...exiting\n");
     exit(1);
   }
 
@@ -982,13 +991,14 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
 #ifdef LOGON
 
-  FILE* file = fopen("nearestScenarios.txt", "a+");
+  FILE* file = fopen((directoryPath + "/nearestScenarios.txt").c_str(), "a+");
   if (!file) {
     fprintf(stderr, "Error opening nearestScenarios.txt...exiting\n");
     exit(1);
   }
 
-  FILE* file2 = fopen("nearestScenariosFormatted.txt", "a+");
+  FILE* file2 =
+      fopen((directoryPath + "/nearestScenariosFormatted.txt").c_str(), "a+");
   if (!file2) {
     fprintf(stderr, "Error opening nearestScenariosFormatted.txt...exiting\n");
     exit(1);
@@ -1076,7 +1086,7 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
 #ifdef LOGON
 
-  FILE* file3 = fopen("predictedValues.txt", "a+");
+  FILE* file3 = fopen((directoryPath + "/predictedValues.txt").c_str(), "a+");
   if (!file3) {
     fprintf(stderr, "Error opening predictedValues.txt...exiting\n");
     exit(1);
@@ -1232,8 +1242,7 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   }
 
   if (this->firstTimeForPoint == 1) {
-    FILE* file = fopen("log.txt", "a+");
-
+    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
     if (!file) {
       fprintf(stderr, "Error opening log.txt...exiting\n");
       exit(1);
@@ -1256,7 +1265,7 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
 
 #ifdef LOGON
 
-  FILE* file = fopen("gains.txt", "a+");
+  FILE* file = fopen((directoryPath + "/gains.txt").c_str(), "a+");
   if (!file) {
     fprintf(stderr, "Error opening gains.txt...exiting\n");
     exit(1);
@@ -1295,7 +1304,7 @@ bool HALO::isBeforeApogee(float acceleration, float velocity, float altitude,
   if (acceleration < -9.81 || velocity < 0.5 || altitude < lastAltitude) {
     printf("Apogee at %f\n", altitude);
 
-    FILE* file = fopen("log.txt", "a+");
+    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
     if (!file) {
       fprintf(stderr, "Error opening log.txt...exiting\n");
       exit(1);
@@ -1347,7 +1356,7 @@ void HALO::overrideStateWithGPS(float GPS) {
     this->X[0] = GPS;
     printf("Override GPS (%f, %f, %f)", this->X[0], this->X[1], this->X[2]);
 
-    FILE* file = fopen("log.txt", "a+");
+    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
     if (!file) {
       fprintf(stderr, "Error opening log.txt...exiting\n");
       exit(1);
@@ -1395,7 +1404,11 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
   // }
 
   if (std::isnan(X(0)) || std::isnan(X(1)) || std::isnan(X(2))) {
-    FILE* file = fopen("log.txt", "a+");
+    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
+    if (!file) {
+      fprintf(stderr, "Error opening log.txt...exiting\n");
+      exit(1);
+    }
     fprintf(file, "At %f X is nan, defaulting to static integration\n",
             this->time);
     fclose(file);

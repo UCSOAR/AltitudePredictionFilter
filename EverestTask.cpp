@@ -39,13 +39,14 @@ using namespace std;
 
 // SETTINGS (mostly for debugging, keep default for run)
 enum debug_level {
-  RAW = 0,        // raw data
-  Secondary = 1,  // all operations before dynamite
-  Dynamite = 2,   // everything during dynamite
-  Third = 3,      // after dynamite
-  ALL = 4,        // all
-  NONE = 5,       // none
-  HAL0 = 6,       // HALO
+  RAW = 0,         // raw data
+  Secondary = 1,   // all operations before dynamite
+  Dynamite = 2,    // everything during dynamite
+  Third = 3,       // after dynamite
+  ALL = 4,         // all
+  NONE = 5,        // none
+  HAL0 = 6,        // HALO
+  Calibration = 7  // Calibration
 };
 bool isTared = false;
 debug_level debug = ALL;
@@ -211,8 +212,6 @@ void EverestTask::MadgwickSetup() {
   infusion = everest.ExternalInitialize();
   ahrs = infusion->getMadAhrs();
 
-  // calculateSTDCoefficients();
-
   // Define calibration (replace with actual calibration data if available)
   const madMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
                                            0.0f, 0.0f, 0.0f, 1.0f};
@@ -258,7 +257,6 @@ void EverestTask::MadgwickSetup() {
  *
  */
 void EverestTask::MadgwickWrapper(IMUData data) {
-  // Infusion infusion = infusion;
   const float timestamp = data.time;
   madVector gyroscope = {
       data.gyroX, data.gyroY,
@@ -277,7 +275,7 @@ void EverestTask::MadgwickWrapper(IMUData data) {
   //        earth.axis.x, earth.axis.y, earth.axis.z);
 
   // Calculate delta time (in seconds) to account for gyroscope sample clock
-  // error static float previousTimestamp;
+  // error
   float deltaTime = (float)(timestamp - previousTimestamp);
   previousTimestamp = timestamp;
 
@@ -292,12 +290,7 @@ void EverestTask::MadgwickWrapper(IMUData data) {
   }
 
   // Update gyroscope AHRS algorithm
-  // infusion->madAhrsUpdateNoMagnetometer(ahrs, gyroscope, accelerometer,
-  // deltaTime);
   infusion->madAhrsUpdate(ahrs, gyroscope, accelerometer, mag, deltaTime);
-
-  // madAhrsInternalStates internal;
-  // madAhrsFlags flags;
 
   madEuler euler = infusion->getEuler(ahrs);
   madVector earth = infusion->madAhrsGetEarthAcceleration(ahrs);
@@ -501,8 +494,8 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
   if (numberOfSamples == 0) {
     this->state.avgIMU = {imu1.time, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   }
+
   // feed to Madgwick
-  // MadgwickWrapper(state.avgIMU);
   this->MadgwickWrapper(state.avgIMU);
 }
 
@@ -524,9 +517,6 @@ void EverestTask::Baro_Update(const BarosData& Baro1, const BarosData& Baro2) {
   this->baro2.previousTime = Baro2.time;
 
   if (debug == RAW || debug == ALL) {
-    // SOAR_PRINT("Baro1: %.f Pa, Baro2: %.f Pa, Baro3: %.f Pa, RealBaro: %.f
-    // m\n",
-    //     baro1.pressure, baro2.pressure, baro3.pressure, realBaro.altitude);
     printf("Baro1: %f Pa, Baro2: %f Pa\n", baro1.pressure, baro2.pressure);
   }
 }
@@ -559,9 +549,9 @@ double EverestTask::ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
 
   double finalAlt = everest.dynamite();
 
-  //    if(debug == Dynamite || debug == ALL){
-  //        printf("After Dynamite: %f\n", finalAlt);
-  //    }
+  if (debug == Dynamite || debug == ALL) {
+    printf("After Dynamite: %f\n", finalAlt);
+  }
 
   // Update altitude list
   this->AltitudeList.secondLastAltitude = this->AltitudeList.lastAltitude;
@@ -647,7 +637,6 @@ double EverestTask::AlignedExternalUpdate(IMUData imu1, IMUData imu2,
  * @return calculated altitude
  */
 double EverestTask::deriveForAltitudeIMU(IMUData avgIMU) {
-  // double accelerationZ = avgIMU.accelX * -9.81;
   double accelerationZ = everest.state.earthAcceleration * -9.81;
   double initialVelocity = this->getKinematics()->initialVelo;
   double initialAltitude = this->Kinematics.initialAlt;
@@ -725,18 +714,6 @@ double EverestTask::dynamite() {
     // SOAR_PRINT("IMU Altitude: %f\n", IMUAltitude);
   }
 
-  // // distributing measurement
-  // double distributed_IMU_Altitude = (IMUAltitude *
-  // everest.state.gain_IMU)/pow(everest.state.std_IMU, 2); double
-  // distributed_Baro_Altitude1 = (BaroAltitude1 *
-  // everest.state.gain_Baro1)/pow(everest.state.std_Baro1, 2); double
-  // distributed_Baro_Altitude2 = (BaroAltitude2 *
-  // everest.state.gain_Baro2)/pow(everest.state.std_Baro2, 2); double
-  // distributed_Baro_Altitude3 = (BaroAltitude3 *
-  // everest.state.gain_Baro3)/pow(everest.state.std_Baro3,2); double
-  // distributed_RealBaro_Altitude = (RealBaroAltitude *
-  // everest.state.gain_Real_Baro)/pow(everest.state.std_Real_Baro,2);
-
   // if pressure is zero, set gain to zero
   if (everest.baro1.pressure == 0) {
     everest.state.gain_Baro1 = 0;
@@ -760,23 +737,6 @@ double EverestTask::dynamite() {
   double distributed_Baro_Altitude2 =
       (BaroAltitude2 * everest.state.gain_Baro2);
 
-  if (debug == Dynamite || debug == ALL) {
-    // SOAR_PRINT("\nDistributed\n");
-    // SOAR_PRINT("Distributed IMU Altitude: %f\n", distributed_IMU_Altitude);
-    // SOAR_PRINT("Gain IMU: %f\n", everest.state.gain_IMU);
-    // SOAR_PRINT("STD IMU: %f\n\n", everest.state.std_IMU);
-
-    // SOAR_PRINT("Distributed Baro1 Altitude: %f\n",
-    // distributed_Baro_Altitude1); SOAR_PRINT("Gain Baro1: %f\n",
-    // everest.state.gain_Baro1); SOAR_PRINT("STD Baro1: %f\n\n",
-    // everest.state.std_Baro1);
-
-    // SOAR_PRINT("Distributed Baro2 Altitude: %f\n",
-    // distributed_Baro_Altitude2); SOAR_PRINT("Gain Baro2: %f\n",
-    // everest.state.gain_Baro2); SOAR_PRINT("STD Baro2: %f\n\n",
-    // everest.state.std_Baro2);
-  }
-
   // summation of distributed measurements
   double distributed_Sum = distributed_IMU_Altitude +
                            distributed_Baro_Altitude1 +
@@ -785,10 +745,6 @@ double EverestTask::dynamite() {
   if (debug == Dynamite || debug == ALL) {
     // SOAR_PRINT("Distributed Sum: %f\n\n", distributed_Sum);
   }
-
-  //    if(debug == Dynamite || debug == ALL){
-  //        // printf("Sum STD: %f\n\n", sumSTD1);
-  //    }
 
   // summation of gains
   double sumGain = everest.state.gain_IMU + everest.state.gain_Baro1 +
@@ -850,10 +806,13 @@ double EverestTask::dynamite() {
   return normalised_Altitude;
 }
 
-// @brief calculation - new gain = 1 / abs(estimate - measurement)
+/**
+ * @brief calculation: new gain = 1 / abs(estimate - measurement)
+ *
+ */
 void EverestTask::recalculateGain(double estimate) {
   double gainedEstimate = deriveChangeInVelocityToGetAltitude(
-      estimate);  // pre integrated for altitude
+      estimate);  // pre-integrated for altitude
 
   double gain_IMU =
       1 / fabsf(gainedEstimate -
@@ -861,21 +820,17 @@ void EverestTask::recalculateGain(double estimate) {
   double gain_Baro1 = 1 / fabsf(gainedEstimate - this->baro1.altitude);
   double gain_Baro2 = 1 / fabsf(gainedEstimate - this->baro2.altitude);
 
-  //    if(debug == Third || debug == ALL){
-  //        printf("\nRecalculate Gain - Before normalization\n");
-  //        printf("Gain IMU: %f\n", gain_IMU);
-  //        printf("Gain Baro1: %f\n", gain_Baro1);
-  //        printf("Gain Baro2: %f\n", gain_Baro2);
-  //        printf("Gain Baro3: %f\n", gain_Baro3);
-  //        printf("Gain Real Baro: %f\n", gain_Real_Baro);
-  //        printf("Gained Estimate: %f\n", gainedEstimate);
+  if (debug == Third || debug == ALL) {
+    printf("\nRecalculate Gain - Before normalization\n");
+    printf("Gain IMU: %f\n", gain_IMU);
+    printf("Gain Baro1: %f\n", gain_Baro1);
+    printf("Gain Baro2: %f\n", gain_Baro2);
+    printf("Gained Estimate: %f\n", gainedEstimate);
 
-  //        printf("Altitude: %f\n", estimate);
-  //        printf("Baro1: %f\n", this->baro1.altitude);
-  //        printf("Baro2: %f\n", this->baro2.altitude);
-  //        printf("Baro3: %f\n", this->baro3.altitude);
-  //        printf("Real Baro: %f\n\n", this->realBaro.altitude);
-  //    }
+    printf("Altitude: %f\n", estimate);
+    printf("Baro1: %f\n", this->baro1.altitude);
+    printf("Baro2: %f\n", this->baro2.altitude);
+  }
 
   // normalise
   this->state.gain_IMU = gain_IMU / (gain_IMU + gain_Baro1 + gain_Baro2);
@@ -910,14 +865,12 @@ void EverestTask::calculateSTDCoefficients() {
   this->state.std_Baro1 = pow(std_Baro1, 2) / sumSTD1;
   this->state.std_Baro2 = pow(std_Baro2, 2) / sumSTD1;
 
-  //    if(debug == Dynamite || debug == ALL){
-  //        printf("\nStandard Deviation Coefficients\n");
-  //        printf("STD IMU: %f\n", this->state.std_IMU);
-  //        printf("STD Baro1: %f\n", this->state.std_Baro1);
-  //        printf("STD Baro2: %f\n", this->state.std_Baro2);
-  //        printf("STD Baro3: %f\n", this->state.std_Baro3);
-  //        printf("STD Real Baro: %f\n\n", this->state.std_Real_Baro);
-  //    }
+  if (debug == Dynamite || debug == ALL) {
+    printf("\nStandard Deviation Coefficients\n");
+    printf("STD IMU: %f\n", this->state.std_IMU);
+    printf("STD Baro1: %f\n", this->state.std_Baro1);
+    printf("STD Baro2: %f\n", this->state.std_Baro2);
+  }
 }
 
 /**
@@ -972,12 +925,8 @@ double getFinalAltitude() { return Kinematics->finalAltitude; }
  */
 void EverestTask::tare(IMUData& imu1, IMUData& imu2, BarosData baro1,
                        BarosData baro2) {
-  // for 10 seconds collect baro
-  // decrement the time
-
   // average pressures
-  // have to do since function is weird
-  double average = 0;
+  double average = 0;  // have to do since function is weird
   int numberOfSamples = 0;
 
   if (baro1.pressure != 0) {
@@ -1002,9 +951,6 @@ void EverestTask::tare(IMUData& imu1, IMUData& imu2, BarosData baro1,
     sum += average / numberOfSamples;
   }
 
-  // if(imu1.accelX > 99999){
-  //     printf("imu1.accelX: %f", imu1.accelX);
-  // }else{
   this->zeroOffsetAccel = {this->zeroOffsetAccel[0] + imu1.accelX,
                            this->zeroOffsetAccel[1] + imu1.accelY,
                            this->zeroOffsetAccel[2] + imu1.accelZ};
@@ -1012,19 +958,19 @@ void EverestTask::tare(IMUData& imu1, IMUData& imu2, BarosData baro1,
                           this->zeroOffsetGyro[1] + imu1.gyroY,
                           this->zeroOffsetGyro[2] + imu1.gyroZ};
 
-  // printf("zeroOffsetAccel[0]: %f, zeroOffsetAccel[1]: %f, zeroOffsetAccel[2]:
-  // %f \n", this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
-  // this->zeroOffsetAccel[2]);
+  if (debug == Calibration | debug == ALL) {
+    // printf("zeroOffsetAccel[0]: %f, zeroOffsetAccel[1]: %f,
+    // zeroOffsetAccel[2]: %f \n", this->zeroOffsetAccel[0],
+    // this->zeroOffsetAccel[1], this->zeroOffsetAccel[2]);
 
-  // printf("zeroOffsetGyro[0]: %f, zeroOffsetGyro[1]: %f, zeroOffsetGyro[2]: %f
-  // \n", this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
-  // this->zeroOffsetGyro[2]);
+    // printf("zeroOffsetGyro[0]: %f, zeroOffsetGyro[1]: %f, zeroOffsetGyro[2]:
+    // %f \n", this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
+    // this->zeroOffsetGyro[2]);
+  }
 
   if (debug == Secondary || debug == ALL) {
     // SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
   }
-
-  // }
 
   // if(!isinf(imu2.accelX)){
   this->zeroOffsetAccel2 = {this->zeroOffsetAccel2[0] + imu2.accelX,
@@ -1079,22 +1025,21 @@ void EverestTask::tare(IMUData& imu1, IMUData& imu2, BarosData baro1,
     // SOAR_PRINT("Tare Initial Altitude: %f\n", this->Kinematics.initialAlt);
     isTared = true;
 
-    // printf("\nCalibration offsets:\n  accel1(%f,%f,%f),\n accel2(%f,%f,%f),\n
-    // gyro(%f,%f,%f),\n  gyro2(%f,%f,%f)\n\n", this->zeroOffsetAccel[0],
-    // this->zeroOffsetAccel[1], this->zeroOffsetAccel[2],
-    // this->zeroOffsetGyro[0],  this->zeroOffsetGyro[1],
-    // this->zeroOffsetGyro[2],
-    // this->zeroOffsetAccel2[0],this->zeroOffsetAccel2[1],
-    // this->zeroOffsetAccel2[2], this->zeroOffsetGyro2[0],
-    // this->zeroOffsetGyro2[1], this->zeroOffsetGyro2[2]
-    // );
-
-    // ExternalUpdate(imu1, imu2, baro1, baro2, baro3, realBaro);
+    if (debug == Calibration || debug == ALL) {
+      printf(
+          "\nCalibration offsets:\n  accel1(%f,%f,%f),\n accel2(%f,%f,%f),\n"
+          "gyro(%f,%f,%f),\n  gyro2(%f,%f,%f)\n\n",
+          this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
+          this->zeroOffsetAccel[2], this->zeroOffsetGyro[0],
+          this->zeroOffsetGyro[1], this->zeroOffsetGyro[2],
+          this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
+          this->zeroOffsetAccel2[2], this->zeroOffsetGyro2[0],
+          this->zeroOffsetGyro2[1], this->zeroOffsetGyro2[2]);
+    }
   }
 
   // call to update time and offsets for these structs
   IMU_Update(imu1, imu2);
-
   theTime -= 1;
 }
 
@@ -1136,7 +1081,6 @@ double EverestTask::finalWrapper(
   };
 
   BarosData baro1 = {timeBaro1, pressure1, 0, 0};
-
   BarosData baro2 = {timeBaro2, pressure2, 0, 0};
 
   // align
@@ -1159,13 +1103,14 @@ double EverestTask::finalWrapper(
   madVector imu2AccelAligned = infusion->AxesSwitch(imu2Accel, alignment2);
   madVector imu2MagAligned = infusion->AxesSwitch(imu2Mag, alignment2);
 
-  //    if(debug == Secondary || debug == ALL){
-  //        printf("Aligned: Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, %.6f,
-  //        %.6f) g\n",
-  //            imu1GyroAligned.axis.x, imu1GyroAligned.axis.y,
-  //            imu1GyroAligned.axis.z, imu1AccelAligned.axis.x,
-  //            imu1AccelAligned.axis.y, imu1AccelAligned.axis.z);
-  //    }
+  if (debug == Secondary || debug == ALL) {
+    printf(
+        "Aligned: Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, %.6f,"
+        "%.6f) g\n",
+        imu1GyroAligned.axis.x, imu1GyroAligned.axis.y, imu1GyroAligned.axis.z,
+        imu1AccelAligned.axis.x, imu1AccelAligned.axis.y,
+        imu1AccelAligned.axis.z);
+  }
 
   // feed vectors into sensorData structs
   sensorData.gyroX = imu1GyroAligned.axis.x;
@@ -1207,52 +1152,13 @@ double EverestTask::finalWrapper(
 void setIsTare(bool isTare) { isTared = isTare; }
 
 // --------------------------------------------------- END OF EVEREST
-// ---------------------------------------------------//
-void monteCarloSims() {
-  // Monte Carlo simulations
-  // 1. Generate random scenarios
-  // 2. Run the simulations
-  // 3. Find the nearest scenarios
-  // 4. Run the simulations for the nearest scenarios
-  // 5. Find the nearest scenarios
-  // 6. Repeat until convergence
-
-  // 1. Generate random scenarios
-  // 2. Run the simulations
-  // 3. Find the nearest scenarios
-  // 4. Run the simulations for the nearest scenarios
-  // 5. Find the nearest scenarios
-  // 6. Repeat until convergence
-
-  // everest.MadgwickSetup();
-
-  // HALO halo = HALO();
-
-  // MatrixXf Q(3,3);
-  // Q <<    0, 0, 0,
-  //         0, 0, 0,
-  //         0, 0, 0;
-
-  // // everest covariance matrix
-  // MatrixXf R0(3,3);
-  // R0 <<   0, 0, 0,
-  //         0, 0, 0,
-  //         0, 0, 0;
-
-  // MatrixXf P0(3,3);
-  // P0 <<   0, 0, 0,
-  //         0, 0, 0,
-  //         0, 0, 0;
-}
-
 #define MAX_LINE_LENGTH 1024
 
 /**
  * Serves to just initialize structs
  */
 int main() {
-  // Setup Madgwick
-  // Attach Madgwick to Everest
+  // Setup Madgwick and attach Madgwick to Everest
   everest.MadgwickSetup();
 
   HALO halo = HALO();
@@ -1355,78 +1261,6 @@ int main() {
 
 #endif
 
-/////// home
-#ifdef HOME
-
-  FILE* file1 = fopen(
-      "C:/Users/andin/OneDrive/Documents/AllRepos/UnscentedKalmanFilter/"
-      "EverestLibrary_HALO/EverestL/EverestLibrary/Imu_Baro.csv",
-      "r");
-
-  FILE* simsFile = fopen(
-      "C:/Users/andin/OneDrive/Documents/AllRepos/UnscentedKalmanFilter/"
-      "EverestLibrary_HALO/EverestL/EverestLibrary/beforeSimsF2_short.csv",
-      "r");
-
-  FILE* simsAfterFile = fopen(
-      "C:/Users/andin/OneDrive/Documents/AllRepos/UnscentedKalmanFilter/"
-      "EverestLibrary_HALO/EverestL/EverestLibrary/beforeSimsF2_short.csv",
-      "r");
-
-  FILE* taberFile = fopen(
-      "C:/Users/andin/OneDrive/Documents/AllRepos/UnscentedKalmanFilter/"
-      "EverestLibrary_HALO/EverestL/EverestLibrary/taber_launch_formattedF.csv",
-      "r");
-
-#endif
-
-////// away
-#ifndef HOME
-
-  FILE* file1 = fopen(
-      "C:/Users/Andrey/Documents/UKFRepo/UnscentedKalmanFilter/"
-      "EverestLibrary_HALO/EverestL/EverestLibrary/Imu_Baro.csv",
-      "r");
-
-  FILE* simsFile = fopen(
-      "C:/Users/Andrey/Documents/UKFRepo/UnscentedKalmanFilter/"
-      "EverestLibrary_HALO/EverestL/EverestLibrary/beforeSimsF2_Short.csv",
-      "r");
-
-  FILE* simsAfterFile = fopen(
-      "C:/Users/Andrey/Documents/UKFRepo/UnscentedKalmanFilter/"
-      "EverestLibrary_HALO/EverestL/EverestLibrary/beforeSimsF2_Short.csv",
-      "r");
-
-  FILE* taberFile = fopen(
-      "C:/Users/Andrey/Documents/UKFRepo/UnscentedKalmanFilter/"
-      "EverestLibrary_HALO/EverestL/EverestLibrary/taber_launch_formattedF.csv",
-      "r");
-
-#endif
-
-  //////
-
-  if (!file1) {
-    perror("Error opening Imu_Baro.csv");
-    return 1;
-  }
-
-  if (!simsFile) {
-    perror("Error opening simsFile.csv");
-    return 1;
-  }
-
-  if (!simsAfterFile) {
-    perror("Error opening simsAfterFile.csv");
-    return 1;
-  }
-
-  if (!taberFile) {
-    perror("Error opening taberFile.csv");
-    return 1;
-  }
-
   // read first line and preset the deltaTime to timestamp
   char line[MAX_LINE_LENGTH];
   std::clock_t start;
@@ -1438,88 +1272,12 @@ int main() {
 
   std::vector<std::vector<std::vector<float>>> scenarioListofVectorsBefore = {
       {{}}, {{}}, {{}}, {{}}, {{}}, {{}}};
-  // for(int i = 0; i < numberOfScenarios; i++){
-  //     scenarioListofVectorsBefore. = howMany;
-  // }
+
   float alt;
   float velo;
   float acc;
   float time1;
   std::vector<float> temp = {0, 0, 0, 0};
-
-// skip header
-// fgets(line, sizeof(line), simsFile);
-
-// while (fgets(line, sizeof(line), simsFile)) {
-//     char *token = strtok(line, ",");
-
-//     for(int i = 0; i < numberOfScenarios; i++){
-//         alt = atof(token); // Convert the time value to float
-//         token = strtok(NULL, ",");
-//         velo = atof(token);
-//         token = strtok(NULL, ",");
-//         acc = atof(token);
-//         token = strtok(NULL, ",");
-//         time1 = atof(token);
-//         token = strtok(NULL, ",");
-
-//         temp = {alt, velo, acc, time1};
-//         // printf("temp[%d] = (%f,%f,%f,%f)\n", i, temp[0], temp[1], temp[2],
-//         temp[3]); if(temp[0] != 0 && temp[1] != 0 && temp[2] != 0 && temp[3]
-//         != 0){
-//             scenarioListofVectorsBefore[i].push_back(temp);
-//         }
-
-//     }
-
-//     // printf("\n");
-
-// }
-
-// std::vector<std::vector<std::vector<float>>> scenarioListofVectorsAfter =
-// {{{}}, {{}}, {{}}, {{}}, {{}}, {{}}};
-
-// // skip header
-// fgets(line, sizeof(line), simsAfterFile);
-
-// while (fgets(line, sizeof(line), simsAfterFile)) {
-//     char *token = strtok(line, ",");
-
-//     for(int i = 0; i < numberOfScenarios; i++){
-//         alt = atof(token); // Convert the time value to float
-//         token = strtok(NULL, ",");
-//         velo = atof(token);
-//         token = strtok(NULL, ",");
-//         acc = atof(token);
-//         token = strtok(NULL, ",");
-//         time1 = atof(token);
-//         token = strtok(NULL, ",");
-
-//         std::vector<float> temp = {alt, velo, acc, time1};
-//         // printf("after temp[%d] = (%f,%f,%f,%f)\n", i, temp[0], temp[1],
-//         temp[2], temp[3]); if(temp[0] != 0 && temp[1] != 0 && temp[2] != 0 &&
-//         temp[3] != 0){
-//             scenarioListofVectorsAfter[i].push_back(temp);
-//         }
-
-//     }
-
-//     // printf("\n");
-// }
-
-// scenarioListofVectorsBefore[0].erase(scenarioListofVectorsBefore[0].begin());
-// scenarioListofVectorsBefore[1].erase(scenarioListofVectorsBefore[1].begin());
-// scenarioListofVectorsBefore[2].erase(scenarioListofVectorsBefore[2].begin());
-// scenarioListofVectorsBefore[3].erase(scenarioListofVectorsBefore[3].begin());
-// scenarioListofVectorsBefore[4].erase(scenarioListofVectorsBefore[4].begin());
-// scenarioListofVectorsBefore[5].erase(scenarioListofVectorsBefore[5].begin());
-
-// scenarioListofVectorsAfter[0].erase(scenarioListofVectorsAfter[0].begin());
-// scenarioListofVectorsAfter[1].erase(scenarioListofVectorsAfter[1].begin());
-// scenarioListofVectorsAfter[2].erase(scenarioListofVectorsAfter[2].begin());
-// scenarioListofVectorsAfter[3].erase(scenarioListofVectorsAfter[3].begin());
-// scenarioListofVectorsAfter[4].erase(scenarioListofVectorsAfter[4].begin());
-// scenarioListofVectorsAfter[5].erase(scenarioListofVectorsAfter[5].begin());
 
 // create scenarios with before and after lists
 #ifdef TIMERON
@@ -1557,13 +1315,6 @@ int main() {
 #endif
 
   float totalTime = 0;
-
-  // add to a list of scenarios
-  // for(int i = 0; i < numberOfScenarios; i++){
-  //     Scenario scenario = Scenario{scenarioListofVectorsBefore[i],
-  //     scenarioListofVectorsAfter[i], "Scenario " + std::to_string(i)};
-  //     scenarios.push_back(scenario);
-  // }
 
   halo.setScenarios(scenarios);
   halo.deltaTime = 1 / 3;
@@ -1603,75 +1354,22 @@ int main() {
 
     BarosData baro2 = {time, pressure, 0, 0};
 
-    // if(howMany <= 13){
-
     printf(
         "\n#%d "
         "Sample----------------------------------------------------------------"
         "----------\n\n",
         howMany);
 
-    // // Example: Print all sensor readings
-    // if(debug == RAW || debug == ALL){
-    //     printf("Raw Time: %.6f s, Gyro: (%.6f, %.6f, %.6f) deg/s, Accel:
-    //     (%.6f, %.6f, %.6f) g Pressure: (%.f, %.f, %.f, %.f)\n",
-    //         time, sensorData.gyroX, sensorData.gyroY, sensorData.gyroZ,
-    //         sensorData.accelX, sensorData.accelY, sensorData.accelZ,
-    //         baro1.pressure, baro2.pressure, baro3.pressure,
-    //         realBaro.pressure);
-    // }
+    // Example: Print all sensor readings
+    if (debug == RAW || debug == ALL) {
+      printf(
+          "Raw Time: %.6f s, Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, "
+          "%.6f, %.6f) g Pressure: (%.f, %.f, %.f, %.f)\n",
+          time, sensorData.gyroX, sensorData.gyroY, sensorData.gyroZ,
+          sensorData.accelX, sensorData.accelY, sensorData.accelZ,
+          baro1.pressure, baro2.pressure);
+    }
 
-    // madVector imu1Gyro = {sensorData.gyroX, sensorData.gyroY,
-    // sensorData.gyroZ}; madVector imu1Accel = {sensorData.accelX,
-    // sensorData.accelY, sensorData.accelZ};
-
-    // madVector imu1GyroAligned = infusion->AxesSwitch(imu1Gyro,
-    // MadAxesAlignmentPXPYNZ); madVector imu1AccelAligned =
-    // infusion->AxesSwitch(imu1Accel, MadAxesAlignmentPXPYNZ);
-
-    // madVector imu2Gyro = {sensorData2.gyroX, sensorData2.gyroY,
-    // sensorData2.gyroZ}; madVector imu2Accel = {sensorData2.accelX,
-    // sensorData2.accelY, sensorData2.accelZ};
-
-    // madVector imu2GyroAligned = infusion->AxesSwitch(imu2Gyro,
-    // MadAxesAlignmentPXPYNZ); madVector imu2AccelAligned =
-    // infusion->AxesSwitch(imu2Accel, MadAxesAlignmentPXPYNZ);
-
-    // if(debug == Secondary || debug == ALL){
-    //     printf("Aligned: Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, %.6f,
-    //     %.6f) g\n",
-    //         imu1GyroAligned.axis.x, imu1GyroAligned.axis.y,
-    //         imu1GyroAligned.axis.z, imu1AccelAligned.axis.x,
-    //         imu1AccelAligned.axis.y, imu1AccelAligned.axis.z);
-    // }
-
-    // // feed vectors into sensorData structs
-    // sensorData.gyroX = imu1GyroAligned.axis.x;
-    // sensorData.gyroY = imu1GyroAligned.axis.y;
-    // sensorData.gyroZ = imu1GyroAligned.axis.z;
-
-    // sensorData.accelX = imu1AccelAligned.axis.x;
-    // sensorData.accelY = imu1AccelAligned.axis.y;
-    // sensorData.accelZ = imu1AccelAligned.axis.z;
-
-    // // second IMU
-    // sensorData2.gyroX = imu2GyroAligned.axis.x;
-    // sensorData2.gyroY = imu2GyroAligned.axis.y;
-    // sensorData2.gyroZ = imu2GyroAligned.axis.z;
-
-    // sensorData2.accelX = imu2AccelAligned.axis.x;
-    // sensorData2.accelY = imu2AccelAligned.axis.y;
-    // sensorData2.accelZ = imu2AccelAligned.axis.z;
-
-    // everest.IMU_Update(sensorData, sensorData2);
-
-    // double eAltitude = everest.AlignedExternalUpdate(sensorData, sensorData2,
-    // baro1, baro2, baro3, realBaro, MadAxesAlignmentPXPYNZ);
-    // double eAltitude = everest.ExternalUpdate(sensorData, sensorData2, baro1,
-    // baro2, baro3, realBaro);
-    //    double eAltitude = finalWrapper(accelX, accelY, accelZ, gyroX, gyroY,
-    //    gyroZ, pressure, pressure, pressure, pressure, time, time, time, time,
-    //    time, time, MadAxesAlignmentPXPYNZ, MadAxesAlignmentPXPYNZ);
     EverestData everestData = {
         sensorData.time,    sensorData2.time,   baro1.time,
         baro2.time,
@@ -1709,10 +1407,6 @@ int main() {
       halo.setStateVector(eAccelerationZ, eVelocity, eAltitude);
 
       std::vector<double> unitedStates = {halo.X0[0], halo.X0[1], halo.X0[2]};
-
-      // printf("\nFinal Measurements - time, eAltitude, HAltitude, HVelo,
-      // Haccel:\n %f,%f,%f,%f,%f\n", time, eAltitude, unitedStates[0],
-      // unitedStates[1], unitedStates[2]);
 
 #ifdef LOGON
       fprintf(file, "%f,%f,%f,%f,%f,%f,%f\n", time, eAltitude, eVelocity,
@@ -1790,8 +1484,6 @@ int main() {
   std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t" << treeCreationTime.count()
             << std::endl;
 #endif
-
-  fclose(file1);
 
 #ifdef LOGON
   fclose(file);

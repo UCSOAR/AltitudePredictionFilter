@@ -10,7 +10,6 @@
 
 #include "KDTree.hpp"
 
-// home
 #ifdef HOME
 #include "C:\Users\andin\OneDrive\Documents\AllRepos\UnscentedKalmanFilter\eigen-3.4.0\Eigen\Cholesky"
 #include "C:\Users\andin\OneDrive\Documents\AllRepos\UnscentedKalmanFilter\eigen-3.4.0\Eigen\Dense"
@@ -22,19 +21,7 @@
 #include "C:\Users\Andrey\Documents\UKFRepo\UnscentedKalmanFilter\eigen-3.4.0\eigen-3.4.0\Eigen\Dense"
 #endif
 
-// bool isBeforeApogeeBool = false;
-
 using namespace Eigen;
-
-/**
- * Keeps track of the kinematics of HALO. Updated
- * with UKF state update
- */
-// typedef struct{
-//     float initialVelo;
-//     float initialAlt;
-//     float finalAltitude;
-// } kinematics;
 
 /**
  * @brief Scenario struct to store the coefficients of the 3rd degree polynomial

@@ -11,8 +11,6 @@
 // -----------------------------------------------------------------------------
 #ifndef INFUSION_HPP
 #define INFUSION_HPP
-// Math--------------------------------------------------------------------------
-//  Includes
 
 #include <math.h>
 #include <stdbool.h>
@@ -140,12 +138,6 @@ typedef enum {
   MadAxesAlignmentNZPXNY, /* -Z+X-Y */
   MadAxesAlignmentPXPYNZ, /* +X+Y-NZ */
 } MadAxesAlignment;
-
-// imu1 = AxesSwitch(imu1, MadAxesAlignmentPXPYPZ);
-//     both PX, PY, NZ
-
-// imu
-//     NY, PX, NZ
 
 /**
  * @brief Gyroscope offset algorithm structure.  Structure members are used
@@ -288,8 +280,7 @@ static inline float fastInverseSqrt(const float x) {
 
 #endif
 
-// Vector
-// Operations-------------------------------------------------------------------------
+// Vector Operations---------------------------------------------------
 /**
  * @brief Returns true if the vector is zero.
  * @param vector Vector.
@@ -438,8 +429,7 @@ static inline madVector madVectorNormalise(const madVector vector) {
   return madVectorMultiplyScalar(vector, magnitudeReciprocal);
 }
 
-// Quaternion
-// operations-----------------------------------------------------------------
+// Quaternion Operations--------------------------------------------------
 /**
  * @brief Returns the sum of two quaternions.
  * @param quaternionA Quaternion A.
@@ -529,8 +519,7 @@ static inline madQuaternion madQuaternionNormalise(
 #undef Q
 }
 
-// Matrix
-// operations---------------------------------------------------------------
+// Matrix Operations------------------------------------------------
 /**
  * @brief Returns the multiplication of a matrix with a vector.
  * @param matrix Matrix.
@@ -553,8 +542,7 @@ static inline madVector madMatrixMultiplyVector(const madMatrix matrix,
 #undef R
 }
 
-// Conversion
-// Operations----------------------------------------------------------------
+// Conversion Operations-------------------------------------------------
 /**
  * @brief Converts a quaternion to a rotation matrix.
  * @param quaternion Quaternion.
@@ -606,9 +594,6 @@ static inline madEuler madQuaternionToEuler(const madQuaternion quaternion) {
 #undef Q
 }
 
-// Function
-// declarations--------------------------------------------------------------
-
 void madAhrsInitialise(madAhrs *const ahrs);
 
 void madAhrsReset(madAhrs *const ahrs);
@@ -626,11 +611,6 @@ void madAhrsUpdateExternalHeading(madAhrs *const ahrs,
                                   const float heading, const float deltaTime);
 
 void madAhrsSetQuaternion(madAhrs *const ahrs, const madQuaternion quaternion);
-
-// madAhrsInternalStates Infusion::madAhrsGetInternalStates(const madAhrs *const
-// ahrs);
-
-// madAhrsFlags madAhrsGetFlags(const madAhrs *const ahrs);
 
 void madAhrsSetHeading(madAhrs *const ahrs, const float heading);
 
@@ -650,15 +630,10 @@ static inline int Clamp(const int value, const int min, const int max);
 
 //------------------------------------------------------------------------------
 
-// Functions---------------------------------------------------------------------
-
-//------------------------------------------------------------------------------
-
 /**
  * @brief Gyroscope, accelerometer, and magnetometer calibration models.
  */
 
-// Functions---------------------------------------------------------------------
 /**
  * @brief Gyroscope and accelerometer calibration model.
  * @param uncalibrated Uncalibrated measurement.
@@ -696,61 +671,38 @@ static inline madVector madCalibrationMagnetic(const madVector uncalibrated,
  * @brief Tilt-compensated compass to calculate the magnetic heading using
  * accelerometer and magnetometer measurements.
  */
-
-// Function declarations--------------------------------------------------------
-
 float compassCalculateHeading(const EarthConvention convention,
                               const madVector accelerometer,
                               const madVector magnetometer);
 
-//------------------------------------------------------------------------------
 /**
  * @brief Gyroscope offset correction algorithm for run-time calibration of the
  * gyroscope offset.
  */
-
-//------------------------------------------------------------------------------
-
-// Function
-// declarations---------------------------------------------------------
-
 void madOffsetInitialise(madOffset *const offset,
                          const unsigned int sampleRate);
 
 madVector madOffsetUpdate(madOffset *const offset, madVector gyroscope);
 
-// madAhrs* getMadAhrs(const Infusion *const infusion) {return this->madAHRS;};
-
-// madOffset* getOffset(const Infusion *const infusion) {return
-// &infusion.offset;};
-
-// madQuaternion* getQuaternion(const Infusion *const infusion) {return
-// &infusion.quaternion;};
-
-// The End
-// Class
+// Class Declaration---------------------------------------------------------
 class Infusion {
  public:
-  // Infusion();
-  // ~Infusion();
   void initialise();
   void reset();
   void setSettings(const madAhrsSettings &settings);
   void update(const madVector &gyroscope, const madVector &accelerometer,
               const madVector &magnetometer, float deltaTime);
-  // void madAhrsUpdateNoMagnetometer(madAhrs *const ahrs, const madVector
-  // gyroscope, const madVector accelerometer, const float deltaTime);
+
   void updateExternalHeading(const madVector &gyroscope,
                              const madVector &accelerometer, float heading,
                              float deltaTime);
   void setQuaternion(const madQuaternion &quaternion);
-  // madAhrsInternalStates getInternalStates() const;
+
   madAhrsInternalStates madAhrsGetInternalStates(const madAhrs *const ahrs);
-  // madAhrsFlags getFlags() const;
+
   void setHeading(float heading);
 
   madAhrs madAHRS;
-
   madOffset offset;
   madQuaternion quaternion;
 
@@ -768,8 +720,6 @@ class Infusion {
 
   void madOffsetInitialise(madOffset *const offset,
                            const unsigned int sampleRate);
-
-  // madEuler getEuler(const madAhrs *const ahrs);
 
   madVector madAhrsGetEarthAcceleration(const madAhrs *ahrs);
 
@@ -812,11 +762,6 @@ class Infusion {
   void reinitialiseGyro(madAhrs *const ahrs, const madVector gyroscope);
 
  private:
-  // madVector halfGravity() const;
-  // madVector halfMagnetic() const;
-  // madVector feedback(const madVector& sensor, const madVector& reference)
-  // const; int clamp(int value, int min, int max) const; // uint32_t
-
  protected:
 };
 
@@ -1090,9 +1035,3 @@ inline madVector AxesSwitch(const madVector sensor,
 }
 
 #endif  // INFUSION_HPP
-
-// Infusion::Infusion() {
-//     initialise();
-
-//     return Infusion();
-// }

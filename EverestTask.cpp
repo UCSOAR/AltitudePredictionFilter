@@ -22,7 +22,6 @@
  * To run:  g++ Infusion.cpp EverestTask.cpp -o Everest
  *          ./Everest
  */
-
 using namespace std;
 
 // SETTINGS (mostly for debugging, keep default for run)
@@ -42,7 +41,6 @@ bool firstSampleAfterCalibration = true;
 bool useSTD = false;
 
 // INTERNAL VARIABLES
-// double timeInSeconds = 2;
 double theTime = CALIBRATION_TIME * RATE_BARO;
 double sum = 0;
 double pressureSum = 0;
@@ -62,114 +60,6 @@ kinematics* Kinematics = everest.getKinematics();  // tare to ground
 madAhrsFlags flags;
 madAhrsInternalStates internalStates;
 EverestData everestData;
-
-//----------------------------------Task
-// Integration----------------------------------//
-// EverestTask::EverestTask() : Task(TASK_EVEREST_QUEUE_DEPTH_OBJS)
-// {
-//     // Initialize the task
-//     MadgwickSetup();
-//     everestData = (EverestData*)soar_malloc(sizeof(EverestData));
-// }
-
-// /**
-//  * @brief Creates a task for the FreeRTOS Scheduler
-//  */
-// void EverestTask::InitTask()
-// {
-//     // Make sure the task is not already initialized
-//     SOAR_ASSERT(rtTaskHandle == nullptr, "Cannot initialize Everest task
-//     twice");
-
-//     // Start the task
-//     BaseType_t rtValue =
-//         xTaskCreate((TaskFunction_t)EverestTask::RunTask,
-//             (const char*)"EverestTask",
-//             (uint16_t)TASK_EVEREST_TASK_STACK_DEPTH_WORDS,
-//             (void*)this,
-//             (UBaseType_t)TASK_EVEREST_TASK_PRIORITY,
-//             (TaskHandle_t*)&rtTaskHandle);
-
-//     //Ensure creation succeded
-//     SOAR_ASSERT(rtValue == pdPASS, "EverestTask::InitTask() - xTaskCreate()
-//     failed");
-// }
-
-// /**
-//  * @brief KalmanFilterTask run loop
-//  * @param pvParams Currently unused task context
-//  */
-// void EverestTask::Run(void* pvParams)
-// {
-
-//     //Task run loop
-//     while (1) {
-
-//         Command cm;
-
-//         //Wait forever for a command
-//         qEvtQueue->ReceiveWait(cm);
-
-//         //Process the command
-//         HandleCommand(cm);
-
-//         cm.Reset();
-//     }
-
-// }
-
-// /**
-//  * @brief Handles a command
-//  * @param cm Command reference to handle
-//  */
-// void EverestTask::HandleCommand(Command& cm)
-// {
-//     //TODO: Since this task will stall for a few milliseconds, we may need a
-//     way to eat the whole queue (combine similar eg. REQUEST commands and eat
-//     to WDG command etc)
-//     //TODO: Maybe a HandleEvtQueue instead that takes in the whole queue and
-//     eats the whole thing in order of non-blocking to blocking
-
-//     //Switch for the GLOBAL_COMMAND
-//     switch (cm.GetCommand()) {
-//     case TASK_SPECIFIC_COMMAND: {
-//     	if(cm.GetTaskCommand()==COPY_DATA){
-//     		*everestData = *(EverestData*) cm.GetDataPointer();
-//     	}else{
-//             *everestData = *(EverestData*) cm.GetDataPointer();
-// 			HandleRequestCommand(cm.GetTaskCommand());
-//     	}
-//         break;
-//     }
-//     default:
-//         SOAR_PRINT("EverestTask - Received Unsupported Command {%d}\n",
-//         cm.GetCommand()); break;
-//     }
-
-//     //No matter what happens, we must reset allocated data
-//     cm.Reset();
-// }
-
-// /**
-//  * @brief Handles a Request Command
-//  * @param taskCommand The command to handle
-//  */
-// void EverestTask::HandleRequestCommand(uint16_t taskCommand)
-// {
-//     //Switch for task specific command within DATA_COMMAND
-//     switch (taskCommand) {
-//     case UPDATE:
-//         TaskWrapper(everestData, MadAxesAlignmentPXPYNZ,
-//         MadAxesAlignmentPXPYNZ); break;
-//     case TEST:
-//     	break;
-//     case RETARE:
-//         setIsTared(false);
-//     default:
-//         SOAR_PRINT("EverestTask - Received Unsupported REQUEST_COMMAND
-//         {%d}\n", taskCommand); break;
-//     }
-// }
 
 /**
  * @brief Calls finalWrapper with data and alignment
@@ -246,34 +136,28 @@ void EverestTask::MadgwickSetup() {
  */
 void EverestTask::MadgwickWrapper(IMUData data) {
   const float timestamp = data.time;
-  madVector gyroscope = {
-      data.gyroX, data.gyroY,
-      data.gyroZ};  // replace this with actual gyroscope data in degrees/s
-  madVector accelerometer = {
-      data.accelX, data.accelY,
-      data.accelZ};  // replace this with actual accelerometer data in g
+  madVector gyroscope = {data.gyroX, data.gyroY,
+                         data.gyroZ};  // data in degrees/s
+  madVector accelerometer = {data.accelX, data.accelY,
+                             data.accelZ};  // data in g
   madVector mag = {data.magX, data.magY, data.magZ};
 
   // Update gyroscope offset correction algorithm
   madOffset offset = infusion->getOffset();
   gyroscope = infusion->madOffsetUpdate(&offset, gyroscope);
 
-  // printf("Roll %0.3f, Pitch %0.3f, Yaw %0.3f, X %0.3f, Y %0.3f, Z %0.3f\n",
-  //        euler.angle.roll, euler.angle.pitch, euler.angle.yaw,
-  //        earth.axis.x, earth.axis.y, earth.axis.z);
-
   // Calculate delta time (in seconds) to account for gyroscope sample clock
   // error
   float deltaTime = (float)(timestamp - previousTimestamp);
   previousTimestamp = timestamp;
-
   this->state.deltaTimeIMU = deltaTime;
 
   if (debug == Secondary || debug == ALL) {
-    // SOAR_PRINT("Averaged: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, %.6f, %.6f)
-    // g Time: %f\n",
-    //     data.gyroX, data.gyroY, data.gyroZ, data.accelX, data.accelY,
-    //     data.accelZ, deltaTime);
+    printf(
+        "Averaged: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, %.6f, %.6f)g Time: "
+        "%f\n",
+        data.gyroX, data.gyroY, data.gyroZ, data.accelX, data.accelY,
+        data.accelZ, deltaTime);
     printf("Mag: (%.6f, %.6f, %.6f) uT\n", mag.axis.x, mag.axis.y, mag.axis.z);
   }
 
@@ -299,21 +183,20 @@ void EverestTask::MadgwickWrapper(IMUData data) {
   //    internalStates.magneticRecoveryTrigger, flags.initialising,
   //    flags.angularRateRecovery, flags.accelerationRecovery,
   //    flags.magneticRecovery, earth.axis.z);
+  // fprintf(file, "\n");
 
   everest.state.earthAcceleration = earth.axis.z;
 
-  // fprintf(file, "\n");
-
-  //    if(debug == Secondary || debug == ALL){
-  //        SOAR_PRINT("%f,%d,%.0f,%.0f,%d,%.0f,%d,%d,%d,%d\n",
-  //        internalStates.accelerationError,
-  //        internalStates.accelerometerIgnored,
-  //        internalStates.accelerationRecoveryTrigger,
-  //        internalStates.magneticError, internalStates.magnetometerIgnored,
-  //        internalStates.magneticRecoveryTrigger, flags.initialising,
-  //        flags.angularRateRecovery, flags.accelerationRecovery,
-  //        flags.magneticRecovery);
-  //    }
+  if (debug == Secondary || debug == ALL) {
+    printf("%f,%d,%.0f,%.0f,%d,%.0f,%d,%d,%d,%d\n",
+           internalStates.accelerationError,
+           internalStates.accelerometerIgnored,
+           internalStates.accelerationRecoveryTrigger,
+           internalStates.magneticError, internalStates.magnetometerIgnored,
+           internalStates.magneticRecoveryTrigger, flags.initialising,
+           flags.angularRateRecovery, flags.accelerationRecovery,
+           flags.magneticRecovery);
+  }
 }
 
 /**
@@ -355,7 +238,6 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
 
   if (isinf(internalIMU_1.accelX)) {
     numberOfSamples -= 1;
-    // printf("%d",numberOfSamples);
     this->internalIMU_1.gyroX = 0;
     this->internalIMU_1.gyroY = 0;
     this->internalIMU_1.gyroZ = 0;
@@ -369,8 +251,11 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
     this->internalIMU_1.magZ = 0;
   } else {
     // Apply calibration
-    // printf("uncalibrated: %f, %f, %f ", this->internalIMU_1.accelX,
-    // this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
+
+    if (debug == Calibration || debug == ALL) {
+      printf("uncalibrated: %f, %f, %f ", this->internalIMU_1.accelX,
+             this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
+    }
 
     this->internalIMU_1.accelX =
         this->internalIMU_1.accelX - this->zeroOffsetAccel[0];
@@ -379,13 +264,17 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
     this->internalIMU_1.accelZ =
         this->internalIMU_1.accelZ - this->zeroOffsetAccel[2];
 
-    // printf("-> offset (%f, %f, %f) = calibrated accel (%f, %f, %f)\n",
-    // this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
-    // this->zeroOffsetAccel[2], this->internalIMU_1.accelX,
-    // this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
+    if (debug == Calibration || debug == ALL) {
+      printf("-> offset (%f, %f, %f) = calibrated accel (%f, %f, %f)\n",
+             this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
+             this->zeroOffsetAccel[2], this->internalIMU_1.accelX,
+             this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
+    }
 
-    // printf("uncalibrated: %f, %f, %f ", this->internalIMU_1.gyroX,
-    // this->internalIMU_1.gyroY, this->internalIMU_1.gyroZ);
+    if (debug == Calibration || debug == ALL) {
+      printf("uncalibrated: %f, %f, %f ", this->internalIMU_1.gyroX,
+             this->internalIMU_1.gyroY, this->internalIMU_1.gyroZ);
+    }
 
     this->internalIMU_1.gyroX =
         this->internalIMU_1.gyroX - this->zeroOffsetGyro[0];
@@ -394,15 +283,16 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
     this->internalIMU_1.gyroZ =
         this->internalIMU_1.gyroZ - this->zeroOffsetGyro[2];
 
-    // printf("-> offset (%f, %f, %f) = calibrated gyro (%f, %f, %f)\n",
-    // this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
-    // this->zeroOffsetGyro[2], this->internalIMU_1.gyroX,
-    // this->internalIMU_1.gyroY, this->internalIMU_1.gyroZ);
+    if (debug == Calibration || debug == ALL) {
+      printf("-> offset (%f, %f, %f) = calibrated gyro (%f, %f, %f)\n",
+             this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
+             this->zeroOffsetGyro[2], this->internalIMU_1.gyroX,
+             this->internalIMU_1.gyroY, this->internalIMU_1.gyroZ);
+    }
   }
 
   if (isinf(internalIMU_2.accelX)) {
     numberOfSamples -= 1;
-    // printf("%d",numberOfSamples);
     this->internalIMU_2.gyroX = 0;
     this->internalIMU_2.gyroY = 0;
     this->internalIMU_2.gyroZ = 0;
@@ -416,8 +306,11 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
     this->internalIMU_2.magZ = 0;
   } else {
     // Apply calibration
-    // printf("uncalibrated: %f, %f, %f ", this->internalIMU_2.accelX,
-    // this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
+
+    if (debug == Calibration || debug == ALL) {
+      printf("uncalibrated: %f, %f, %f ", this->internalIMU_2.accelX,
+             this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
+    }
 
     this->internalIMU_2.accelX =
         this->internalIMU_2.accelX - this->zeroOffsetAccel2[0];
@@ -426,13 +319,17 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
     this->internalIMU_2.accelZ =
         this->internalIMU_2.accelZ - this->zeroOffsetAccel2[2];
 
-    // printf("-> offset (%f, %f, %f) = calibrated accel2 (%f, %f, %f)\n",
-    // this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
-    // this->zeroOffsetAccel2[2], this->internalIMU_2.accelX,
-    // this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
+    if (debug == Calibration || debug == ALL) {
+      printf("-> offset (%f, %f, %f) = calibrated accel2 (%f, %f, %f)\n",
+             this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
+             this->zeroOffsetAccel2[2], this->internalIMU_2.accelX,
+             this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
+    }
 
-    // printf("uncalibrated: %f, %f, %f ", this->internalIMU_2.gyroX,
-    // this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
+    if (debug == Calibration || debug == ALL) {
+      printf("uncalibrated: %f, %f, %f ", this->internalIMU_2.gyroX,
+             this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
+    }
 
     this->internalIMU_2.gyroX =
         this->internalIMU_2.gyroX - this->zeroOffsetGyro2[0];
@@ -441,10 +338,12 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
     this->internalIMU_2.gyroZ =
         this->internalIMU_2.gyroZ - this->zeroOffsetGyro2[2];
 
-    // printf("-> offset (%f, %f, %f) = calibrated gyro2 (%f, %f, %f)\n",
-    // this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
-    // this->zeroOffsetGyro[2], this->internalIMU_2.gyroX,
-    // this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
+    if (debug == Calibration || debug == ALL) {
+      printf("-> offset (%f, %f, %f) = calibrated gyro2 (%f, %f, %f)\n",
+             this->zeroOffsetGyro2[0], this->zeroOffsetGyro2[1],
+             this->zeroOffsetGyro2[2], this->internalIMU_2.gyroX,
+             this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
+    }
   }
 
 // Calculate average of IMU parameters
@@ -529,8 +428,8 @@ double EverestTask::ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
   everest.IMU_Update(imu1, imu2);
 
   if (debug == Third || debug == ALL) {
-    // SOAR_PRINT("After IMU Update IMU Altitude: %f\n",
-    // everest.state.avgIMU.altitude);
+    printf("After IMU Update IMU Altitude: %f\n",
+           everest.state.avgIMU.altitude);
   }
 
   everest.Baro_Update(baro1, baro2);
@@ -544,8 +443,6 @@ double EverestTask::ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
   // Update altitude list
   this->AltitudeList.secondLastAltitude = this->AltitudeList.lastAltitude;
   this->AltitudeList.lastAltitude = finalAlt;
-
-  //    fprintf(file, ",%f\n", finalAlt); // write to file
 
   return finalAlt;
 }
@@ -569,17 +466,17 @@ double EverestTask::AlignedExternalUpdate(IMUData imu1, IMUData imu2,
       infusion->AxesSwitch({imu2.gyroX, imu2.gyroY, imu2.gyroZ}, alignment);
 
   if (debug == Secondary || debug == ALL) {
-    // SOAR_PRINT("Unaligned IMU1: (%.6f, %.6f, %.6f) g, (%.6f, %.6f, %.6f)
+    // printf("Unaligned IMU1: (%.6f, %.6f, %.6f) g, (%.6f, %.6f, %.6f)
     // deg/s\n",
     //     imu1.accelX, imu1.accelY, imu1.accelZ, imu1.gyroX, imu1.gyroY,
     //     imu1.gyroZ);
 
-    // SOAR_PRINT("Unaligned IMU2: (%.6f, %.6f, %.6f) g, (%.6f, %.6f, %.6f)
+    // printf("Unaligned IMU2: (%.6f, %.6f, %.6f) g, (%.6f, %.6f, %.6f)
     // deg/s\n",
     //     imu2.accelX, imu2.accelY, imu2.accelZ, imu2.gyroX, imu2.gyroY,
     //     imu2.gyroZ);
 
-    // SOAR_PRINT("Alignment: %d\n", alignment);
+    // printf("Alignment: %d\n", alignment);
   }
 
   // put aligned data into IMUData struct
@@ -1368,16 +1265,9 @@ int main() {
 #endif
     }
 
-    // update Kinematics
-
-    // }
-
-    howMany++;
-
     clock_t endTime = std::clock();
 
     totalTime += endTime - start;
-    // printf("Time for one more (seconds): %f\n", duration/CLOCKS_PER_SEC);
 
     if (i == taberLaunch.size() - 13) {
       std::cout << "Overall for " << howMany << " samples:\t\t\t\t\t\t\t\t\t"

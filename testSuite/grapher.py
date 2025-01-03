@@ -61,7 +61,7 @@ plt.title("Time vs Velo")
 plt.legend()
 plt.grid(True)
 
-input_data = input_data[20:]["accel_z"]
+input_data = input_data[21:]["accel_z"]
 # accel_z = input_data["accel_z"]
 
 # plot accel    (altimeter, everest, halo, gps, sigma, scenarios)

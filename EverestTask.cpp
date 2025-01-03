@@ -12,23 +12,11 @@
 #include <iostream>
 #include <sstream>
 
-#include "Data.cpp"
 #include "input_data.cpp"
 
 #define LOGON
 #define TIMERON
-
-// #define printf(...) ;
-
-// task specific defines
-// #include "main.h"
-// #include "Data.h"
-// #include "DebugTask.hpp"
-// #include "Task.hpp"
-// #include "DMBProtocolTask.hpp"
-// #include "TelemetryMessage.hpp"
-// #include "FlashTask.hpp"
-// #include <string.h>
+#define printf(...) ;
 
 /**
  * To run:  g++ Infusion.cpp EverestTask.cpp -o Everest
@@ -1040,6 +1028,8 @@ void EverestTask::tare(IMUData& imu1, IMUData& imu2, BarosData baro1,
 
   // call to update time and offsets for these structs
   IMU_Update(imu1, imu2);
+
+  // keeps track of remaining time for tare
   theTime -= 1;
 }
 
@@ -1166,7 +1156,7 @@ int main() {
   MatrixXf Q(3, 3);
   Q << 100, 0, 0, 0, 40, 0, 0, 0, 8;
 
-  // everest covariance matrix
+  // Covariance matrix
   MatrixXf R0(3, 3);
   R0 << 200, 0.5, 0.5, 0.5, 100, 1, 0.5, 1, 10;
 
@@ -1268,10 +1258,9 @@ int main() {
 
   int howMany = 1;
   int i = 0;
-  int numberOfScenarios = 6;
 
-  std::vector<std::vector<std::vector<float>>> scenarioListofVectorsBefore = {
-      {{}}, {{}}, {{}}, {{}}, {{}}, {{}}};
+  // create scenarios
+  halo.createScenarios(&halo);
 
   float alt;
   float velo;
@@ -1279,47 +1268,13 @@ int main() {
   float time1;
   std::vector<float> temp = {0, 0, 0, 0};
 
-// create scenarios with before and after lists
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point treeCreation =
-      std::chrono::high_resolution_clock::now();
-
-#endif
-
-  Scenario scenario1 = Scenario{sim1, sim1, 1};
-  scenario1.createTree();
-  Scenario scenario2 = Scenario{sim2, sim2, 2};
-  scenario2.createTree();
-  Scenario scenario3 = Scenario{sim3, sim3, 3};
-  scenario3.createTree();
-  Scenario scenario4 = Scenario{sim4, sim4, 4};
-  scenario4.createTree();
-  Scenario scenario5 = Scenario{sim5, sim5, 5};
-  scenario5.createTree();
-  Scenario scenario6 = Scenario{sim6, sim6, 6};
-  scenario6.createTree();
-
-  std::vector<Scenario> scenarios = {scenario1, scenario2, scenario3,
-                                     scenario4, scenario5, scenario6};
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point treeCreationEnd =
-      std::chrono::high_resolution_clock::now();
-
-  std::chrono::duration<double> treeCreationTime =
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          treeCreationEnd - treeCreation);
-
-#endif
-
-  float totalTime = 0;
-
-  halo.setScenarios(scenarios);
   halo.deltaTime = 1 / 3;
 
+  float totalTime = 0;
+  std::cout << "taberLaunch size: " << taberLaunch.size() << std::endl;
+
   for (int i = 0; i < taberLaunch.size(); i++) {
+    std::cout << "Loop iteration: " << i << std::endl;
     // Tokenize the line using strtok
     // Parse accelerometer readings (X, Y, Z)
     float time = taberLaunch[i][0];
@@ -1348,8 +1303,6 @@ int main() {
         time, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, magX, magY, magZ,
     };
 
-    start = std::clock();
-
     BarosData baro1 = {time, pressure, 0, 0};
 
     BarosData baro2 = {time, pressure, 0, 0};
@@ -1360,7 +1313,7 @@ int main() {
         "----------\n\n",
         howMany);
 
-    // Example: Print all sensor readings
+    // Print all sensor readings
     if (debug == RAW || debug == ALL) {
       printf(
           "Raw Time: %.6f s, Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, "
@@ -1390,7 +1343,7 @@ int main() {
     double eVelocity = everest.getKinematics()->initialVelo;
     double eAccelerationZ = (everest.state.earthAcceleration - 1) * -9.81;
 
-    if (howMany == 7) {
+    if (i == 7) {
       VectorXf X0(3);
       X0 << everest.Kinematics.initialAlt, 0, 0;
 
@@ -1401,9 +1354,9 @@ int main() {
     // start timer for iteration
     start = std::clock();
 
-    if (howMany > 7) {
+    if (i > 7) {
+      // enter measurements from Everest after tare
       halo.setTime(time);
-
       halo.setStateVector(eAccelerationZ, eVelocity, eAltitude);
 
       std::vector<double> unitedStates = {halo.X0[0], halo.X0[1], halo.X0[2]};
@@ -1424,66 +1377,66 @@ int main() {
     clock_t endTime = std::clock();
 
     totalTime += endTime - start;
-
     // printf("Time for one more (seconds): %f\n", duration/CLOCKS_PER_SEC);
-  }
-  // }
 
-  // printf("Overall for %d samples: %f", howMany, totalTime/CLOCKS_PER_SEC);
-  howMany = howMany - 7;
-
-  std::cout << "Overall for " << howMany << " samples:\t\t\t\t\t\t\t\t\t"
-            << totalTime / (double)CLOCKS_PER_SEC << std::endl;
+    if (i == taberLaunch.size() - 13) {
+      std::cout << "Overall for " << howMany << " samples:\t\t\t\t\t\t\t\t\t"
+                << totalTime / (double)CLOCKS_PER_SEC << std::endl;
 
 #ifdef TIMERON
-  std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t" << halo.updateTime.count()
-            << std::endl;
-  std::cout << "Predict time:\t\t\t\t\t\t\t\t\t\t" << halo.predictTime.count()
-            << std::endl;
+      std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t" << halo.updateTime.count()
+                << std::endl;
+      std::cout << "Predict time:\t\t\t\t\t\t\t\t\t\t"
+                << halo.predictTime.count() << std::endl;
 
-  std::cout << "\tTriangulationTime:\t\t\t\t\t\t\t"
-            << halo.triangulationTime.count() << std::endl;
-  std::cout << "\tdModeltime:\t\t\t\t\t\t\t\t" << halo.dynamicModelTime.count()
-            << std::endl;
+      std::cout << "\tTriangulationTime:\t\t\t\t\t\t\t"
+                << halo.triangulationTime.count() << std::endl;
+      std::cout << "\tdModeltime:\t\t\t\t\t\t\t\t"
+                << halo.dynamicModelTime.count() << std::endl;
 
-  std::cout << "\t\tgetScenarioTime:\t\t\t\t\t" << halo.getScenarioTime.count()
-            << std::endl;
-  std::cout << "\t\tpPredictionTime:\t\t\t\t\t" << halo.PpredictionTime.count()
-            << std::endl;
-  std::cout << "\t\tprojErrorTime:\t\t\t\t\t\t" << halo.projErrorTime.count()
-            << std::endl;
-  std::cout << "\t\tpreMeanTime:\t\t\t\t\t\t" << halo.preMeanTime.count()
-            << std::endl;
-  std::cout << "\t\tsPointTime:\t\t\t\t\t\t" << halo.sPointTime.count()
-            << std::endl;
-  std::cout << "\t\tpredictLoopTime:\t\t\t\t\t" << halo.predictLoopTime.count()
-            << std::endl;
-  std::cout << "\t\tendPredictLoopTime:\t\t\t\t\t"
-            << halo.endPredictLoopTime.count() << std::endl;
-  std::cout << "\t\tnearestScenariosTime:\t\t\t\t\t"
-            << halo.nearestScenariosTime.count() << std::endl;
+      std::cout << "\t\tgetScenarioTime:\t\t\t\t\t"
+                << halo.getScenarioTime.count() << std::endl;
+      std::cout << "\t\tpPredictionTime:\t\t\t\t\t"
+                << halo.PpredictionTime.count() << std::endl;
+      std::cout << "\t\tprojErrorTime:\t\t\t\t\t\t"
+                << halo.projErrorTime.count() << std::endl;
+      std::cout << "\t\tpreMeanTime:\t\t\t\t\t\t" << halo.preMeanTime.count()
+                << std::endl;
+      std::cout << "\t\tsPointTime:\t\t\t\t\t\t" << halo.sPointTime.count()
+                << std::endl;
+      std::cout << "\t\tpredictLoopTime:\t\t\t\t\t"
+                << halo.predictLoopTime.count() << std::endl;
+      std::cout << "\t\tendPredictLoopTime:\t\t\t\t\t"
+                << halo.endPredictLoopTime.count() << std::endl;
+      std::cout << "\t\tnearestScenariosTime:\t\t\t\t\t"
+                << halo.nearestScenariosTime.count() << std::endl;
 
-  std::cout << "\t\t\t->loopScenariosTime:\t\t\t"
-            << halo.loopScenariosTime.count() << std::endl;
-  std::cout << "\t\t\t\t->getListsTime:\t\t" << halo.getListsTime.count()
-            << std::endl;
-  std::cout << "\t\t\t\t->othersTime:\t\t" << halo.othersTime.count()
-            << std::endl;
-  std::cout << "\t\t\t\t->KDTreeTime:\t\t" << halo.KDTreeTime.count()
-            << std::endl;
-  std::cout << "\t\t\t\t->twoDistancesTime:\t" << halo.twoDistancesTime.count()
-            << std::endl;
-  std::cout << "\t\t\t\t->emplaceBackTime:\t" << halo.emplaceBackTime.count()
-            << std::endl;
+      std::cout << "\t\t\t->loopScenariosTime:\t\t\t"
+                << halo.loopScenariosTime.count() << std::endl;
+      std::cout << "\t\t\t\t->getListsTime:\t\t" << halo.getListsTime.count()
+                << std::endl;
+      std::cout << "\t\t\t\t->othersTime:\t\t" << halo.othersTime.count()
+                << std::endl;
+      std::cout << "\t\t\t\t->KDTreeTime:\t\t" << halo.KDTreeTime.count()
+                << std::endl;
+      std::cout << "\t\t\t\t->twoDistancesTime:\t"
+                << halo.twoDistancesTime.count() << std::endl;
+      std::cout << "\t\t\t\t->emplaceBackTime:\t"
+                << halo.emplaceBackTime.count() << std::endl;
 
-  std::cout << "\t\t\t->vectorsTime:\t\t\t\t" << halo.vectorsTime.count()
-            << std::endl;
-  std::cout << "\t\t\t->push_backTime:\t\t\t" << halo.push_backTime.count()
-            << std::endl;
+      std::cout << "\t\t\t->vectorsTime:\t\t\t\t" << halo.vectorsTime.count()
+                << std::endl;
+      std::cout << "\t\t\t->push_backTime:\t\t\t" << halo.push_backTime.count()
+                << std::endl;
 
-  std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t" << treeCreationTime.count()
-            << std::endl;
+      std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t"
+                << (halo.treeCreationTime).count() << std::endl;
+
 #endif
+    }
+  }
+
+  std::cout << "End of program" << std::endl;
 
 #ifdef LOGON
   fclose(file);

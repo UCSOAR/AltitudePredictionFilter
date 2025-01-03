@@ -254,6 +254,8 @@ class HALO {
 
   float euclideanDistance(const std::vector<float> &vec1, const VectorXf &vec2);
 
+  void createScenarios(HALO *halo);
+
   std::vector<std::pair<std::vector<float>, std::vector<float>>>
       listOfGainsSigmaPoints =
           // {{{0.4, 0.4, 0.4}, {0.6, 0.6, 0.6}},
@@ -299,6 +301,7 @@ class HALO {
   std::chrono::duration<double> predictLoopTime;
   std::chrono::duration<double> endPredictLoopTime;
   std::chrono::duration<double> getScenarioTime;
+  std::chrono::duration<double> treeCreationTime;
 
  private:
   float Uaccel;

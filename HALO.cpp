@@ -1,6 +1,7 @@
 #include "HALO.hpp"
 // #include "everestTaskHPP.hpp"
 #include <fstream>
+#include "Data.cpp"
 
 #define LOGON
 #define TIMERON
@@ -1343,6 +1344,53 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
   // Xprediction(1), Xprediction(2));
 
   return Xprediction;
+}
+
+/**
+ * @brief Create scenarios for HALO
+ */
+void HALO::createScenarios(HALO* halo) {
+  // create scenarios with before and after lists
+  std::vector<std::vector<std::vector<float>>> scenarioListofVectorsBefore = {
+      {{}}, {{}}, {{}}, {{}}, {{}}, {{}}};
+
+#ifdef TIMERON
+
+  std::chrono::high_resolution_clock::time_point treeCreation =
+      std::chrono::high_resolution_clock::now();
+
+#endif
+
+  Scenario scenario1 = Scenario{sim1, sim1, 1};
+  scenario1.createTree();
+  Scenario scenario2 = Scenario{sim2, sim2, 2};
+  scenario2.createTree();
+  Scenario scenario3 = Scenario{sim3, sim3, 3};
+  scenario3.createTree();
+  Scenario scenario4 = Scenario{sim4, sim4, 4};
+  scenario4.createTree();
+  Scenario scenario5 = Scenario{sim5, sim5, 5};
+  scenario5.createTree();
+  Scenario scenario6 = Scenario{sim6, sim6, 6};
+  scenario6.createTree();
+
+  std::vector<Scenario> scenarios = {scenario1, scenario2, scenario3,
+                                     scenario4, scenario5, scenario6};
+
+#ifdef TIMERON
+
+  std::chrono::high_resolution_clock::time_point treeCreationEnd =
+      std::chrono::high_resolution_clock::now();
+
+  std::chrono::duration<double> treeCreationTime =
+      std::chrono::duration_cast<std::chrono::duration<double>>(
+          treeCreationEnd - treeCreation);
+
+  halo->treeCreationTime = treeCreationTime;
+
+#endif
+
+  halo->setScenarios(scenarios);
 }
 
 #endif

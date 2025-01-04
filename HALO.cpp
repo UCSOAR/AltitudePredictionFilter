@@ -950,6 +950,7 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
       fopen((directoryPath + "/nearestScenariosFormatted.txt").c_str(), "a+");
   if (!nearestScenariosFormattedFile) {
     fprintf(stderr, "Error opening nearestScenariosFormatted.txt...exiting\n");
+    fprintf(stderr, "%d\n", errno);
     exit(1);
   }
 
@@ -1200,6 +1201,8 @@ bool HALO::isBeforeApogee(float acceleration, float velocity, float altitude,
 
     fprintf(file, "Apogee at %f\n", altitude);
 
+    fclose(file);
+
     return false;
   }
 
@@ -1448,7 +1451,7 @@ std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
     // #endif
   }
 
-  if (counter == 550) {
+  if (counter == 543) {
 #ifdef TIMERON
     std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t"
               << haloPointer->updateTime.count() << std::endl;

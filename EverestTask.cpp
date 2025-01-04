@@ -17,6 +17,107 @@
 #define LOGON
 #define TIMERON
 #define printf(...) ;
+FILE* haloFile;
+
+int openFiles() {
+  // Define the directory path
+  std::string directoryPath = "testSuite/results";
+
+  // Create the directory if it doesn't exist
+  if (_mkdir("testSuite") == -1) {
+    if (errno != EEXIST) {
+      std::cerr << "Error creating directory: testSuite" << std::endl;
+      return 1;
+    }
+  }
+
+  if (_mkdir(directoryPath.c_str()) == -1) {
+    if (errno != EEXIST) {
+      std::cerr << "Error creating directory: " << directoryPath << std::endl;
+      return 1;
+    }
+  }
+
+  // File names
+  std::vector<std::string> fileNames = {"gains.txt",
+                                        "predictedValues.txt",
+                                        "log.txt",
+                                        "nearestScenarios.txt",
+                                        "nearestScenariosFormatted.txt",
+                                        "sigmaPoints.txt",
+                                        "sigmaPoints1.txt",
+                                        "sigmaPoints2.txt",
+                                        "sigmaPoints3.txt",
+                                        "sigmaPoints4.txt",
+                                        "sigmaPoints5.txt",
+                                        "sigmaPoints6.txt"};
+
+  // Deleting files
+  for (size_t i = 0; i < fileNames.size(); ++i) {
+    std::string filePath = directoryPath + "/" + fileNames[i];
+    if (std::remove(filePath.c_str()) == 0) {
+      std::cout << "File deleted successfully: " << fileNames[i] << std::endl;
+    } else {
+      std::perror("Error deleting file");
+    }
+  }
+
+  // Creating and writing to files
+  std::vector<std::pair<std::string, std::string>> filesToCreate = {
+      std::make_pair("predictedValues.txt",
+                     "s1_alt,s1_velo,s1_acc,s2_alt,s2_velo,s2_acc,s3_alt,s3_"
+                     "velo,s3_acc,s4_alt,s4_velo,s4_acc,s5_alt,s5_velo,s5_acc,"
+                     "s6_alt,s6_velo,s6_acc\n"),
+      std::make_pair(
+          "gains.txt",
+          "sigmaPoint1->gain_v1[0],[1],[2],s1->gain_vector2[0],[1],[2]...\n"),
+      std::make_pair("sigmaPoints.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints1.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints2.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints3.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints4.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints5.txt", "alt,velo,acc\n"),
+      std::make_pair("sigmaPoints6.txt", "alt,velo,acc\n"),
+      std::make_pair("nearestScenarios.txt",
+                     "lowestDistance,secondLowestDistance,firstScenario,"
+                     "SecondScenario\n"),
+      std::make_pair("nearestScenariosFormatted.txt",
+                     "Header_formatted_scenarios\n")};
+
+  for (size_t i = 0; i < filesToCreate.size(); ++i) {
+    std::string filePath = directoryPath + "/" + filesToCreate[i].first;
+    FILE* file = fopen(filePath.c_str(), "a+");
+    if (file) {
+      fputs(filesToCreate[i].second.c_str(), file);
+      fclose(file);
+      std::cout << "File written: " << filesToCreate[i].first << std::endl;
+    } else {
+      fprintf(stderr, "Error opening %s...exiting\n",
+              filesToCreate[i].first.c_str());
+      exit(1);
+    }
+  }
+
+  // Deleting HALO.txt
+  std::string filePath = directoryPath + "/HALO.txt";
+  if (std::remove(filePath.c_str()) == 0) {
+    std::cout << "File deleted successfully: HALO.txt" << std::endl;
+  } else {
+    std::perror("Error deleting file");
+  }
+
+  haloFile = fopen((directoryPath + "/HALO.txt").c_str(),
+                   "a+");  // Open the file for writing
+  if (!haloFile) {
+    fprintf(stderr, "Error opening HALO.txt...exiting\n");
+    exit(1);
+  }
+  fprintf(haloFile,
+          "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
+          "Accel\n");
+
+  // fclose(haloFile);
+}
 
 /**
  * To run:  g++ Infusion.cpp EverestTask.cpp -o Everest
@@ -126,6 +227,9 @@ void EverestTask::MadgwickSetup() {
   };
 
   infusion->madAhrsSetSettings(ahrs, &settings);
+
+  // open files
+  openFiles();
 }
 
 /**
@@ -1055,8 +1159,8 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
       std::cout << "Tareing done, initializing HALO" << std::endl;
       halo = HALO();
       halo.initializeHALO(everest->Kinematics.initialAlt, &halo);
-      std::cout << "Everst initial altitude: " << everest->Kinematics.initialAlt
-                << std::endl;
+      std::cout << "Everest initial altitude: "
+                << everest->Kinematics.initialAlt << std::endl;
       haloInitialized = true;
     }
   }
@@ -1070,15 +1174,10 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
 
   if (isTared) {
 #ifdef LOGON
-    FILE* haloFile =
-        fopen("testSuite/results/HALO.txt", "a+");  // Open the file for writing
-    if (!haloFile) {
-      fprintf(stderr, "Error opening HALO.txt...exiting\n");
-      exit(1);
-    }
 
     fprintf(haloFile, "%f,%f,%f,%f,", everestData.timeIMU1, eAltitude,
             eVelocity, eAccelerationZ);
+
 #endif
 
     // Update HALO
@@ -1118,101 +1217,104 @@ int main() {
 
 // create directory for results
 #ifdef LOGON
-  // Define the directory path
-  std::string directoryPath = "testSuite/results";
+  // // Define the directory path
+  // std::string directoryPath = "testSuite/results";
 
-  // Create the directory if it doesn't exist
-  if (_mkdir("testSuite") == -1) {
-    if (errno != EEXIST) {
-      std::cerr << "Error creating directory: testSuite" << std::endl;
-      return 1;
-    }
-  }
+  // // Create the directory if it doesn't exist
+  // if (_mkdir("testSuite") == -1) {
+  //   if (errno != EEXIST) {
+  //     std::cerr << "Error creating directory: testSuite" << std::endl;
+  //     return 1;
+  //   }
+  // }
 
-  if (_mkdir(directoryPath.c_str()) == -1) {
-    if (errno != EEXIST) {
-      std::cerr << "Error creating directory: " << directoryPath << std::endl;
-      return 1;
-    }
-  }
+  // if (_mkdir(directoryPath.c_str()) == -1) {
+  //   if (errno != EEXIST) {
+  //     std::cerr << "Error creating directory: " << directoryPath <<
+  //     std::endl; return 1;
+  //   }
+  // }
 
-  // File names
-  std::vector<std::string> fileNames = {"gains.txt",
-                                        "predictedValues.txt",
-                                        "log.txt",
-                                        "nearestScenarios.txt",
-                                        "nearestScenariosFormatted.txt",
-                                        "sigmaPoints.txt",
-                                        "sigmaPoints1.txt",
-                                        "sigmaPoints2.txt",
-                                        "sigmaPoints3.txt",
-                                        "sigmaPoints4.txt",
-                                        "sigmaPoints5.txt",
-                                        "sigmaPoints6.txt"};
+  // // File names
+  // std::vector<std::string> fileNames = {"gains.txt",
+  //                                       "predictedValues.txt",
+  //                                       "log.txt",
+  //                                       "nearestScenarios.txt",
+  //                                       "nearestScenariosFormatted.txt",
+  //                                       "sigmaPoints.txt",
+  //                                       "sigmaPoints1.txt",
+  //                                       "sigmaPoints2.txt",
+  //                                       "sigmaPoints3.txt",
+  //                                       "sigmaPoints4.txt",
+  //                                       "sigmaPoints5.txt",
+  //                                       "sigmaPoints6.txt"};
 
-  // Deleting files
-  for (size_t i = 0; i < fileNames.size(); ++i) {
-    std::string filePath = directoryPath + "/" + fileNames[i];
-    if (std::remove(filePath.c_str()) == 0) {
-      std::cout << "File deleted successfully: " << fileNames[i] << std::endl;
-    } else {
-      std::perror("Error deleting file");
-    }
-  }
+  // // Deleting files
+  // for (size_t i = 0; i < fileNames.size(); ++i) {
+  //   std::string filePath = directoryPath + "/" + fileNames[i];
+  //   if (std::remove(filePath.c_str()) == 0) {
+  //     std::cout << "File deleted successfully: " << fileNames[i] <<
+  //     std::endl;
+  //   } else {
+  //     std::perror("Error deleting file");
+  //   }
+  // }
 
-  // Creating and writing to files
-  std::vector<std::pair<std::string, std::string>> filesToCreate = {
-      std::make_pair("predictedValues.txt",
-                     "s1_alt,s1_velo,s1_acc,s2_alt,s2_velo,s2_acc,s3_alt,s3_"
-                     "velo,s3_acc,s4_alt,s4_velo,s4_acc,s5_alt,s5_velo,s5_acc,"
-                     "s6_alt,s6_velo,s6_acc\n"),
-      std::make_pair(
-          "gains.txt",
-          "sigmaPoint1->gain_v1[0],[1],[2],s1->gain_vector2[0],[1],[2]...\n"),
-      std::make_pair("sigmaPoints.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints1.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints2.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints3.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints4.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints5.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints6.txt", "alt,velo,acc\n"),
-      std::make_pair("nearestScenarios.txt",
-                     "lowestDistance,secondLowestDistance,firstScenario,"
-                     "SecondScenario\n"),
-      std::make_pair("nearestScenariosFormatted.txt",
-                     "Header_formatted_scenarios\n")};
+  // // Creating and writing to files
+  // std::vector<std::pair<std::string, std::string>> filesToCreate = {
+  //     std::make_pair("predictedValues.txt",
+  //                    "s1_alt,s1_velo,s1_acc,s2_alt,s2_velo,s2_acc,s3_alt,s3_"
+  //                    "velo,s3_acc,s4_alt,s4_velo,s4_acc,s5_alt,s5_velo,s5_acc,"
+  //                    "s6_alt,s6_velo,s6_acc\n"),
+  //     std::make_pair(
+  //         "gains.txt",
+  //         "sigmaPoint1->gain_v1[0],[1],[2],s1->gain_vector2[0],[1],[2]...\n"),
+  //     std::make_pair("sigmaPoints.txt", "alt,velo,acc\n"),
+  //     std::make_pair("sigmaPoints1.txt", "alt,velo,acc\n"),
+  //     std::make_pair("sigmaPoints2.txt", "alt,velo,acc\n"),
+  //     std::make_pair("sigmaPoints3.txt", "alt,velo,acc\n"),
+  //     std::make_pair("sigmaPoints4.txt", "alt,velo,acc\n"),
+  //     std::make_pair("sigmaPoints5.txt", "alt,velo,acc\n"),
+  //     std::make_pair("sigmaPoints6.txt", "alt,velo,acc\n"),
+  //     std::make_pair("nearestScenarios.txt",
+  //                    "lowestDistance,secondLowestDistance,firstScenario,"
+  //                    "SecondScenario\n"),
+  //     std::make_pair("nearestScenariosFormatted.txt",
+  //                    "Header_formatted_scenarios\n")};
 
-  for (size_t i = 0; i < filesToCreate.size(); ++i) {
-    std::string filePath = directoryPath + "/" + filesToCreate[i].first;
-    FILE* file = fopen(filePath.c_str(), "a+");
-    if (file) {
-      fputs(filesToCreate[i].second.c_str(), file);
-      fclose(file);
-      std::cout << "File written: " << filesToCreate[i].first << std::endl;
-    } else {
-      fprintf(stderr, "Error opening %s...exiting\n",
-              filesToCreate[i].first.c_str());
-      exit(1);
-    }
-  }
+  // for (size_t i = 0; i < filesToCreate.size(); ++i) {
+  //   std::string filePath = directoryPath + "/" + filesToCreate[i].first;
+  //   FILE* file = fopen(filePath.c_str(), "a+");
+  //   if (file) {
+  //     fputs(filesToCreate[i].second.c_str(), file);
+  //     fclose(file);
+  //     std::cout << "File written: " << filesToCreate[i].first << std::endl;
+  //   } else {
+  //     fprintf(stderr, "Error opening %s...exiting\n",
+  //             filesToCreate[i].first.c_str());
+  //     exit(1);
+  //   }
+  // }
 
-  // Deleting HALO.txt
-  std::string filePath = directoryPath + "/HALO.txt";
-  if (std::remove(filePath.c_str()) == 0) {
-    std::cout << "File deleted successfully: HALO.txt" << std::endl;
-  } else {
-    std::perror("Error deleting file");
-  }
+  // // Deleting HALO.txt
+  // std::string filePath = directoryPath + "/HALO.txt";
+  // if (std::remove(filePath.c_str()) == 0) {
+  //   std::cout << "File deleted successfully: HALO.txt" << std::endl;
+  // } else {
+  //   std::perror("Error deleting file");
+  // }
 
-  FILE* file = fopen((directoryPath + "/HALO.txt").c_str(),
-                     "a+");  // Open the file for writing
-  if (!file) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
-    exit(1);
-  }
-  fprintf(file,
-          "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
-          "Accel\n");
+  // FILE* file = fopen((directoryPath + "/HALO.txt").c_str(),
+  //                    "a+");  // Open the file for writing
+  // if (!file) {
+  //   fprintf(stderr, "Error opening HALO.txt...exiting\n");
+  //   exit(1);
+  // }
+  // fprintf(file,
+  //         "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
+  //         "Accel\n");
+
+  // fclose(file);
 
 #endif
 
@@ -1318,6 +1420,7 @@ int main() {
     // start timer for iteration
     start = std::clock();
 
+    // calls the entirety of the power of HALO, peak modularization
     std::vector<double> haloData = everest.EverestToHalo(everestData, &everest);
 
     std::cout << "Halo Data: " << haloData[0] << ", " << haloData[1] << ", "
@@ -1409,7 +1512,8 @@ int main() {
   std::cout << "End of program" << std::endl;
 
 #ifdef LOGON
-  fclose(file);
+  // fclose(file);
+  fclose(haloFile);
 #endif
 
   return 0;

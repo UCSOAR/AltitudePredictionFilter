@@ -61,7 +61,7 @@ plt.title("Time vs Velo")
 plt.legend()
 plt.grid(True)
 
-input_data = input_data[21:]["accel_z"]
+input_data = input_data[20:]["accel_z"]
 # accel_z = input_data["accel_z"]
 
 # plot accel    (altimeter, everest, halo, gps, sigma, scenarios)
@@ -172,17 +172,26 @@ plt.title("Time vs Velo")
 plt.legend()
 plt.grid(True)
 
-residual_halo = sims["alt_6"] - df["Halo_Alt"]
-residual_everest = sims["alt_6"] - df["Everest_Alt"]
 
-plt.figure(figsize=(10, 6))
-# marker for apogee at 3 secs
-plt.axvline(x=3, color="r", linestyle="--", label="x=3")
-plt.plot(df["Time"], residual_halo, label="residual_halo")
-plt.plot(df["Time"], residual_everest, label="residual_everest")
-plt.legend()
-plt.grid(True)
+# Plot Residual Altitude ----------------------------------------------------
+# halo_cut = df["Halo_Alt"][1:].reset_index(drop=True)
+# altimeter_cut = altimeter["final_alt"][16:535].reset_index(drop=True)
+# x = list(range(1, len(halo_cut)+1))  # x values from 1 to 535
 
+# residual_halo = altimeter_cut - halo_cut
+# residual_everest = altimeter["final_alt"][16:536] - df["Everest_Alt"]
+
+# plt.figure(figsize=(10, 6))
+# # marker for apogee at 3 secs
+# plt.axvline(x=3, color="r", linestyle="--", label="x=3")
+# plt.plot(x, residual_halo, label="residual_halo")
+# # plt.plot(x, residual_everest, label="residual_everest")
+# plt.legend()
+# plt.grid(True)
+
+# print(halo_cut)
+# print(altimeter["final_alt"][16:536])
+# print(residual_halo)
 # -------------------------------------------------------------------------------
 
 # plot scenario choices

@@ -8,6 +8,8 @@
 #include <ctime>
 #include <chrono>
 
+// #include "everestTaskHPP.hpp"
+
 #include "KDTree.hpp"
 
 #ifdef HOME
@@ -257,18 +259,13 @@ class HALO {
   void createScenarios(HALO *halo);
 
   std::vector<std::pair<std::vector<float>, std::vector<float>>>
-      listOfGainsSigmaPoints =
-          // {{{0.4, 0.4, 0.4}, {0.6, 0.6, 0.6}},
-          //                           {{0.6, 0.6, 0.6}, {0.4, 0.4, 0.4}},
-          //                           {{0.2, 0.2, 0.2}, {0.8, 0.8, 0.8}},
-          //                           {{0.7, 0.7, 0.7}, {0.3, 0.3, 0.3}},
-          //                           {{0.3, 0.3, 0.3}, {0.7, 0.7, 0.7}},
-          //                           {{0.1, 0.1, 0.1}, {0.9, 0.9, 0.9}},
-          //                           {{0.8, 0.8, 0.8}, {0.2, 0.2, 0.2}}};
-      {{{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}}, {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
-       {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}}, {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
-       {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}}, {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
-       {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}}};
+      listOfGainsSigmaPoints = {{{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}}};
 
   void overrideStateWithGPS(float GPS);
 
@@ -279,6 +276,12 @@ class HALO {
   FILE *file;
 
   int scenarioIndex = 0;
+
+  void initializeHALO(float initialAlt, HALO *halo);
+
+  std::vector<double> Halo_Input(HALO *haloPointer, bool isInitialized,
+                                 double eAccelerationZ, double eVelocity,
+                                 double eAltitude, float time);
 
   std::chrono::duration<double> updateTime;
   std::chrono::duration<double> predictTime;

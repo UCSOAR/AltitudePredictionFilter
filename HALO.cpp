@@ -33,13 +33,10 @@
 #define k 3 - dim  // 3 dimensions
 std::string directoryPath = "testSuite/results";
 
+bool isInitialized = false;
+int counter = 0;
+
 using namespace Eigen;
-
-// Madgwick -> IMUs, Baros
-
-// UKF -> GPS, Dynamic Model = augmented state vector
-
-// Madgwick -(Xi = Filtered Altitude)> z = GPS
 
 void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
   // Input: Estimate Uncertainty -> system state
@@ -942,40 +939,36 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
 #ifdef LOGON
 
-  FILE* file = fopen((directoryPath + "/nearestScenarios.txt").c_str(), "a+");
-  if (!file) {
+  FILE* nearestScenariosFile =
+      fopen((directoryPath + "/nearestScenarios.txt").c_str(), "a+");
+  if (!nearestScenariosFile) {
     fprintf(stderr, "Error opening nearestScenarios.txt...exiting\n");
     exit(1);
   }
 
-  FILE* file2 =
+  FILE* nearestScenariosFormattedFile =
       fopen((directoryPath + "/nearestScenariosFormatted.txt").c_str(), "a+");
-  if (!file2) {
+  if (!nearestScenariosFormattedFile) {
     fprintf(stderr, "Error opening nearestScenariosFormatted.txt...exiting\n");
     exit(1);
   }
 
-  fprintf(file, "%f,%f,", lowestDistance, secondLowestDistance);
-  fprintf(file, "%d,%d\n", lowestDistanceIndex, secondLowestDistanceIndex);
-  // fprintf(file, "%d,%d,", distances[lowestDistanceIndex].second.second,
-  // distances[secondLowestDistanceIndex].second.second); fprintf(file,
-  // "%f,%f\n", distances[lowestDistanceIndex].first,
-  // distances[secondLowestDistanceIndex].first);
+  fprintf(nearestScenariosFile, "%f,%f,", lowestDistance, secondLowestDistance);
+  fprintf(nearestScenariosFile, "%d,%d\n", lowestDistanceIndex,
+          secondLowestDistanceIndex);
 
-  fprintf(file2, "For Meas(%f,%f,%f) V1(%f) lowest(%f),secondL(%f),",
-          measurement[0], measurement[1], measurement[2], lowestDistance,
-          secondLowestDistance);
-  // fprintf(file2, "lowestIndex(%d),secondLI(%d),", lowestDistanceIndex,
-  // secondLowestDistanceIndex);
-  fprintf(file2, "lowestName(%d),secondLN(%d)\n",
+  fprintf(nearestScenariosFormattedFile,
+          "For Meas(%f,%f,%f) lowest(%f),secondL(%f),", measurement[0],
+          measurement[1], measurement[2], lowestDistance, secondLowestDistance);
+  fprintf(nearestScenariosFormattedFile, "lowestName(%d),secondLN(%d)\n",
           distances[lowestDistanceIndex].second.second,
           distances[secondLowestDistanceIndex].second.second);
-  fprintf(file2, "list: %f,%f,%f,%f,%f,%f\n", distances[0].first,
-          distances[1].first, distances[2].first, distances[3].first,
-          distances[4].first, distances[5].first, distances[6].first);
+  fprintf(nearestScenariosFormattedFile, "list: %f,%f,%f,%f,%f,%f\n",
+          distances[0].first, distances[1].first, distances[2].first,
+          distances[3].first, distances[4].first, distances[5].first);
 
-  fclose(file);
-  fclose(file2);
+  fclose(nearestScenariosFile);
+  fclose(nearestScenariosFormattedFile);
 
 #endif
 
@@ -1160,20 +1153,20 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
 
 #ifdef LOGON
 
-  FILE* file = fopen((directoryPath + "/gains.txt").c_str(), "a+");
-  if (!file) {
+  FILE* gainsFile = fopen((directoryPath + "/gains.txt").c_str(), "a+");
+  if (!gainsFile) {
     fprintf(stderr, "Error opening gains.txt...exiting\n");
     exit(1);
   }
 
-  fprintf(file, "%f, %f, %f,", gainV1[0], gainV1[1], gainV1[2]);
-  fprintf(file, "%f, %f, %f", gainV2[0], gainV2[1], gainV2[2]);
+  fprintf(gainsFile, "%f, %f, %f,", gainV1[0], gainV1[1], gainV1[2]);
+  fprintf(gainsFile, "%f, %f, %f", gainV2[0], gainV2[1], gainV2[2]);
 
-  fclose(file);
+  fclose(gainsFile);
 
 #endif
 
-  // interpolate between the two scenarios to get predicted values0
+  // interpolate between the two scenarios to get predicted values
   float predicted_interpolated_alt = this->prevGain1[0] * vector1Future[0] +
                                      this->prevGain2[0] * vector2Future[0];
   float predicted_interpolated_velo = this->prevGain1[1] * vector1Future[1] +
@@ -1391,6 +1384,126 @@ void HALO::createScenarios(HALO* halo) {
 #endif
 
   halo->setScenarios(scenarios);
+}
+
+/**
+ * @brief Initialize HALO filter, created HALO object, scenarios and initial
+ * state vector from calibration
+ */
+void HALO::initializeHALO(float initialAlt, HALO* halo) {
+  // HALO* halo = new HALO();
+  // set initial state
+  VectorXf X0(3);
+  X0 << initialAlt, 0, 0;
+
+  MatrixXf Q(3, 3);
+  Q << 100, 0, 0, 0, 40, 0, 0, 0, 8;
+
+  // Covariance matrix
+  MatrixXf R0(3, 3);
+  R0 << 200, 0.5, 0.5, 0.5, 100, 1, 0.5, 1, 10;
+
+  MatrixXf P0(3, 3);
+  P0 << 50, 0, 0, 0, 0, 0, 0, 0, 0;
+
+  halo->deltaTime = 1 / 3;
+
+  // create scenarios
+  createScenarios(halo);
+
+  // Initialize with tare / GPS values
+  halo->init(X0, P0, Q, R0);
+}
+
+std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
+                                     double eAccelerationZ, double eVelocity,
+                                     double eAltitude, float time) {
+  // HALO* haloPointer;
+  std::vector<double> unitedStates = {0, 0, 0};
+
+  // #ifdef LOGON
+  //   FILE* file = fopen((directoryPath + "/HALO.txt").c_str(),
+  //                     "w+");  // Open the file for writing
+  //   if (!file) {
+  //     fprintf(stderr, "Error opening HALO.txt...exiting\n");
+  //     exit(1);
+  //   }
+  // #endif
+
+  if (isInitialized) {
+    haloPointer->setTime(time);
+    haloPointer->setStateVector(eAccelerationZ, eVelocity, eAltitude);
+
+    unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
+
+    std::cout << "Everest measurements (HALO_Input): " << eAltitude << ", "
+              << eVelocity << ", " << eAccelerationZ << std::endl;
+
+    // #ifdef LOGON
+    //   fprintf(file, "%f,%f,%f,%f,%f,%f,%f\n", time, eAltitude, eVelocity,
+    //           eAccelerationZ, unitedStates[0], unitedStates[1],
+    //           unitedStates[2]);
+
+    //   fclose(file);
+    // #endif
+  }
+
+  if (counter == 550) {
+#ifdef TIMERON
+    std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t"
+              << haloPointer->updateTime.count() << std::endl;
+    std::cout << "Predict time:\t\t\t\t\t\t\t\t\t\t"
+              << haloPointer->predictTime.count() << std::endl;
+
+    std::cout << "\tTriangulationTime:\t\t\t\t\t\t\t"
+              << haloPointer->triangulationTime.count() << std::endl;
+    std::cout << "\tdModeltime:\t\t\t\t\t\t\t\t"
+              << haloPointer->dynamicModelTime.count() << std::endl;
+
+    std::cout << "\t\tgetScenarioTime:\t\t\t\t\t"
+              << haloPointer->getScenarioTime.count() << std::endl;
+    std::cout << "\t\tpPredictionTime:\t\t\t\t\t"
+              << haloPointer->PpredictionTime.count() << std::endl;
+    std::cout << "\t\tprojErrorTime:\t\t\t\t\t\t"
+              << haloPointer->projErrorTime.count() << std::endl;
+    std::cout << "\t\tpreMeanTime:\t\t\t\t\t\t"
+              << haloPointer->preMeanTime.count() << std::endl;
+    std::cout << "\t\tsPointTime:\t\t\t\t\t\t"
+              << haloPointer->sPointTime.count() << std::endl;
+    std::cout << "\t\tpredictLoopTime:\t\t\t\t\t"
+              << haloPointer->predictLoopTime.count() << std::endl;
+    std::cout << "\t\tendPredictLoopTime:\t\t\t\t\t"
+              << haloPointer->endPredictLoopTime.count() << std::endl;
+    std::cout << "\t\tnearestScenariosTime:\t\t\t\t\t"
+              << haloPointer->nearestScenariosTime.count() << std::endl;
+
+    std::cout << "\t\t\t->loopScenariosTime:\t\t\t"
+              << haloPointer->loopScenariosTime.count() << std::endl;
+    std::cout << "\t\t\t\t->getListsTime:\t\t"
+              << haloPointer->getListsTime.count() << std::endl;
+    std::cout << "\t\t\t\t->othersTime:\t\t" << haloPointer->othersTime.count()
+              << std::endl;
+    std::cout << "\t\t\t\t->KDTreeTime:\t\t" << haloPointer->KDTreeTime.count()
+              << std::endl;
+    std::cout << "\t\t\t\t->twoDistancesTime:\t"
+              << haloPointer->twoDistancesTime.count() << std::endl;
+    std::cout << "\t\t\t\t->emplaceBackTime:\t"
+              << haloPointer->emplaceBackTime.count() << std::endl;
+
+    std::cout << "\t\t\t->vectorsTime:\t\t\t\t"
+              << haloPointer->vectorsTime.count() << std::endl;
+    std::cout << "\t\t\t->push_backTime:\t\t\t"
+              << haloPointer->push_backTime.count() << std::endl;
+
+    std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t"
+              << (haloPointer->treeCreationTime).count() << std::endl;
+
+#endif
+  }
+
+  counter++;
+
+  return unitedStates;
 }
 
 #endif

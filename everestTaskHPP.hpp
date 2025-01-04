@@ -202,6 +202,11 @@ class EverestTask {
                       float timeBaro1, float timeBaro2,
                       MadAxesAlignment alignment, MadAxesAlignment alignment2);
 
+  bool getIsTared();
+
+  std::vector<double> EverestToHalo(EverestData everestData,
+                                    EverestTask* everest);
+
  protected:
   IMUData internalIMU_1, internalIMU_2;
 

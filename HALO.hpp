@@ -7,9 +7,6 @@
 #include <iostream>
 #include <ctime>
 #include <chrono>
-
-// #include "everestTaskHPP.hpp"
-
 #include "KDTree.hpp"
 
 #ifdef HOME
@@ -164,7 +161,6 @@ struct Scenario {
   std::vector<float> evaluateVectorAtTime(float time) {
     std::vector<std::vector<float>> *list = getLists();
     int index = 0;
-    // printf("starting to evaluate vector at time %f\n", time);
     std::vector<float> vect = {0, 0, 0, 0};
 
     vect = list->at(binarySearch((*list), time));
@@ -183,10 +179,6 @@ struct kinematicsHalo {
 class HALO {
  public:
   void init(VectorXf &X0, MatrixXf &P0, MatrixXf Q_input, MatrixXf &R0);
-
-  void update();
-
-  void unscentedTransform();
 
   void stateUpdate();
 
@@ -337,47 +329,7 @@ class HALO {
 
   kinematicsHalo KinematicsHalo;
 
-  // kinematics* getKinematics();
-
   MatrixXf sigPoints;
 };
-
-// bool getIsBeforeApogee(){
-//     return isBeforeApogeeBool;
-// };
-
-// void HALO::setFilteredValues(float FAccel, float FVelo, float FAlt){
-//     this->fAccel = FAccel;
-//     this->fVelo = FVelo;
-//     this->fAlt = FAlt;
-// }
-
-// float HALO::getFAlt(){
-//     return this->fAlt;
-// }
-
-// float HALO::getFVelo(){
-//     return this->fVelo;
-// }
-
-// float HALO::getFAccel(){
-//     return this->fAccel;
-// }
-
-// void HALO::setAlt(float gps_alt){
-//     this->GPS_Alt = gps_alt;
-// }
-
-// float HALO::getGPSAlt(){
-//     return this->GPS_Alt;
-// }
-
-// kinematics* HALO::getKinematics(){
-//     return &Kinematics;
-// }
-
-// HALO getHALO(){
-//     return
-// }
 
 #endif

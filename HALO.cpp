@@ -1,5 +1,4 @@
 #include "HALO.hpp"
-// #include "everestTaskHPP.hpp"
 #include <fstream>
 #include "Data.cpp"
 
@@ -18,9 +17,6 @@
 
 #ifndef HALO_CPP
 #define HALO_CPP
-
-// Integration of Everest with UKF = HALO
-
 #define REFRESH_RATE 20
 
 #define printf(...) ;
@@ -46,28 +42,11 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
   this->Q = Q_input;
   this->R = R0;
 
-  // std::cout << "X0: \n" << X0 << std::endl;
-  // std::cout << "P0: \n" << P0 << std::endl;
-  // std::cout << "Q: \n" << Q_input << std::endl;
-
-  // F is for state to next state transition
-  // P0 = initial guess of state covariance matrix
-  // Q = process noise covariance matrix -> dynamic model std
-  // R = measurement noise covariance matrix -> sensor std
-
-  // std::cout << "k: " << k << std::endl;
-
-  // std::cout << "N: " << N << std::endl;
-
   // Weights for sigma points
   float dime = 3;
   float k1 = 3 - dime;
   float w0_m = k1 / (dime + k1);  // weight for first sPoint when cal covar
   float w_i = 1 / (2 * (dime + k1));
-
-  // std::cout << "w0_m: " << w0_m << std::endl;
-
-  // std::cout << "w_i: " << w_i << std::endl;
 
   MatrixXf Weights(7, 7);
   VectorXf W(7, 1);
@@ -82,72 +61,24 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
 
   this->WeightsUKF = Weights;
 
-  // std::cout << "Weights: \n" << Weights << std::endl;
-
-  // errors can be because you didnt instantiate the matrix
-  // or trying to make a vector and declaring as a matrix
   VectorXf WeightsForSigmaPoints(7, 1);
   WeightsForSigmaPoints.setConstant(7, w_i);
   WeightsForSigmaPoints(0) = w0_m;
   this->WeightsForSigmaPoints = WeightsForSigmaPoints;
 
-  // std::cout << "WeightsForSigmaPoints: \n" << WeightsForSigmaPoints <<
-  // std::endl;
-
   this->KinematicsHalo.altitudeStore = X0(0);
-
-  // Z_in = [GPS altitude]
-  // Z_in << this->getGPSAlt();
   this->N1 = 3;
 
   calculateSigmaPoints();
 }
 
 // Update Step-------------------------------------
-void HALO::update() {
-  unscentedTransform();
-
-  // stateUpdate();
-}
-
-void HALO::unscentedTransform() {
-  // measurement vector
-  // Z = h (X) = altitude
-
-  // N = number of dimensions
-  // number of s points = 2N +1
-  // all others = xn,n + sqrt((N+k)Pn,n) for 1 to N
-  // change sign to negative when i = N+1, .... 2N
-
-  //  propagate s points measurment to state equation
-
-  // compute weights of s points
-
-  // w0 = k/(N+k) for the first mean s point
-
-  // wi = 1/2(N+k)
-
-  // Zn = sigma(wi Zn)
-
-  // approx mean and covar pf output distribution
-
-  // mean = xhat n+1, n = sum 2N for wi Xn+1,n
-
-  // covar P n+1, n = sum to 2N for wi (Xn+1,n - xhatn+1,n)(same transposed)
-
-  // for gaussian distribution, set N + k = 3
-}
-
 void HALO::stateUpdate() {
   std::chrono::high_resolution_clock::time_point stateUpdateTime;
 
 #ifdef TIMERON
-
   stateUpdateTime = std::chrono::high_resolution_clock::now();
-
 #endif
-  // Xn = Xn-1 + K (Zn - EstZn)
-  // std::cout << "\n---- State Update ---- \n" << std::endl;
 
   MatrixXf observedValues(3, 7);
   observedValues.setZero(3, 7);
@@ -156,16 +87,10 @@ void HALO::stateUpdate() {
     observedValues.col(i) = sigPoints.col(i);
   }
 
-  // std::cout << "Observed Values: \n" << observedValues << std::endl;
-  // std::cout << "WeightsForSigmaPoints: \n" << WeightsForSigmaPoints <<
-  // std::endl;
-
   // calculate the mean of the observed values
   VectorXf zMean(3);
   zMean.setZero(3);
   zMean = observedValues * WeightsForSigmaPoints;
-
-  // std::cout << "\nZ mean:\n " << zMean << std::endl;
   this->Z = zMean;
 
   // calculate covariance of Z
@@ -177,55 +102,30 @@ void HALO::stateUpdate() {
         (observedValues.row(i).array() - zMean.row(i).value()).matrix();
   }
 
-  // std::cout << "\nZ Covar:\n " << zCovar << std::endl;
-  // std::cout << "R: " << this->R << std::endl;
-
   // calculate the innovation covariance, measurement covariance
   MatrixXf Pz(3, 3);
   Pz.setZero(3, 3);
-
   Pz = (zCovar * WeightsForSigmaPoints.asDiagonal() * zCovar.transpose()) +
        this->R;
-
-  // std::cout << "\nPz:\n " << Pz << std::endl;
 
   // calculate the cross covariance
   MatrixXf Pxz(3, 2);
   Pxz.setZero();
 
-  // std::cout << "\nprojectError: \n" << projectError << std::endl;
-
   Pxz = projectError * WeightsForSigmaPoints.asDiagonal() * zCovar.transpose();
-
-  // std::cout << "\nPxz:\n " << Pxz << std::endl;
 
   // calculate the Kalman gain
   MatrixXf K(3, 3);
   K.setZero();
-
   K = Pxz * Pz.inverse();
-
-  // std::cout << "X: \n" << this->X << std::endl;
-  // std::cout << "\nKalman Gain: \n" << K << std::endl;
-
-  // update the state vector
-  // printf("\nthis->Xprediction + K * (this->X - zMean)\n\n");
-
-  // std::cout << "Xprediction\n" <<  this->Xprediction << std::endl;
-  // std::cout << "\nthis->X\n" << this->X;
-  // std::cout << "\n\nzMean\n\n" << zMean;
 
   bool kZero = false;
 
   for (int row = 0; row < 3; row++) {
     for (int col = 0; col < 3; col++) {
       if (std::isnan(K(row, col))) {
-        std::cout << "NAN detected in the Kalman Gain, defaulting to 0"
-                  << std::endl;
-
         FILE* log = fopen("log.txt", "a+");  // Open the file for appending or
                                              // create it if it doesn't exist
-
         kZero = true;
 
         if (!log) {
@@ -257,14 +157,10 @@ void HALO::stateUpdate() {
     fclose(log);
   }
 
-  // std::cout << "\n\nK\n" << K;
-
   VectorXf difference(3, 1);
   difference.setZero();
   difference << this->X[2] - zMean(0), this->X[1] - zMean(1),
       this->X[0] - zMean(2);
-
-  // std::cout << "\n\n difference\n" << difference << std::endl;
 
   X0 = this->Xprediction + K * difference;
 
@@ -276,7 +172,7 @@ void HALO::stateUpdate() {
       scenarios->at(i).setIsBeforeApogee(false);
     }
 
-    printf("Apogee!!!!!!\n");
+    printf("Apogee\n");
 
   } else {
     // check if the rocket is before apogee
@@ -300,16 +196,10 @@ void HALO::stateUpdate() {
             "Prediction as Estimation\n",
             this->time);
 
-    std::cout << "NAN detected in the state update, defaulting to Prediction "
-                 "as Estimation"
-              << std::endl;
-
     X0 = this->Xprediction;
 
     fclose(log);
   }
-
-  // std::cout << "\nEstimated X (HALO): \n" << X0 << std::endl;
 
   this->KinematicsHalo.altitudeStore = X0(0);
 
@@ -318,27 +208,17 @@ void HALO::stateUpdate() {
   MatrixXf P1(3, 3);
   P1.setZero();
 
-  // // std::cout << "Pprediction: " << Pprediction << std::endl;
-  // // std::cout << "K: " << K << std::endl;
-  // // std::cout << "Pz: " << Pz << std::endl;
-
   P1 = Pprediction - (K * Pz * K.transpose());
 
   this->P = P1;
-
-  // std::cout << "\nP(1,1):\n " << P << std::endl;
-
-  // std::cout << "\n end of state Update\n " << std::endl;
 
   std::chrono::high_resolution_clock::time_point predictTimer;
   std::chrono::high_resolution_clock::time_point endUpdateTime;
 
 #ifdef TIMERON
 
-  // endUpdateTime = std::clock();
   endUpdateTime = std::chrono::high_resolution_clock::now();
 
-  // this->updateTime += (endUpdateTime - stateUpdateTime);
   this->updateTime += std::chrono::duration_cast<std::chrono::duration<double>>(
       std::chrono::high_resolution_clock::now() - stateUpdateTime);
 
@@ -348,13 +228,8 @@ void HALO::stateUpdate() {
 
   calculateSigmaPoints();
 
-  // clock_t endPredictTime;
-
 #ifdef TIMERON
 
-  // endPredictTime = std::clock();
-
-  // this->predictTime += (endPredictTime - predictTimer);
   this->predictTime +=
       std::chrono::duration_cast<std::chrono::duration<double>>(
           std::chrono::high_resolution_clock::now() - predictTimer);
@@ -365,14 +240,7 @@ void HALO::stateUpdate() {
 
 // Prediction--------------------------------------
 void HALO::calculateSigmaPoints() {
-  // std::cout << "X0: " << X0 << std::endl;
-  // std::cout << " ---- Predict Step ---- \n" << std::endl;
-
-  // std::cout << "Q: " << Q << std::endl;
-
   float mutliplier = 3;  // N - lambda
-
-  // std::cout << "Multiplier: " << mutliplier << std::endl;
 
   std::chrono::high_resolution_clock::time_point tTime;
 
@@ -391,11 +259,6 @@ void HALO::calculateSigmaPoints() {
           std::chrono::high_resolution_clock::now() - tTime);
 
 #endif
-  // std::cout << L.col(0) << std::endl;
-
-  // std::cout << "N " << this->N1 << std::endl;
-
-  // std::cout << "L: \n" << L << std::endl;
 
 #ifdef TIMERON
 
@@ -426,9 +289,6 @@ void HALO::calculateSigmaPoints() {
       std::chrono::high_resolution_clock::now() - startSPoint);
 
 #endif
-
-  // before dynamics
-  // std::cout << "before dynamics sPoints: \n" << sigmaPoints << std::endl;
 
 #ifdef LOGON
 
@@ -505,9 +365,6 @@ void HALO::calculateSigmaPoints() {
     this->prevGain1 = this->listOfGainsSigmaPoints[i].first;
     this->prevGain2 = this->listOfGainsSigmaPoints[i].second;
 
-    // printf("\nprevGain1 (%f,%f,%f)\n", this->prevGain1[0],
-    // this->prevGain1[1], this->prevGain1[2]); printf("\nsPoint[%d]: \n", i);
-
 #ifdef TIMERON
 
     this->predictLoopTime +=
@@ -516,13 +373,10 @@ void HALO::calculateSigmaPoints() {
 
 #endif
 
-    // update
-    // clock_t dynamicTime;
     std::chrono::high_resolution_clock::time_point dynamicTime;
 
 #ifdef TIMERON
 
-    // dynamicTime = std::clock();
     dynamicTime = std::chrono::high_resolution_clock::now();
 
 #endif
@@ -549,35 +403,11 @@ void HALO::calculateSigmaPoints() {
 #ifdef LOGON
     fprintf(file, " ");
 #endif
-    // printf("List of Gains\n {(%f, %f, %f), (%f, %f, %f)},\n {(%f, %f, %f),
-    // (%f, %f, %f)},\n {(%f, %f, %f), (%f, %f, %f)},\n {(%f, %f, %f), (%f, %f,
-    // %f)},\n {(%f, %f, %f), (%f, %f, %f)},\n {(%f, %f, %f), (%f, %f, %f)}\n",
-    // listOfGainsSigmaPoints[0].first[0], listOfGainsSigmaPoints[0].first[1],
-    // listOfGainsSigmaPoints[0].first[2], listOfGainsSigmaPoints[0].second[0],
-    // listOfGainsSigmaPoints[0].second[1], listOfGainsSigmaPoints[0].second[2],
-    // listOfGainsSigmaPoints[1].first[0], listOfGainsSigmaPoints[1].first[1],
-    // listOfGainsSigmaPoints[1].first[2], listOfGainsSigmaPoints[1].second[0],
-    // listOfGainsSigmaPoints[1].second[1], listOfGainsSigmaPoints[1].second[2],
-    // listOfGainsSigmaPoints[2].first[0], listOfGainsSigmaPoints[2].first[1],
-    // listOfGainsSigmaPoints[2].first[2], listOfGainsSigmaPoints[2].second[0],
-    // listOfGainsSigmaPoints[2].second[1], listOfGainsSigmaPoints[2].second[2],
-    // listOfGainsSigmaPoints[3].first[0], listOfGainsSigmaPoints[3].first[1],
-    // listOfGainsSigmaPoints[3].first[2], listOfGainsSigmaPoints[3].second[0],
-    // listOfGainsSigmaPoints[3].second[1], listOfGainsSigmaPoints[3].second[2],
-    // listOfGainsSigmaPoints[4].first[0], listOfGainsSigmaPoints[4].first[1],
-    // listOfGainsSigmaPoints[4].first[2], listOfGainsSigmaPoints[4].second[0],
-    // listOfGainsSigmaPoints[4].second[1], listOfGainsSigmaPoints[4].second[2],
-    // listOfGainsSigmaPoints[5].first[0], listOfGainsSigmaPoints[5].first[1],
-    // listOfGainsSigmaPoints[5].first[2], listOfGainsSigmaPoints[5].second[0],
-    // listOfGainsSigmaPoints[5].second[1],
-    // listOfGainsSigmaPoints[5].second[2]);
 
 #ifdef TIMERON
-
     this->endPredictLoopTime +=
         std::chrono::duration_cast<std::chrono::duration<double>>(
             std::chrono::high_resolution_clock::now() - endPredictLoop);
-
 #endif
   }
 
@@ -611,16 +441,6 @@ void HALO::calculateSigmaPoints() {
 
 #endif
 
-  // std::cout << "\nafter predict sPoints: \n" << sigmaPoints << std::endl;
-
-  // std::cout << "Sigma Points row: " << sigmaPoints.rows() << " col: " <<
-  // sigmaPoints.cols() << std::endl; std::cout << "Sigma Points row 0 \n" <<
-  // sigmaPoints.row(0) << std::endl; std::cout << "Sigma Points row 0\n" <<
-  // sigmaPoints(all, all) << std::endl;
-
-  // std::cout << "WeightsForSigmaPoints row: " << WeightsForSigmaPoints.rows()
-  // << " col: " << WeightsForSigmaPoints.cols() << std::endl;
-
 #ifdef TIMERON
 
   std::chrono::high_resolution_clock::time_point preMeanStart =
@@ -633,12 +453,9 @@ void HALO::calculateSigmaPoints() {
   for (int row = 0; row < this->N1; row++) {
     float sum00 = 0;
     for (int col = 0; col < 2 * this->N1 + 1; col++) {
-      // std::cout << "sP (" << row << ", " << col << ")" << "= " <<
-      // sigmaPoints(row, col) << std::endl;
       sum00 += sigmaPoints(row, col) * WeightsForSigmaPoints(col);
     }
     xPreMean(row) = sum00;
-    // std::cout << "XpreMean: \n" << xPreMean << std::endl;
   }
 
 #ifdef TIMERON
@@ -649,8 +466,6 @@ void HALO::calculateSigmaPoints() {
 
 #endif
 
-  // std::cout << "\nXprediction: \n" << xPreMean << std::endl;
-  // std::cout << "Xprediction: \n" << Xprediction << std::endl;
   this->Xprediction = xPreMean;
 
 #ifdef TIMERON
@@ -663,18 +478,11 @@ void HALO::calculateSigmaPoints() {
   MatrixXf projError(3, 7);
   projError.setZero(3, 7);
 
-  // std::cout << "Sigma Points row: " << sigmaPoints.rows() << " col: " <<
-  // sigmaPoints.cols() << std::endl; std::cout << "xPreMean row: " <<
-  // xPreMean.rows() << " col: " << xPreMean.cols() << std::endl; std::cout <<
-  // "sigmaPoints (0,3) " << projError(0,3) << std::endl;
-
   for (int i = 0; i < this->N1; i++) {
     projError.row(i) =
         (sigmaPoints.row(i).array() - (this->Xprediction).row(i).value())
             .matrix();
   }
-
-  // std::cout << "\nProject Error: \n" << projError << std::endl;
 
   this->projectError = projError;
 
@@ -699,8 +507,6 @@ void HALO::calculateSigmaPoints() {
       projError * WeightsForSigmaPoints.asDiagonal() * projError.transpose() +
       this->Q;
 
-  // std::cout << "\nPprediction: \n" << Pprediction << std::endl;
-
   this->Pprediction = Pprediction;
 
 #ifdef TIMERON
@@ -712,8 +518,6 @@ void HALO::calculateSigmaPoints() {
 #endif
 
   this->sigPoints = sigmaPoints;
-
-  // std::cout << " ---- End Predict Step ---- \n" << std::endl;
 }
 
 // Function to calculate the Euclidean distance between two 3D vectors
@@ -729,8 +533,6 @@ float HALO::euclideanDistance(const std::vector<float>& vec1,
   y2 = vec2(1);
   z2 = vec2(2);
 
-  // printf("vec (%f,%f,%f) meas (%f,%f,%f)\n", x1, y1, z1, x2, y2, z2);
-
   return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2) +
                    std::pow(z2 - z1, 2));
 }
@@ -741,7 +543,6 @@ float HALO::euclideanDistance(const std::vector<float>& vec1,
  */
 std::vector<std::vector<float>> HALO::findNearestScenarios(
     std::vector<Scenario>* scenarios, VectorXf& measurement) {
-  // printf("findNearestScenarios\n");
   std::vector<std::pair<float, std::pair<float, int>>> distances;
   distances.reserve(7);
   float minDistance = std::numeric_limits<float>::max();
@@ -764,8 +565,6 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
     i = 0;
     int lowestDistanceIndex = 0;
-
-    // std::vector<float> lowestVector = scenarios[s].getLists()[0];
 
 #ifdef TIMERON
 
@@ -796,9 +595,6 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
             std::chrono::high_resolution_clock::now() - othersTimeStart);
 
 #endif
-
-    // printf("Asking tree for measurementVec: %f, %f, %f\n", measurementVec[0],
-    // measurementVec[1], measurementVec[2]);
 
 #ifdef TIMERON
 
@@ -836,31 +632,6 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
 #endif
 
-    // for(std::vector<float> vec : scenario.getLists()){
-    //     int valueIndex = 0;
-    //
-    //     for(float value : vec){
-    //         vect[valueIndex] = value;
-    //         valueIndex++;
-    //     }
-    //
-    //     // printf(" NS vec: %f, %f, %f\n", vect[0], vect[1], vect[2]);
-    //
-    //     float distance = euclideanDistance(vect, measurement);
-    //     // printf("eucledian distance %f\n", distance);
-    //
-    //     if (distance < minDistance) {
-    //         minDistance = distance;
-    //         lowestDistanceIndex = i;
-    //         lowestVector = scenario.getLists()[i];
-    //     }
-    //
-    //     i++;
-    // }
-
-    // minDistance to order the list and get lowest 2
-    // index go evaluate scenario at n+1
-
 #ifdef TIMERON
 
     std::chrono::high_resolution_clock::time_point emplace_BackStart =
@@ -890,13 +661,6 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
 #endif
 
-  // print distances list
-  // for(int i = 0; i < 6; i++){
-  //     printf("minDistance: %f, lowestIndex: %d, scenario %d\n",
-  //     distances[i].first, distances[i].second.first,
-  //     distances[i].second.second.name);
-  // }
-
 #ifdef TIMERON
 
   std::chrono::high_resolution_clock::time_point startTime =
@@ -911,15 +675,12 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
   for (int i = 0; i < 6; i++) {
     if (distances[i].first < lowestDistance) {
-      // printf("new lowest distance %f\n", distances[i].first);
-
       secondLowestDistance = lowestDistance;
       secondLowestDistanceIndex = lowestDistanceIndex;
 
       lowestDistance = distances[i].first;
       lowestDistanceIndex = i;
     } else if (distances[i].first < secondLowestDistance) {
-      // printf("new second lowest distance %f\n", distances[i].first);
       secondLowestDistance = distances[i].first;
       secondLowestDistanceIndex = i;
     }
@@ -932,10 +693,6 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
           std::chrono::high_resolution_clock::now() - startTime);
 
 #endif
-
-  // printf("lowest distance(%d) = %f, second lowest distance(%d) = %f\n",
-  // lowestDistanceIndex, lowestDistance, secondLowestDistanceIndex,
-  // secondLowestDistance);
 
 #ifdef LOGON
 
@@ -1221,7 +978,6 @@ void HALO::setStateVector(float filteredAcc, float filteredVelo,
   VectorXf X_in(3);
   X_in << this->Uaccel, this->Uvelo, this->Ualt;
 
-  /** X_in = [acceleration, velocity, altitude] */
   this->X = X_in;
 
   this->stateUpdate();
@@ -1260,7 +1016,6 @@ void HALO::overrideStateWithGPS(float GPS) {
 
 // prediction step based on the dynamic model
 VectorXf HALO::dynamicModel(VectorXf& X) {
-  // X = [acceleration, velocity, altitude]
   VectorXf Xprediction(3, 1);
 
 #ifdef TIMERON
@@ -1327,17 +1082,7 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
   std::vector<float> vector3 = nearestVectors[2];
   std::vector<float> vector4 = nearestVectors[3];
 
-  // printf("vector1 (%f,%f,%f)\n", vector1[0], vector1[1], vector1[2]);
-  // printf("futureV1 (%f,%f,%f)\n", vector2[0], vector2[1], vector2[2]);
-  // printf("vector2 (%f,%f,%f)\n", vector3[0], vector3[1], vector3[2]);
-  // printf("futureV2 (%f,%f,%f)\n", vector4[0], vector4[1], vector4[2]);
-
-  // printf("Spoint being propagated X (%f,%f,%f)\n", X(0), X(1), X(2));
-
   Xprediction = predictNextValues(nearestVectors, X);
-
-  // printf("\nXPrediction of Model: (%f,%f,%f)\n\n", Xprediction(0),
-  // Xprediction(1), Xprediction(2));
 
   return Xprediction;
 }
@@ -1394,7 +1139,6 @@ void HALO::createScenarios(HALO* halo) {
  * state vector from calibration
  */
 void HALO::initializeHALO(float initialAlt, HALO* halo) {
-  // HALO* halo = new HALO();
   // set initial state
   VectorXf X0(3);
   X0 << initialAlt, 0, 0;
@@ -1421,37 +1165,16 @@ void HALO::initializeHALO(float initialAlt, HALO* halo) {
 std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
                                      double eAccelerationZ, double eVelocity,
                                      double eAltitude, float time) {
-  // HALO* haloPointer;
   std::vector<double> unitedStates = {0, 0, 0};
-
-  // #ifdef LOGON
-  //   FILE* file = fopen((directoryPath + "/HALO.txt").c_str(),
-  //                     "w+");  // Open the file for writing
-  //   if (!file) {
-  //     fprintf(stderr, "Error opening HALO.txt...exiting\n");
-  //     exit(1);
-  //   }
-  // #endif
 
   if (isInitialized) {
     haloPointer->setTime(time);
     haloPointer->setStateVector(eAccelerationZ, eVelocity, eAltitude);
 
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
-
-    std::cout << "Everest measurements (HALO_Input): " << eAltitude << ", "
-              << eVelocity << ", " << eAccelerationZ << std::endl;
-
-    // #ifdef LOGON
-    //   fprintf(file, "%f,%f,%f,%f,%f,%f,%f\n", time, eAltitude, eVelocity,
-    //           eAccelerationZ, unitedStates[0], unitedStates[1],
-    //           unitedStates[2]);
-
-    //   fclose(file);
-    // #endif
   }
 
-  if (counter == 543) {
+  if (counter == 536) {
 #ifdef TIMERON
     std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t"
               << haloPointer->updateTime.count() << std::endl;

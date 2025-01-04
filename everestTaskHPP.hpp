@@ -6,16 +6,11 @@
 #define EVEREST_TASK_HPP
 
 #include "infusion.hpp"
-
 #include "KDTree.hpp"
 #include "HALO.hpp"
-
-// #include <filesystem>
-
 #include <stdio.h>
 #include <ctime>
 #include <string.h>
-
 #include <vector>
 #include <fstream>
 #include <iostream>
@@ -29,19 +24,12 @@
 #include "C:\Users\Andrey\Documents\UKFRepo\UnscentedKalmanFilter\EverestLibrary_HALO\EverestL\EverestLibrary\HALO.hpp"
 #endif
 
-// task specific
-// #include "Task.hpp"
-// #include "Data.h"
-// #include "SystemDefines.hpp"
-
 // Definitions
 // CHANGE
 #define SAMPLE_RATE (3)  // replace this with actual sample rate of baros
 #define DELTA_TIME (1.0f / 3.0f)
 #define RATE_BARO (3)
 #define CALIBRATION_TIME (2)
-
-#define LAPTOP
 
 /* Macros/Enums ------------------------------------------------------------*/
 enum EVEREST_TASK_COMMANDS { EVEREST_NONE = 0, UPDATE, TEST, RETARE };
@@ -137,13 +125,6 @@ typedef struct {
 
 class EverestTask {
  public:
-  // static EverestTask& Inst() {
-  // 	static EverestTask inst;
-  // 	return inst;
-  // }
-
-  // void InitTask();
-
   void IMU_Update(const IMUData& imu1, const IMUData& imu2);
 
   Infusion* ExternalInitialize();
@@ -170,9 +151,6 @@ class EverestTask {
   double deriveChangeInVelocityToGetAltitude(double estimate);
 
   void MadgwickWrapper(IMUData data);
-
-  // void IMU_Update(const SensorDataNoMag& imu1, const SensorDataNoMag& imu2,
-  // float magX, float magY, float magZ);
 
   double ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
                         BarosData baro2);
@@ -217,19 +195,7 @@ class EverestTask {
   std::vector<double> zeroOffsetGyro = {0, 0, 0};
   std::vector<double> zeroOffsetGyro2 = {0, 0, 0};
 
-  // static void RunTask(void* pvParams) { EverestTask::Inst().Run(pvParams); }
-  // // Static Task Interface, passes control to the instance Run();
-
-  // void Run(void* pvParams);    // Main run code
-
-  // void HandleCommand(Command& cm);
-  // void HandleRequestCommand(uint16_t taskCommand);
-
  private:
-  // EverestTask();                                        // Private
-  // constructor EverestTask(const EverestTask&);                    // Prevent
-  // copy-construction EverestTask& operator=(const EverestTask&);            //
-  // Prevent assignment
 };
 
 void EverestTask::initialize1(systemState& state) {
@@ -241,8 +207,6 @@ void EverestTask::initialize1(systemState& state) {
   Kinematics.initialVelo = 0;
   Kinematics.initialAlt = 0;
   Kinematics.finalAltitude = 0;
-
-  printf("Initialized\n");
 }
 
 Infusion* EverestTask::ExternalInitialize() {

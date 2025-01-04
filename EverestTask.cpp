@@ -18,6 +18,7 @@
 #define TIMERON
 #define printf(...) ;
 FILE* haloFile;
+FILE* everestFile;
 
 int openFiles() {
   // Define the directory path
@@ -106,6 +107,14 @@ int openFiles() {
     std::perror("Error deleting file");
   }
 
+  // deleting EVEREST.txt
+  filePath = directoryPath + "/EVEREST.txt";
+  if (std::remove(filePath.c_str()) == 0) {
+    std::cout << "File deleted successfully: EVEREST.txt" << std::endl;
+  } else {
+    std::perror("Error deleting file");
+  }
+
   haloFile = fopen((directoryPath + "/HALO.txt").c_str(),
                    "a+");  // Open the file for writing
   if (!haloFile) {
@@ -116,7 +125,20 @@ int openFiles() {
           "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
           "Accel\n");
 
-  // fclose(haloFile);
+  // Open EVEREST.txt
+  everestFile = fopen((directoryPath + "/EVEREST.txt").c_str(),
+                      "a+");  // Open the file for writing
+  if (!everestFile) {
+    fprintf(stderr, "Error opening EVEREST.txt...exiting\n");
+    exit(1);
+  }
+
+  fprintf(
+      everestFile,
+      "timestamp, roll, pitch, yaw,accelerationError, accelerometerIgnored, "
+      "accelerationRecoveryTrigger,magneticError, magnetometerIgnored, "
+      "magneticRecoveryTrigger, initialising, angularRateRecovery, "
+      "accelerationRecovery, magneticRecovery, earth.axis.z\n");
 }
 
 /**
@@ -228,8 +250,10 @@ void EverestTask::MadgwickSetup() {
 
   infusion->madAhrsSetSettings(ahrs, &settings);
 
-  // open files
+// open files
+#ifdef LOGON
   openFiles();
+#endif
 }
 
 /**
@@ -276,20 +300,22 @@ void EverestTask::MadgwickWrapper(IMUData data) {
   internalStates = infusion->madAhrsGetInternalStates(infusion->getMadAhrs());
   flags = infusion->madAhrsGetFlags(infusion->getMadAhrs());
 
+#ifdef LOGON
   // write to file
-  //    fprintf(file, "%f,", timestamp);
-  //
-  //    fprintf(file, "%f,%f,%f,", euler.angle.roll, euler.angle.pitch,
-  //    euler.angle.yaw);
-  //
-  //    fprintf(file, "%f,%d,%.0f,%.0f,%d,%.0f,%d,%d,%d,%d,%f",
-  //    internalStates.accelerationError, internalStates.accelerometerIgnored,
-  //    internalStates.accelerationRecoveryTrigger,
-  //    internalStates.magneticError, internalStates.magnetometerIgnored,
-  //    internalStates.magneticRecoveryTrigger, flags.initialising,
-  //    flags.angularRateRecovery, flags.accelerationRecovery,
-  //    flags.magneticRecovery, earth.axis.z);
-  // fprintf(file, "\n");
+  fprintf(everestFile, "%f,", timestamp);
+
+  fprintf(everestFile, "%f,%f,%f,", euler.angle.roll, euler.angle.pitch,
+          euler.angle.yaw);
+
+  fprintf(everestFile, "%f,%d,%.0f,%.0f,%d,%.0f,%d,%d,%d,%d,%f",
+          internalStates.accelerationError, internalStates.accelerometerIgnored,
+          internalStates.accelerationRecoveryTrigger,
+          internalStates.magneticError, internalStates.magnetometerIgnored,
+          internalStates.magneticRecoveryTrigger, flags.initialising,
+          flags.angularRateRecovery, flags.accelerationRecovery,
+          flags.magneticRecovery, earth.axis.z);
+  fprintf(everestFile, "\n");
+#endif
 
   everest.state.earthAcceleration = earth.axis.z;
 
@@ -526,7 +552,6 @@ void EverestTask::Baro_Update(const BarosData& Baro1, const BarosData& Baro2) {
 double EverestTask::ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
                                    BarosData baro2) {
   if (!isTared) {
-    // printf("Taring in progress\n");
     everest.tare(imu1, imu2, baro1, baro2);
     return 0;
   }
@@ -1174,10 +1199,8 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
 
   if (isTared) {
 #ifdef LOGON
-
     fprintf(haloFile, "%f,%f,%f,%f,", everestData.timeIMU1, eAltitude,
             eVelocity, eAccelerationZ);
-
 #endif
 
     // Update HALO
@@ -1203,143 +1226,12 @@ int main() {
   // Setup Madgwick and attach Madgwick to Everest
   everest.MadgwickSetup();
 
-  // HALO halo = HALO();
-
-  // MatrixXf Q(3, 3);
-  // Q << 100, 0, 0, 0, 40, 0, 0, 0, 8;
-
-  // // Covariance matrix
-  // MatrixXf R0(3, 3);
-  // R0 << 200, 0.5, 0.5, 0.5, 100, 1, 0.5, 1, 10;
-
-  // MatrixXf P0(3, 3);
-  // P0 << 50, 0, 0, 0, 0, 0, 0, 0, 0;
-
-// create directory for results
-#ifdef LOGON
-  // // Define the directory path
-  // std::string directoryPath = "testSuite/results";
-
-  // // Create the directory if it doesn't exist
-  // if (_mkdir("testSuite") == -1) {
-  //   if (errno != EEXIST) {
-  //     std::cerr << "Error creating directory: testSuite" << std::endl;
-  //     return 1;
-  //   }
-  // }
-
-  // if (_mkdir(directoryPath.c_str()) == -1) {
-  //   if (errno != EEXIST) {
-  //     std::cerr << "Error creating directory: " << directoryPath <<
-  //     std::endl; return 1;
-  //   }
-  // }
-
-  // // File names
-  // std::vector<std::string> fileNames = {"gains.txt",
-  //                                       "predictedValues.txt",
-  //                                       "log.txt",
-  //                                       "nearestScenarios.txt",
-  //                                       "nearestScenariosFormatted.txt",
-  //                                       "sigmaPoints.txt",
-  //                                       "sigmaPoints1.txt",
-  //                                       "sigmaPoints2.txt",
-  //                                       "sigmaPoints3.txt",
-  //                                       "sigmaPoints4.txt",
-  //                                       "sigmaPoints5.txt",
-  //                                       "sigmaPoints6.txt"};
-
-  // // Deleting files
-  // for (size_t i = 0; i < fileNames.size(); ++i) {
-  //   std::string filePath = directoryPath + "/" + fileNames[i];
-  //   if (std::remove(filePath.c_str()) == 0) {
-  //     std::cout << "File deleted successfully: " << fileNames[i] <<
-  //     std::endl;
-  //   } else {
-  //     std::perror("Error deleting file");
-  //   }
-  // }
-
-  // // Creating and writing to files
-  // std::vector<std::pair<std::string, std::string>> filesToCreate = {
-  //     std::make_pair("predictedValues.txt",
-  //                    "s1_alt,s1_velo,s1_acc,s2_alt,s2_velo,s2_acc,s3_alt,s3_"
-  //                    "velo,s3_acc,s4_alt,s4_velo,s4_acc,s5_alt,s5_velo,s5_acc,"
-  //                    "s6_alt,s6_velo,s6_acc\n"),
-  //     std::make_pair(
-  //         "gains.txt",
-  //         "sigmaPoint1->gain_v1[0],[1],[2],s1->gain_vector2[0],[1],[2]...\n"),
-  //     std::make_pair("sigmaPoints.txt", "alt,velo,acc\n"),
-  //     std::make_pair("sigmaPoints1.txt", "alt,velo,acc\n"),
-  //     std::make_pair("sigmaPoints2.txt", "alt,velo,acc\n"),
-  //     std::make_pair("sigmaPoints3.txt", "alt,velo,acc\n"),
-  //     std::make_pair("sigmaPoints4.txt", "alt,velo,acc\n"),
-  //     std::make_pair("sigmaPoints5.txt", "alt,velo,acc\n"),
-  //     std::make_pair("sigmaPoints6.txt", "alt,velo,acc\n"),
-  //     std::make_pair("nearestScenarios.txt",
-  //                    "lowestDistance,secondLowestDistance,firstScenario,"
-  //                    "SecondScenario\n"),
-  //     std::make_pair("nearestScenariosFormatted.txt",
-  //                    "Header_formatted_scenarios\n")};
-
-  // for (size_t i = 0; i < filesToCreate.size(); ++i) {
-  //   std::string filePath = directoryPath + "/" + filesToCreate[i].first;
-  //   FILE* file = fopen(filePath.c_str(), "a+");
-  //   if (file) {
-  //     fputs(filesToCreate[i].second.c_str(), file);
-  //     fclose(file);
-  //     std::cout << "File written: " << filesToCreate[i].first << std::endl;
-  //   } else {
-  //     fprintf(stderr, "Error opening %s...exiting\n",
-  //             filesToCreate[i].first.c_str());
-  //     exit(1);
-  //   }
-  // }
-
-  // // Deleting HALO.txt
-  // std::string filePath = directoryPath + "/HALO.txt";
-  // if (std::remove(filePath.c_str()) == 0) {
-  //   std::cout << "File deleted successfully: HALO.txt" << std::endl;
-  // } else {
-  //   std::perror("Error deleting file");
-  // }
-
-  // FILE* file = fopen((directoryPath + "/HALO.txt").c_str(),
-  //                    "a+");  // Open the file for writing
-  // if (!file) {
-  //   fprintf(stderr, "Error opening HALO.txt...exiting\n");
-  //   exit(1);
-  // }
-  // fprintf(file,
-  //         "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
-  //         "Accel\n");
-
-  // fclose(file);
-
-#endif
-
   // read first line and preset the deltaTime to timestamp
   char line[MAX_LINE_LENGTH];
   std::clock_t start;
-  double duration;
-
-  int howMany = 1;
-  int i = 0;
-
-  // create scenarios
-  // halo.createScenarios(&halo);
-
-  float alt;
-  float velo;
-  float acc;
-  float time1;
-  std::vector<float> temp = {0, 0, 0, 0};
-
   float totalTime = 0;
-  std::cout << "taberLaunch size: " << taberLaunch.size() << std::endl;
 
   for (int i = 0; i < taberLaunch.size(); i++) {
-    std::cout << "Loop iteration: " << i << std::endl;
     // Tokenize the line using strtok
     // Parse accelerometer readings (X, Y, Z)
     float time = taberLaunch[i][0];
@@ -1372,12 +1264,6 @@ int main() {
 
     BarosData baro2 = {time, pressure, 0, 0};
 
-    printf(
-        "\n#%d "
-        "Sample----------------------------------------------------------------"
-        "----------\n\n",
-        howMany);
-
     // Print all sensor readings
     if (debug == RAW || debug == ALL) {
       printf(
@@ -1403,117 +1289,28 @@ int main() {
         sensorData2.magX,   sensorData2.magY,   sensorData2.magZ,
     };
 
-    // double eAltitude = everest.TaskWrapper(everestData,
-    // MadAxesAlignmentPXPYNZ,
-    //                                        MadAxesAlignmentPXPYNZ);
-    // double eVelocity = everest.getKinematics()->initialVelo;
-    // double eAccelerationZ = (everest.state.earthAcceleration - 1) * -9.81;
-
-    // if (i == 7) {
-    //   VectorXf X0(3);
-    //   X0 << everest.Kinematics.initialAlt, 0, 0;
-
-    //   // Initialize with tare / GPS values
-    //   halo.init(X0, P0, Q, R0);
-    // }
-
     // start timer for iteration
     start = std::clock();
 
     // calls the entirety of the power of HALO, peak modularization
     std::vector<double> haloData = everest.EverestToHalo(everestData, &everest);
 
-    std::cout << "Halo Data: " << haloData[0] << ", " << haloData[1] << ", "
-              << haloData[2] << std::endl;
-
-    // if (i > 7) {
-    //   // enter measurements from Everest after tare
-    //   halo.setTime(time);
-    //   halo.setStateVector(eAccelerationZ, eVelocity, eAltitude);
-
-    //   std::vector<double> unitedStates = {halo.X0[0], halo.X0[1],
-    //   halo.X0[2]};
-
-    // #ifdef LOGON
-    //       fprintf(file, "%f,%f,%f\n", haloData[0], haloData[1],
-    //               haloData[2]);
-    // #endif
-    // }
-
     clock_t endTime = std::clock();
 
     totalTime += endTime - start;
 
+    std::cout << "Iteration: " << i << std::endl;
+
     if (i == taberLaunch.size() - 13) {
-      std::cout << "Overall for " << howMany << " samples:\t\t\t\t\t\t\t\t\t"
+      std::cout << "Overall time:\t\t\t\t\t\t\t\t\t"
                 << totalTime / (double)CLOCKS_PER_SEC << std::endl;
-
-      // #ifdef TIMERON
-      //       std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t" <<
-      //       halo.updateTime.count()
-      //                 << std::endl;
-      //       std::cout << "Predict time:\t\t\t\t\t\t\t\t\t\t"
-      //                 << halo.predictTime.count() << std::endl;
-
-      //       std::cout << "\tTriangulationTime:\t\t\t\t\t\t\t"
-      //                 << halo.triangulationTime.count() << std::endl;
-      //       std::cout << "\tdModeltime:\t\t\t\t\t\t\t\t"
-      //                 << halo.dynamicModelTime.count() << std::endl;
-
-      //       std::cout << "\t\tgetScenarioTime:\t\t\t\t\t"
-      //                 << halo.getScenarioTime.count() << std::endl;
-      //       std::cout << "\t\tpPredictionTime:\t\t\t\t\t"
-      //                 << halo.PpredictionTime.count() << std::endl;
-      //       std::cout << "\t\tprojErrorTime:\t\t\t\t\t\t"
-      //                 << halo.projErrorTime.count() << std::endl;
-      //       std::cout << "\t\tpreMeanTime:\t\t\t\t\t\t" <<
-      //       halo.preMeanTime.count()
-      //                 << std::endl;
-      //       std::cout << "\t\tsPointTime:\t\t\t\t\t\t" <<
-      //       halo.sPointTime.count()
-      //                 << std::endl;
-      //       std::cout << "\t\tpredictLoopTime:\t\t\t\t\t"
-      //                 << halo.predictLoopTime.count() << std::endl;
-      //       std::cout << "\t\tendPredictLoopTime:\t\t\t\t\t"
-      //                 << halo.endPredictLoopTime.count() << std::endl;
-      //       std::cout << "\t\tnearestScenariosTime:\t\t\t\t\t"
-      //                 << halo.nearestScenariosTime.count() << std::endl;
-
-      //       std::cout << "\t\t\t->loopScenariosTime:\t\t\t"
-      //                 << halo.loopScenariosTime.count() << std::endl;
-      //       std::cout << "\t\t\t\t->getListsTime:\t\t" <<
-      //       halo.getListsTime.count()
-      //                 << std::endl;
-      //       std::cout << "\t\t\t\t->othersTime:\t\t" <<
-      //       halo.othersTime.count()
-      //                 << std::endl;
-      //       std::cout << "\t\t\t\t->KDTreeTime:\t\t" <<
-      //       halo.KDTreeTime.count()
-      //                 << std::endl;
-      //       std::cout << "\t\t\t\t->twoDistancesTime:\t"
-      //                 << halo.twoDistancesTime.count() << std::endl;
-      //       std::cout << "\t\t\t\t->emplaceBackTime:\t"
-      //                 << halo.emplaceBackTime.count() << std::endl;
-
-      //       std::cout << "\t\t\t->vectorsTime:\t\t\t\t" <<
-      //       halo.vectorsTime.count()
-      //                 << std::endl;
-      //       std::cout << "\t\t\t->push_backTime:\t\t\t" <<
-      //       halo.push_backTime.count()
-      //                 << std::endl;
-
-      //       std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t"
-      //                 << (halo.treeCreationTime).count() << std::endl;
-
-      // #endif
+      break;
     }
   }
 
-  std::cout << "End of program" << std::endl;
-
 #ifdef LOGON
-  // fclose(file);
   fclose(haloFile);
+  fclose(everestFile);
 #endif
 
   return 0;

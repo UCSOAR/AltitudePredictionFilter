@@ -34,8 +34,29 @@ int counter = 0;
 
 using namespace Eigen;
 
+#ifdef LOGON
+FILE* resetGainsFile;
+
+#endif
+
 void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
-  // Input: Estimate Uncertainty -> system state
+#ifdef LOGON
+
+  // remove the file if it exists
+  std::string filePath = directoryPath + "/resetGainsFile.txt";
+  if (std::remove(filePath.c_str()) == 0) {
+    std::cout << "File deleted successfully: resetGainsFile.txt" << std::endl;
+  } else {
+    std::perror("Error deleting file");
+  }
+
+  resetGainsFile = fopen((directoryPath + "/resetGainsFile.txt").c_str(),
+                         "a+");  // Open the file for writing
+  if (!resetGainsFile) {
+    fprintf(stderr, "Error opening resetGainsFile.txt...exiting\n");
+    exit(1);
+  }
+#endif
   // Initial Guess
   this->X0 = X0;
   this->P = P0;
@@ -541,8 +562,9 @@ float HALO::euclideanDistance(const std::vector<float>& vec1,
  * @brief Given a list of scenarios, find the nearest 2 scenarios and returns
  * the vectors of the nearest scenarios
  */
-std::vector<std::vector<float>> HALO::findNearestScenarios(
-    std::vector<Scenario>* scenarios, VectorXf& measurement) {
+std::pair<std::vector<int>, std::vector<std::vector<float>>>
+HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
+                           VectorXf& measurement) {
   std::vector<std::pair<float, std::pair<float, int>>> distances;
   distances.reserve(7);
   float minDistance = std::numeric_limits<float>::max();
@@ -805,14 +827,31 @@ std::vector<std::vector<float>> HALO::findNearestScenarios(
 
 #endif
 
-  return nearestVectors;
+  std::pair<std::vector<int>, std::vector<std::vector<float>>>
+      nearestVectorsWithIndices = {std::make_pair(
+          std::vector<int>{lowestDistanceIndex, secondLowestDistanceIndex},
+          nearestVectors)};
+
+  // std::cout << "Nearest Index: " << nearestVectorsWithIndices.first[0] << ",
+  // " << nearestVectorsWithIndices.first[1] << std::endl; std::cout << "Nearest
+  // Vectors: " << nearestVectorsWithIndices.second[0][0] << ", " <<
+  // nearestVectorsWithIndices.second[0][1] << ", " <<
+  // nearestVectorsWithIndices.second[0][2] << ", " <<
+  // nearestVectorsWithIndices.second[0][3] << std::endl; std::cout << "Nearest
+  // Vectors: " << nearestVectorsWithIndices.second[1][0] << ", " <<
+  // nearestVectorsWithIndices.second[1][1] << ", " <<
+  // nearestVectorsWithIndices.second[1][2] << ", " <<
+  // nearestVectorsWithIndices.second[1][3] << std::endl;
+
+  return nearestVectorsWithIndices;
 }
 
 /**
  * @brief Predicts the next values based on the interpolated scenarios
  */
 VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
-                                 VectorXf& X_in) {
+                                 VectorXf& X_in, int scenario1Index,
+                                 int scenario2Index) {
   std::vector<float> gainV1 = {0, 0, 0};
   std::vector<float> gainV2 = {0, 0, 0};
   std::vector<float> vector1 = vectors[0];
@@ -924,6 +963,25 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
 
 #endif
 
+  // check if scenario indices are the same
+  // if not reset the gains
+  if (this->scenariosGainsList[this->counterSigmaPoint][0] != scenario1Index |
+      this->scenariosGainsList[this->counterSigmaPoint][1] != scenario2Index) {
+    this->prevGain1 = {0.5, 0.5, 0.5};
+    this->prevGain2 = {0.5, 0.5, 0.5};
+
+// write to resetGainsFile.txt, already opened
+#ifdef LOGON
+    fprintf(resetGainsFile, "%d\n", 6);
+#endif
+  } else {
+// not resetting gains, scenarios are the same from prior iteration
+#ifdef LOGON
+    // write to resetGainsFile.txt, already opened
+    fprintf(resetGainsFile, "%d\n", 0);
+#endif
+  }
+
   // interpolate between the two scenarios to get predicted values
   float predicted_interpolated_alt = this->prevGain1[0] * vector1Future[0] +
                                      this->prevGain2[0] * vector2Future[0];
@@ -932,12 +990,30 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   float predicted_interpolated_acc = this->prevGain1[2] * vector1Future[2] +
                                      this->prevGain2[2] * vector2Future[2];
 
+  // save scenario indices
+  this->scenariosGainsList[this->counterSigmaPoint] = {scenario1Index,
+                                                       scenario2Index};
+
   this->prevGain1 = gainV1;
   this->prevGain2 = gainV2;
 
   VectorXf X_pred(3, 1);
   X_pred << predicted_interpolated_alt, predicted_interpolated_velo,
       predicted_interpolated_acc;
+
+  // increment counter
+  this->counterSigmaPoint = this->counterSigmaPoint + 1;
+
+  // reset counter
+  this->counterSigmaPoint = this->counterSigmaPoint % 6;
+
+  if (this->counterSigmaPoint == 0) {
+    // close file
+    this->currentTime = this->currentTime + 1.0 / 3.0;
+  }
+
+  // std::cout << "Counter Sigma Point: " << this->counterSigmaPoint <<
+  // std::endl;
 
   return X_pred;
 }
@@ -1066,8 +1142,13 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
 #endif
 
+  std::pair<std::vector<int>, std::vector<std::vector<float>>>
+      nearestVectorsWithIndex = this->findNearestScenarios(scenarios, X);
+
   std::vector<std::vector<float>> nearestVectors =
-      this->findNearestScenarios(scenarios, X);
+      nearestVectorsWithIndex.second;
+  int scenario1Index = nearestVectorsWithIndex.first[0];
+  int scenario2Index = nearestVectorsWithIndex.first[1];
 
 #ifdef TIMERON
 
@@ -1077,12 +1158,13 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
 #endif
 
-  std::vector<float> vector1 = nearestVectors[0];
-  std::vector<float> vector2 = nearestVectors[1];
-  std::vector<float> vector3 = nearestVectors[2];
-  std::vector<float> vector4 = nearestVectors[3];
+  // std::vector<float> vector1 = nearestVectors[0];
+  // std::vector<float> vector2 = nearestVectors[1];
+  // std::vector<float> vector3 = nearestVectors[2];
+  // std::vector<float> vector4 = nearestVectors[3];
 
-  Xprediction = predictNextValues(nearestVectors, X);
+  Xprediction =
+      predictNextValues(nearestVectors, X, scenario1Index, scenario2Index);
 
   return Xprediction;
 }

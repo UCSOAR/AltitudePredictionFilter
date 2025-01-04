@@ -107,10 +107,10 @@ int openFiles() {
     std::perror("Error deleting file");
   }
 
-  // deleting EVEREST.txt
-  filePath = directoryPath + "/EVEREST.txt";
+  // deleting infusion.txt
+  filePath = directoryPath + "/infusion.txt";
   if (std::remove(filePath.c_str()) == 0) {
-    std::cout << "File deleted successfully: EVEREST.txt" << std::endl;
+    std::cout << "File deleted successfully: infusion.txt" << std::endl;
   } else {
     std::perror("Error deleting file");
   }
@@ -125,11 +125,11 @@ int openFiles() {
           "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
           "Accel\n");
 
-  // Open EVEREST.txt
-  everestFile = fopen((directoryPath + "/EVEREST.txt").c_str(),
+  // Open infusion.txt
+  everestFile = fopen((directoryPath + "/infusion.txt").c_str(),
                       "a+");  // Open the file for writing
   if (!everestFile) {
-    fprintf(stderr, "Error opening EVEREST.txt...exiting\n");
+    fprintf(stderr, "Error opening infusion.txt...exiting\n");
     exit(1);
   }
 

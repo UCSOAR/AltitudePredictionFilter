@@ -197,12 +197,13 @@ class HALO {
   void setAlt(float gps_alt);
 
   VectorXf predictNextValues(std::vector<std::vector<float>> &vectors,
-                             VectorXf &X_in);
+                             VectorXf &X_in, int scenario1Index,
+                             int scenario2Index);
 
   void setStateVector(float filteredAcc, float filteredVelo, float filteredAlt);
 
-  std::vector<std::vector<float>> findNearestScenarios(
-      std::vector<Scenario> *scenarios, VectorXf &measurement);
+  std::pair<std::vector<int>, std::vector<std::vector<float>>>
+  findNearestScenarios(std::vector<Scenario> *scenarios, VectorXf &measurement);
 
   void calculateSigmaPoints();
 
@@ -274,6 +275,13 @@ class HALO {
   std::vector<double> Halo_Input(HALO *haloPointer, bool isInitialized,
                                  double eAccelerationZ, double eVelocity,
                                  double eAltitude, float time);
+
+  // for predictNextValues
+  int counterSigmaPoint = 0;
+  std::vector<std::vector<int>> scenariosGainsList = {{0, 0}, {0, 0}, {0, 0},
+                                                      {0, 0}, {0, 0}, {0, 0}};
+  // CHANGE THIS
+  float currentTime = 2;
 
   std::chrono::duration<double> updateTime;
   std::chrono::duration<double> predictTime;

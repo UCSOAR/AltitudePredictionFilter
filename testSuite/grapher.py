@@ -16,8 +16,8 @@ sigmaPoints6 = pd.read_csv("testSuite/results/sigmaPoints6.txt")
 nearestScenarios = pd.read_csv("testSuite/results/nearestScenarios.txt")
 launch = pd.read_csv("testSuite/data/taber_launch_formattedF.csv")
 input_data = pd.read_csv("testSuite/data/Imu_Baro.csv")
+resetGains = pd.read_csv("testSuite/results/resetGainsFile.txt")
 
-# plot Madgwick
 
 # plot altitude (altimeter, baro, imu, everest, halo, gps, sigmaPoints, scenarios)
 plt.figure(figsize=(10, 6))
@@ -202,6 +202,7 @@ plt.plot(
     label="Scenario 1",
 )
 plt.plot(nearestScenarios["SecondScenario"], "o", label="Scenario 2")
+plt.plot(resetGains, "or", label="Reset Gains")
 plt.legend()
 plt.grid(True)
 

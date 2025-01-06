@@ -205,10 +205,13 @@ class HALO {
   std::pair<std::vector<int>, std::vector<std::vector<float>>>
   findNearestScenarios(std::vector<Scenario> *scenarios, VectorXf &measurement);
 
+  // Takes Altitude, Velocity, Acceleration
   void calculateSigmaPoints();
 
+  // Acceleration, Velocity, Altitude
   VectorXf X;  // state vector
 
+  // Altitude, Velocity, Acceleration
   VectorXf X0;  // current state vector
 
   MatrixXf observe(MatrixXf sigmaPoints);

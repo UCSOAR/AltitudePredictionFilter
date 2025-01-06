@@ -180,6 +180,8 @@ void HALO::stateUpdate() {
 
   VectorXf difference(3, 1);
   difference.setZero();
+  // flipped X, order should be Alt, Velo, Accel, thats why
+  // the order is 2, 1, 0
   difference << this->X[2] - zMean(0), this->X[1] - zMean(1),
       this->X[0] - zMean(2);
 
@@ -217,12 +219,16 @@ void HALO::stateUpdate() {
             "Prediction as Estimation\n",
             this->time);
 
+    // default to prediction
     X0 = this->Xprediction;
 
     fclose(log);
   }
 
   this->KinematicsHalo.altitudeStore = X0(0);
+
+  std::cout << "altitudeStore: " << this->KinematicsHalo.altitudeStore
+            << std::endl;
 
   // update the estimate covariance matrix
   // when variations in the estimate are small then its good
@@ -832,17 +838,6 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
           std::vector<int>{lowestDistanceIndex, secondLowestDistanceIndex},
           nearestVectors)};
 
-  // std::cout << "Nearest Index: " << nearestVectorsWithIndices.first[0] << ",
-  // " << nearestVectorsWithIndices.first[1] << std::endl; std::cout << "Nearest
-  // Vectors: " << nearestVectorsWithIndices.second[0][0] << ", " <<
-  // nearestVectorsWithIndices.second[0][1] << ", " <<
-  // nearestVectorsWithIndices.second[0][2] << ", " <<
-  // nearestVectorsWithIndices.second[0][3] << std::endl; std::cout << "Nearest
-  // Vectors: " << nearestVectorsWithIndices.second[1][0] << ", " <<
-  // nearestVectorsWithIndices.second[1][1] << ", " <<
-  // nearestVectorsWithIndices.second[1][2] << ", " <<
-  // nearestVectorsWithIndices.second[1][3] << std::endl;
-
   return nearestVectorsWithIndices;
 }
 
@@ -1003,17 +998,11 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
 
   // increment counter
   this->counterSigmaPoint = this->counterSigmaPoint + 1;
-
   // reset counter
   this->counterSigmaPoint = this->counterSigmaPoint % 6;
-
   if (this->counterSigmaPoint == 0) {
-    // close file
     this->currentTime = this->currentTime + 1.0 / 3.0;
   }
-
-  // std::cout << "Counter Sigma Point: " << this->counterSigmaPoint <<
-  // std::endl;
 
   return X_pred;
 }
@@ -1074,7 +1063,7 @@ void HALO::overrideStateWithGPS(float GPS) {
   }
 
   if (GPS > (lowest) && GPS < highest) {
-    this->X[0] = GPS;
+    this->X[2] = GPS;
     printf("Override GPS (%f, %f, %f)", this->X[0], this->X[1], this->X[2]);
 
     FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
@@ -1083,8 +1072,8 @@ void HALO::overrideStateWithGPS(float GPS) {
       exit(1);
     }
 
-    fprintf(file, "Override GPS (%f, %f, %f), where GPS(\n", this->X[0],
-            this->X[1], this->X[2]);
+    fprintf(file, "Override GPS (%f, %f, %f), where GPS(%f)\n", this->X[0],
+            this->X[1], this->X[2], GPS);
 
     fclose(file);
   }
@@ -1158,11 +1147,6 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
 #endif
 
-  // std::vector<float> vector1 = nearestVectors[0];
-  // std::vector<float> vector2 = nearestVectors[1];
-  // std::vector<float> vector3 = nearestVectors[2];
-  // std::vector<float> vector4 = nearestVectors[3];
-
   Xprediction =
       predictNextValues(nearestVectors, X, scenario1Index, scenario2Index);
 
@@ -1221,17 +1205,26 @@ void HALO::createScenarios(HALO* halo) {
  * state vector from calibration
  */
 void HALO::initializeHALO(float initialAlt, HALO* halo) {
-  // set initial state
+  // set initial state (altitude, velocity, acceleration)
   VectorXf X0(3);
   X0 << initialAlt, 0, 0;
 
+  // process noise Covariance matrix (altitude, velocity, acceleration)
+  // Calculated using covarianceCalc.py -> covariance matrix from Altimeter
+  // Assuming Altimeter has no process noise (Q = 0)
+
+  // unaccounted for noise in envrionment (wind, etc)-> residual from sims
   MatrixXf Q(3, 3);
   Q << 100, 0, 0, 0, 40, 0, 0, 0, 8;
 
-  // Covariance matrix
+  // Measurement Covariance matrix (altitude, velocity, acceleration)
+  // Calculated using covarianceCalc.py -> residual from Everest
   MatrixXf R0(3, 3);
   R0 << 200, 0.5, 0.5, 0.5, 100, 1, 0.5, 1, 10;
+  // R0 << 1804831.72, -49164.14, -21321.08, -49164.14, 5378.01, 229.88,
+  // -21321.08, 229.88, 357.22;
 
+  // Initial state covariance matrix
   MatrixXf P0(3, 3);
   P0 << 50, 0, 0, 0, 0, 0, 0, 0, 0;
 
@@ -1253,6 +1246,7 @@ std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
     haloPointer->setTime(time);
     haloPointer->setStateVector(eAccelerationZ, eVelocity, eAltitude);
 
+    // X0 = {eAltitude, eVelocity, eAccelerationZ};
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
   }
 

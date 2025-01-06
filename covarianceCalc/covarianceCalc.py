@@ -61,6 +61,22 @@ def calculate_averages(
 start_time = 0
 interval = 0.1
 
+residual_alt_5 = []
+residual_velo_5 = []
+residual_acc_5 = []
+
+residual_alt_6 = []
+residual_velo_6 = []
+residual_acc_6 = []
+
+residual_alt_7 = []
+residual_velo_7 = []
+residual_acc_7 = []
+
+residual_alt_8 = []
+residual_velo_8 = []
+residual_acc_8 = []
+
 
 # Inputs and graphs
 def graph():
@@ -104,7 +120,17 @@ def graph():
         # get residuals for each scenario
         residuals = []
         for j in range(len(avg_Alt_i)):
-            residuals.append(abs(avg_Alt_i[j] - avg_Altimeter_Alt[j]))
+            residuals.append(avg_Altimeter_Alt[j] - avg_Alt_i[j])
+
+        # calculate covariance matrix of residuals
+        if i == 5:
+            residuals_alt_5 = residuals
+        elif i == 6:
+            residuals_alt_6 = residuals
+        elif i == 7:
+            residuals_alt_7 = residuals
+        elif i == 8:
+            residuals_alt_8 = residuals
 
         # Plot each set of averages for altitude
         plt.plot(time_i, avg_Alt_i, label=f"Alt {i}")
@@ -139,11 +165,17 @@ def graph():
             # actual - predicted
             residuals_Velo.append(avg_Altimeter_Velo[j] - avg_Velo_i[j])
 
+        if i == 5:
+            residuals_velo_5 = residuals_Velo
+        elif i == 6:
+            residuals_velo_6 = residuals_Velo
+        elif i == 7:
+            residuals_velo_7 = residuals_Velo
+        elif i == 8:
+            residuals_velo_8 = residuals_Velo
+
         # Plot each set of averages for velocity
         plt.plot(time_i, avg_Velo_i, label=f"Velo {i}")
-
-        # show residuals
-        plt.plot(time_i, residuals, label=f"Residual {i}")
 
     # Plot the Altimeter data for velocity
     plt.plot(altimeter_Time, avg_Altimeter_Velo, label="Altimeter Velo", linestyle="--")
@@ -169,6 +201,20 @@ def graph():
             time_i, alt_i, velo_i, acc_i, start_time, interval
         )
 
+        # get residuals for each scenario
+        residuals_Acc = []
+        for j in range(len(avg_Acc_i)):
+            residuals_Acc.append(avg_Altimeter_Acc[j] - avg_Acc_i[j])
+
+        if i == 5:
+            residuals_acc_5 = residuals_Acc
+        elif i == 6:
+            residuals_acc_6 = residuals_Acc
+        elif i == 7:
+            residuals_acc_7 = residuals_Acc
+        elif i == 8:
+            residuals_acc_8 = residuals_Acc
+
         # Plot each set of averages for acceleration
         plt.plot(time_i, avg_Acc_i, label=f"Acc {i}")
 
@@ -183,19 +229,36 @@ def graph():
     plt.grid(True)
     plt.show()
 
-    # Calculate and plot covariance matrix
-    combined_data = np.vstack(
-        (avg_Altimeter_Alt, avg_Altimeter_Velo, avg_Altimeter_Acc)
-    )
-    covariance_matrix = np.cov(combined_data)
+    # Individually calculate covariance matrix of residuals for each scenario
+    combined_data_5 = np.vstack((residuals_alt_5, residuals_velo_5, residuals_acc_5))
+    covariance_matrix_5 = np.cov(combined_data_5)
 
-    print("Covariance Matrix of Altitude, Velocity, and Acceleration:")
+    combined_data_6 = np.vstack((residuals_alt_6, residuals_velo_6, residuals_acc_6))
+    covariance_matrix_6 = np.cov(combined_data_6)
+
+    combined_data_7 = np.vstack((residuals_alt_7, residuals_velo_7, residuals_acc_7))
+    covariance_matrix_7 = np.cov(combined_data_7)
+
+    combined_data_8 = np.vstack((residuals_alt_8, residuals_velo_8, residuals_acc_8))
+    covariance_matrix_8 = np.cov(combined_data_8)
+
+    # add all covariance matrices
+    covariance_matrix = (
+        covariance_matrix_5
+        + covariance_matrix_6
+        + covariance_matrix_7
+        + covariance_matrix_8
+    )
+    covariance_matrix = covariance_matrix / 4
+
+    print("Covariance Matrix of Altitude, Velocity, and Acceleration Residuals:")
     print(covariance_matrix)
 
+    # plot covariance matrix
     plt.figure(figsize=(8, 6))
     plt.imshow(covariance_matrix, cmap="hot", interpolation="nearest")
     plt.colorbar()
-    plt.title("Covariance Matrix of Altitude, Velocity, and Acceleration")
+    plt.title("Covariance Matrix of Altitude, Velocity, and Acceleration Residuals")
     plt.xticks([0, 1, 2], ["Altitude", "Velocity", "Acceleration"])
     plt.yticks([0, 1, 2], ["Altitude", "Velocity", "Acceleration"])
     plt.show()
@@ -218,7 +281,7 @@ def everest_Residual():
     start_time = 0
     interval = 1 / 3
     avg_Altimeter_Alt, avg_Altimeter_Velo, avg_Altimeter_Acc, altimeter_Time = (
-        calculate_averages(alt_Alt, velo_Alt, acc_Alt, time_Alt, start_time, interval)
+        calculate_averages(time_Alt, alt_Alt, velo_Alt, acc_Alt, start_time, interval)
     )
 
     # Everest data
@@ -227,13 +290,19 @@ def everest_Residual():
     acc_Everest = Everest_data["Everest_Accel"]
     time_Everest = Everest_data["Time"]
 
+    # cutoff at Time = 27.333334
+    alt_Everest = alt_Everest[:79]
+    velo_Everest = velo_Everest[:79]
+    acc_Everest = acc_Everest[:79]
+    time_Everest = time_Everest[:79]
+
     # drop NaN values
     alt_Everest = alt_Everest.dropna()
     velo_Everest = velo_Everest.dropna()
     acc_Everest = acc_Everest.dropna()
     time_Everest = time_Everest.dropna()
 
-    # substract 2 from the time to match the time of the altimeter
+    # substract 2.333 from the time to match the time of the altimeter
     time_Everest = time_Everest - (2 + 1 / 3)
 
     # plot
@@ -309,5 +378,5 @@ def everest_Residual():
     plt.show()
 
 
-# graph()
-everest_Residual()
+graph()
+# everest_Residual()

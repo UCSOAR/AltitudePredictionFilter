@@ -1215,14 +1215,19 @@ void HALO::initializeHALO(float initialAlt, HALO* halo) {
 
   // unaccounted for noise in envrionment (wind, etc)-> residual from sims
   MatrixXf Q(3, 3);
-  Q << 100, 0, 0, 0, 40, 0, 0, 0, 8;
+  // Q << 100, 0, 0, 0, 40, 0, 0, 0, 8;
+  Q << 74777.41, 4458.13, -2164.91, 4458.13, 2413.02, -4.52, -2164.91, -4.52,
+      503.78;
 
   // Measurement Covariance matrix (altitude, velocity, acceleration)
   // Calculated using covarianceCalc.py -> residual from Everest
   MatrixXf R0(3, 3);
-  R0 << 200, 0.5, 0.5, 0.5, 100, 1, 0.5, 1, 10;
+  // R0 << 200, 0.5, 0.5, 0.5, 100, 1, 0.5, 1, 10;
   // R0 << 1804831.72, -49164.14, -21321.08, -49164.14, 5378.01, 229.88,
   // -21321.08, 229.88, 357.22;
+
+  R0 << 63511.47, -5694.70, 3689.12, -5694.70, 6295.84, -468.48, 3689.12,
+      -468.48, 290.62;
 
   // Initial state covariance matrix
   MatrixXf P0(3, 3);

@@ -283,8 +283,6 @@ class HALO {
   int counterSigmaPoint = 0;
   std::vector<std::vector<int>> scenariosGainsList = {{0, 0}, {0, 0}, {0, 0},
                                                       {0, 0}, {0, 0}, {0, 0}};
-  // CHANGE THIS
-  float currentTime = 2;
 
   std::chrono::duration<double> updateTime;
   std::chrono::duration<double> predictTime;

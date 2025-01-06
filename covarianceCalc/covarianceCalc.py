@@ -5,6 +5,7 @@ import numpy as np
 # import data from csv
 data = pd.read_csv("covarianceCalc/covariance_Cal_CSV.csv")
 Everest_data = pd.read_csv("testSuite/results/HALO.txt")
+Quasar_data = pd.read_csv("covarianceCalc/covariance_Cal_New.csv")
 
 # ignore first row of Everest
 Everest_data = Everest_data.iloc[1:]
@@ -266,10 +267,10 @@ def graph():
 
 def everest_Residual():
     # Special case of Altimeter averaging (every 0.33333 seconds)
-    alt_Alt = data["altitude_alt"]
-    velo_Alt = data["velo_alt"]
-    acc_Alt = data["acceleration_alt"]
-    time_Alt = data["new_time_alt"]
+    alt_Alt = Quasar_data["alt_Q"]
+    velo_Alt = Quasar_data["velo_Q"]
+    acc_Alt = Quasar_data["acc_Q"]
+    time_Alt = Quasar_data["time_Q"]
 
     # drop NaN values
     alt_Alt = alt_Alt.dropna()
@@ -303,7 +304,7 @@ def everest_Residual():
     time_Everest = time_Everest.dropna()
 
     # substract 2.333 from the time to match the time of the altimeter
-    time_Everest = time_Everest - (2 + 1 / 3)
+    time_Everest = time_Everest
 
     # plot
     plt.figure(figsize=(10, 6))
@@ -319,6 +320,8 @@ def everest_Residual():
     residuals_Alt = []
     i = 0
     for i in range(min(len(avg_Altimeter_Alt), len(alt_Everest))):
+        print(avg_Altimeter_Alt[i], alt_Everest.iloc[i])
+        print(avg_Altimeter_Alt[i] - alt_Everest.iloc[i])
         residuals_Alt.append(avg_Altimeter_Alt[i] - alt_Everest.iloc[i])
 
     # plot residuals
@@ -378,5 +381,5 @@ def everest_Residual():
     plt.show()
 
 
-graph()
-# everest_Residual()
+# graph()
+everest_Residual()

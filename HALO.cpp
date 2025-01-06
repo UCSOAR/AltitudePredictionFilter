@@ -1000,9 +1000,6 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   this->counterSigmaPoint = this->counterSigmaPoint + 1;
   // reset counter
   this->counterSigmaPoint = this->counterSigmaPoint % 6;
-  if (this->counterSigmaPoint == 0) {
-    this->currentTime = this->currentTime + 1.0 / 3.0;
-  }
 
   return X_pred;
 }
@@ -1223,11 +1220,9 @@ void HALO::initializeHALO(float initialAlt, HALO* halo) {
   // Calculated using covarianceCalc.py -> residual from Everest
   MatrixXf R0(3, 3);
   // R0 << 200, 0.5, 0.5, 0.5, 100, 1, 0.5, 1, 10;
-  // R0 << 1804831.72, -49164.14, -21321.08, -49164.14, 5378.01, 229.88,
-  // -21321.08, 229.88, 357.22;
 
-  R0 << 63511.47, -5694.70, 3689.12, -5694.70, 6295.84, -468.48, 3689.12,
-      -468.48, 290.62;
+  R0 << 15438.09, 1528.51, 727.68, 1528.51, 5005.79, -469.20, 727.68, -469.20,
+      613.20;
 
   // Initial state covariance matrix
   MatrixXf P0(3, 3);

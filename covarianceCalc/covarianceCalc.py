@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # import data from csv
-data = pd.read_csv("covarianceCalc/covariance_Cal.csv")
+data = pd.read_csv("covarianceCalc/covariance_Cal_CSV.csv")
 Everest_data = pd.read_csv("testSuite/results/HALO.txt")
 
 # ignore first row of Everest
@@ -249,7 +249,7 @@ def everest_Residual():
     # get residuals for Everest
     residuals_Alt = []
     i = 0
-    for i in range(len(avg_Altimeter_Alt) or i < len(alt_Everest)):
+    for i in range(min(len(avg_Altimeter_Alt), len(alt_Everest))):
         residuals_Alt.append(avg_Altimeter_Alt[i] - alt_Everest.iloc[i])
 
     # plot residuals
@@ -267,7 +267,7 @@ def everest_Residual():
 
     # get residuals for Everest
     residuals_Velo = []
-    for i in range(len(avg_Altimeter_Velo) or i < len(velo_Everest)):
+    for i in range(min(len(avg_Altimeter_Velo), len(velo_Everest))):
         residuals_Velo.append(avg_Altimeter_Velo[i] - velo_Everest.iloc[i])
 
     # plot residuals
@@ -285,7 +285,7 @@ def everest_Residual():
 
     # get residuals for Everest
     residuals_Acc = []
-    for i in range(len(avg_Altimeter_Acc) or i < len(acc_Everest)):
+    for i in range(min(len(avg_Altimeter_Acc), len(acc_Everest))):
         residuals_Acc.append(avg_Altimeter_Acc[i] - acc_Everest.iloc[i])
 
     # plot residuals

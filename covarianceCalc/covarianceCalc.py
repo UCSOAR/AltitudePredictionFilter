@@ -5,10 +5,13 @@ import numpy as np
 # import data from csv
 data = pd.read_csv("covarianceCalc/covariance_Cal_CSV.csv")
 Everest_data = pd.read_csv("testSuite/results/HALO.txt")
-Quasar_data = pd.read_csv("covarianceCalc/covariance_Cal_New.csv")
+Quasar_data = pd.read_csv("covarianceCalc/covariance_Cal_New_CSV.csv")
+HALO_data = pd.read_csv("testSuite/results/HALO.txt")
+p_data = pd.read_csv("testSuite/results/P.txt")
 
 # ignore first row of Everest
 Everest_data = Everest_data.iloc[1:]
+HALO_data = HALO_data.iloc[1:]
 
 
 def calculate_averages(
@@ -178,6 +181,9 @@ def graph():
         # Plot each set of averages for velocity
         plt.plot(time_i, avg_Velo_i, label=f"Velo {i}")
 
+        # plot residuals
+        plt.plot(time_i, residuals_Velo, label=f"Residual {i}")
+
     # Plot the Altimeter data for velocity
     plt.plot(altimeter_Time, avg_Altimeter_Velo, label="Altimeter Velo", linestyle="--")
 
@@ -206,6 +212,9 @@ def graph():
         residuals_Acc = []
         for j in range(len(avg_Acc_i)):
             residuals_Acc.append(avg_Altimeter_Acc[j] - avg_Acc_i[j])
+
+        # plot residuals
+        plt.plot(time_i, residuals_Acc, label=f"Residual {i}")
 
         if i == 5:
             residuals_acc_5 = residuals_Acc
@@ -266,6 +275,38 @@ def graph():
 
 
 def everest_Residual():
+    # HALO data
+    alt_HALO = HALO_data["Halo_Alt"]
+    velo_HALO = HALO_data["Halo_Velo"]
+    acc_HALO = HALO_data["Halo_Accel"]
+    time_HALO = HALO_data["Time"]
+
+    halo_alt_np = np.array(alt_HALO)
+    halo_velo_np = np.array(velo_HALO)
+    halo_acc_np = np.array(acc_HALO)
+
+    # get confidence interval
+    upper_alt = halo_alt_np + np.sqrt(np.abs(p_data["alt_std"]))
+    lower_alt = halo_alt_np - np.sqrt(np.abs(p_data["alt_std"]))
+
+    upper_velo = halo_velo_np + np.sqrt(np.abs(p_data["velo_std"]))
+    lower_velo = halo_velo_np - np.sqrt(np.abs(p_data["velo_std"]))
+
+    upper_acc = halo_acc_np + np.sqrt(np.abs(p_data["acc_std"]))
+    lower_acc = halo_acc_np - np.sqrt(np.abs(p_data["acc_std"]))
+
+    print("Acc std")
+    print(np.sqrt(np.abs(p_data["acc_std"])))
+
+    # cut at 89 for apogee
+    # alt_HALO = alt_HALO[1:89]
+    # velo_HALO = velo_HALO[1:89]
+    # acc_HALO = acc_HALO[1:89]
+    # time_HALO = time_HALO[1:89]
+
+    # substract 2.333 from the time to match the time of the altimeter
+    time_HALO = time_HALO - (1 + 2 / 3)
+
     # Special case of Altimeter averaging (every 0.33333 seconds)
     alt_Alt = Quasar_data["alt_Q"]
     velo_Alt = Quasar_data["velo_Q"]
@@ -304,12 +345,21 @@ def everest_Residual():
     time_Everest = time_Everest.dropna()
 
     # substract 2.333 from the time to match the time of the altimeter
-    time_Everest = time_Everest
+    time_Everest = time_Everest - (1 + 2 / 3)
 
     # plot
     plt.figure(figsize=(10, 6))
     plt.plot(altimeter_Time, avg_Altimeter_Alt, label="Altimeter")
     plt.plot(time_Everest, alt_Everest, label="Everest")
+    plt.plot(time_HALO, alt_HALO, label="HALO")
+    plt.fill_between(
+        time_HALO,
+        lower_alt,
+        upper_alt,
+        color="gray",
+        alpha=0.5,
+        label="Confidence Interval",
+    )
     plt.xlabel("Time")
     plt.ylabel("Altitude")
     plt.title("Altimeter vs Everest Altitude")
@@ -320,8 +370,6 @@ def everest_Residual():
     residuals_Alt = []
     i = 0
     for i in range(min(len(avg_Altimeter_Alt), len(alt_Everest))):
-        print(avg_Altimeter_Alt[i], alt_Everest.iloc[i])
-        print(avg_Altimeter_Alt[i] - alt_Everest.iloc[i])
         residuals_Alt.append(avg_Altimeter_Alt[i] - alt_Everest.iloc[i])
 
     # plot residuals
@@ -331,6 +379,15 @@ def everest_Residual():
     plt.figure(figsize=(10, 6))
     plt.plot(altimeter_Time, avg_Altimeter_Velo, label="Altimeter")
     plt.plot(time_Everest, velo_Everest, label="Everest")
+    plt.plot(time_HALO, velo_HALO, label="HALO")
+    plt.fill_between(
+        time_HALO,
+        lower_velo,
+        upper_velo,
+        color="gray",
+        alpha=0.5,
+        label="Confidence Interval",
+    )
     plt.xlabel("Time")
     plt.ylabel("Velocity")
     plt.title("Altimeter vs Everest Velocity")
@@ -349,6 +406,15 @@ def everest_Residual():
     plt.figure(figsize=(10, 6))
     plt.plot(altimeter_Time, avg_Altimeter_Acc, label="Altimeter")
     plt.plot(time_Everest, acc_Everest, label="Everest")
+    plt.plot(time_HALO, acc_HALO, label="HALO")
+    plt.fill_between(
+        time_HALO,
+        lower_acc,
+        upper_acc,
+        color="gray",
+        alpha=0.5,
+        label="Confidence Interval",
+    )
     plt.xlabel("Time")
     plt.ylabel("Acceleration")
     plt.title("Altimeter vs Everest Acceleration")
@@ -379,6 +445,9 @@ def everest_Residual():
     plt.xticks([0, 1, 2], ["Altitude", "Velocity", "Acceleration"])
     plt.yticks([0, 1, 2], ["Altitude", "Velocity", "Acceleration"])
     plt.show()
+
+    # print acceleration std
+    # print(np.sqrt(np.abs(p_data["acc_std"])))
 
 
 # graph()

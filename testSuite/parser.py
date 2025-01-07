@@ -1,4 +1,5 @@
 import csv
+import random
 
 # Read the scenario data from a CSV file
 scenarios = []
@@ -77,6 +78,15 @@ for scenario_id, data in scenario_data.items():
             break
         cpp_code += f"    {{{entry[20]}, {entry[21]}, {entry[22]}, {entry[23]}}},\n"
     cpp_code += "};\n"
+
+
+# for Scenario 7, take Scenario 6's data and add random noise (from 0 to )
+# Scenario 7
+cpp_code += f"\nstd::vector<std::vector<float>> sim{7} = {{\n"
+for entry in scenario_data[6]:
+    if entry[20] == "":
+        break
+    cpp_code += f"    {{{entry[20]}, {entry[21] + random(), entry[22] + 0.01, entry[23] + 0.01}}},\n"
 
 
 # Write the generated C++ code to a file

@@ -56,6 +56,25 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
     fprintf(stderr, "Error opening resetGainsFile.txt...exiting\n");
     exit(1);
   }
+
+  // deleting P.txt
+  filePath = directoryPath + "/P.txt";
+  if (std::remove(filePath.c_str()) == 0) {
+    std::cout << "File deleted successfully: P.txt" << std::endl;
+  } else {
+    std::perror("Error deleting file");
+  }
+
+  // create P.txt
+  FILE* file = fopen((directoryPath + "/P.txt").c_str(),
+                     "a+");  // Open the file for writing
+  if (!file) {
+    fprintf(stderr, "Error opening P.txt...exiting\n");
+    exit(1);
+  }
+
+  fprintf(file, "alt_std,velo_std,acc_std\n");
+  fclose(file);
 #endif
   // Initial Guess
   this->X0 = X0;
@@ -238,6 +257,29 @@ void HALO::stateUpdate() {
   P1 = Pprediction - (K * Pz * K.transpose());
 
   this->P = P1;
+
+#ifdef LOGON
+  // write diagonal of P to file
+  FILE* file = fopen((directoryPath + "/P.txt").c_str(), "a+");
+  if (!file) {
+    fprintf(stderr, "Error opening P.txt...exiting\n");
+    exit(1);
+  }
+
+  for (int i = 0; i < 3; i++) {
+    // dont write a comma at the end
+    if (i == 2) {
+      fprintf(file, "%f", P1(i, i));
+      break;
+    }
+    fprintf(file, "%f,", P1(i, i));
+  }
+
+  fprintf(file, "\n");
+
+  fclose(file);
+
+#endif
 
   std::chrono::high_resolution_clock::time_point predictTimer;
   std::chrono::high_resolution_clock::time_point endUpdateTime;

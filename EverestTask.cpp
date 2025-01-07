@@ -139,6 +139,8 @@ int openFiles() {
       "accelerationRecoveryTrigger,magneticError, magnetometerIgnored, "
       "magneticRecoveryTrigger, initialising, angularRateRecovery, "
       "accelerationRecovery, magneticRecovery, earth.axis.z\n");
+
+  return 0;
 }
 
 /**

@@ -335,9 +335,6 @@ class HALO {
   double maxAltitude = 0;
 
   double calculateConfidence(double current, double previous, double variance) {
-    std::cout << "Current: " << current << " Previous: " << previous
-              << " Variance: " << variance << std::endl;
-
     if (current > maxAltitude) {
       maxAltitude = current;
     }
@@ -348,14 +345,10 @@ class HALO {
       altitudeAccumulator += difference;
     }
 
-    std::cout << "Difference: " << difference
-              << " Accumulator: " << altitudeAccumulator << std::endl;
-
     // override since altitude has consistently been going down in the range of
     // the variance
     if (altitudeAccumulator >= variance) {
-      std::cout << "accummulator: " << altitudeAccumulator
-                << " variance: " << variance << std::endl;
+      std::cout << "Altitude has been consistently going down" << std::endl;
       return 1;
     }
 
@@ -363,8 +356,6 @@ class HALO {
   }
 
   double calculateVelocityConfidence(double currentVelo, double varianceVelo) {
-    std::cout << "CurrentVelo: " << currentVelo
-              << " VarianceVelo: " << varianceVelo << std::endl;
     // velocity should be < 0 for apogee
     // range
     double range = 2 * std::abs(varianceVelo);
@@ -373,9 +364,6 @@ class HALO {
 
   double calculateAccelerationConfidence(double currentAcc,
                                          double varianceAcc) {
-    std::cout << "CurrentAcc: " << currentAcc << " VarianceAcc: " << varianceAcc
-              << std::endl;
-
     double lowerBound1 = -9.81 - varianceAcc;
     double upperBound1 = -9.81 + varianceAcc;
 
@@ -391,48 +379,20 @@ class HALO {
 
     double confidence = overlap / totalRange;
 
-    std::cout << "LowerBound1: " << lowerBound1
-              << " UpperBound1: " << upperBound1 << std::endl;
-    std::cout << "LowerBound2: " << lowerBound2
-              << " UpperBound2: " << upperBound2 << std::endl;
-    std::cout << "Overlap: " << overlap << " TotalRange: " << totalRange
-              << " Confidence: " << confidence << std::endl;
-
     return confidence;
   }
 
   bool apogeeDetection(const Measurement &currentMeasurement) {
-    // check measurements
-    // std::cout << "Time: " << currentMeasurement.time << " Altitude: " <<
-    // currentMeasurement.altitude << " Velocity: " <<
-    // currentMeasurement.velocity << " Acceleration: " <<
-    // currentMeasurement.acceleration << std::endl;
-
     updateBuffer(currentMeasurement);
-
-    // check buffer
-    // for (const auto& measurement : buffer) {
-    //     std::cout << "Buffer: " << measurement.time << " " <<
-    //     measurement.altitude << " " << measurement.velocity << " " <<
-    //     measurement.acceleration << std::endl;
-    // }
 
     double avgAltitude = altitudeSum / buffer.size();
     double avgVelocity = velocitySum / buffer.size();
     double avgAcceleration = accelerationSum / buffer.size();
 
-    // check averages
-    // std::cout << "Averages: " << avgAltitude << " " << avgVelocity << " " <<
-    // avgAcceleration << std::endl;
-
     // Square root the P values
     double sqrtP_altitude = std::sqrt(this->P(0, 0));
     double sqrtP_velocity = std::sqrt(this->P(1, 1));
     double sqrtP_acceleration = std::sqrt(this->P(2, 2));
-
-    // check P values
-    std::cout << "P values: " << sqrtP_altitude << " " << sqrtP_velocity << " "
-              << sqrtP_acceleration << std::endl;
 
     if (buffer.size() < windowSize) {
       return false;
@@ -480,6 +440,8 @@ class HALO {
         (altitudeConfidence * 0.5 + velocityConfidence * 0.5 +
          accelerationConfidence * 0.5);
 
+    std::cout << "Altitude: " << avgAltitude << " Velocity: " << avgVelocity
+              << " Acceleration: " << avgAcceleration << std::endl;
     std::cout << "Confidence: " << totalConfidence << std::endl;
 
     if (totalConfidence >= 1) {
@@ -498,10 +460,10 @@ class HALO {
     return false;
   }
 
-  int windowSize = 5;
-  double altitudeThreshold = 50.0;
-  double velocityThreshold = 0.0;
-  double accelerationThreshold = -5.0;
+  // from empirical observations window of 10 is best
+  // detected highest apogee with relatively
+  // best confidence values
+  int windowSize = 10;
 
  private:
   void updateBuffer(const Measurement &currentMeasurement) {

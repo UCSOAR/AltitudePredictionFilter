@@ -1301,8 +1301,6 @@ int main() {
 
     totalTime += endTime - start;
 
-    std::cout << "Iteration: " << i << std::endl;
-
     if (i == taberLaunch.size() - 13) {
       std::cout << "Overall time:\t\t\t\t\t\t\t\t\t"
                 << totalTime / (double)CLOCKS_PER_SEC << std::endl;

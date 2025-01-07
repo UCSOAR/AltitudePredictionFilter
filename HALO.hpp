@@ -8,6 +8,7 @@
 #include <ctime>
 #include <chrono>
 #include "KDTree.hpp"
+#include <deque>
 
 #ifdef HOME
 #include "C:\Users\andin\OneDrive\Documents\AllRepos\UnscentedKalmanFilter\eigen-3.4.0\Eigen\Cholesky"
@@ -21,6 +22,17 @@
 #endif
 
 using namespace Eigen;
+
+/**
+ * @brief Measurement struct to store the time, altitude, velocity and
+ * acceleration
+ */
+struct Measurement {
+  double altitude;
+  double velocity;
+  double acceleration;
+  double time;
+};
 
 /**
  * @brief Scenario struct to store the coefficients of the 3rd degree polynomial
@@ -235,8 +247,6 @@ class HALO {
 
   std::vector<Scenario> scenarios;
 
-  bool isBeforeApogeeBoolHALO = false;
-
   bool isBeforeApogee(float acceleration, float velocity, float altitude,
                       float lastAltitude);
 
@@ -319,6 +329,172 @@ class HALO {
 
   std::vector<float> prevGain1 = {0.5, 0.5, 0.5};
   std::vector<float> prevGain2 = {0.5, 0.5, 0.5};
+
+  double altitudeAccumulator = 0;
+
+  double calculateConfidence(double current, double previous, double variance) {
+    std::cout << "Current: " << current << " Previous: " << previous
+              << " Variance: " << variance << std::endl;
+    double difference = previous - current;
+
+    if (difference > 0) {
+      altitudeAccumulator += difference;
+    }
+
+    std::cout << "Difference: " << difference
+              << " Accumulator: " << altitudeAccumulator << std::endl;
+
+    // override since altitude has consistently been going down in the range of
+    // the variance
+    if (altitudeAccumulator >= variance) {
+      std::cout << "accummulator: " << altitudeAccumulator
+                << " variance: " << variance << std::endl;
+      return 1;
+    }
+
+    return difference / std::abs(variance);
+  }
+
+  double calculateVelocityConfidence(double currentVelo, double varianceVelo) {
+    std::cout << "CurrentVelo: " << currentVelo
+              << " VarianceVelo: " << varianceVelo << std::endl;
+    // velocity should be < 0 for apogee
+    return (1 - (std::abs(varianceVelo) - std::abs(currentVelo)) /
+                    std::abs(varianceVelo));
+  }
+
+  double calculateAccelerationConfidence(double currentAcc,
+                                         double varianceAcc) {
+    std::cout << "CurrentAcc: " << currentAcc << " VarianceAcc: " << varianceAcc
+              << std::endl;
+    return std::abs(currentAcc / (9.81 + std::abs(varianceAcc)));
+  }
+
+  bool apogeeDetection(const Measurement &currentMeasurement) {
+    // check measurements
+    // std::cout << "Time: " << currentMeasurement.time << " Altitude: " <<
+    // currentMeasurement.altitude << " Velocity: " <<
+    // currentMeasurement.velocity << " Acceleration: " <<
+    // currentMeasurement.acceleration << std::endl;
+
+    updateBuffer(currentMeasurement);
+
+    // check buffer
+    // for (const auto& measurement : buffer) {
+    //     std::cout << "Buffer: " << measurement.time << " " <<
+    //     measurement.altitude << " " << measurement.velocity << " " <<
+    //     measurement.acceleration << std::endl;
+    // }
+
+    double avgAltitude = altitudeSum / buffer.size();
+    double avgVelocity = velocitySum / buffer.size();
+    double avgAcceleration = accelerationSum / buffer.size();
+
+    // check averages
+    // std::cout << "Averages: " << avgAltitude << " " << avgVelocity << " " <<
+    // avgAcceleration << std::endl;
+
+    // Square root the P values
+    double sqrtP_altitude = std::sqrt(this->P(0, 0));
+    double sqrtP_velocity = std::sqrt(this->P(1, 1));
+    double sqrtP_acceleration = std::sqrt(this->P(2, 2));
+
+    // check P values
+    std::cout << "P values: " << sqrtP_altitude << " " << sqrtP_velocity << " "
+              << sqrtP_acceleration << std::endl;
+
+    if (buffer.size() < windowSize) {
+      return false;
+    }
+
+    if (prevAvgAltitude == 0.0) {
+      prevAvgAltitude = avgAltitude;
+    }
+
+    double altitudeConfidence =
+        calculateConfidence(avgAltitude, prevAvgAltitude, sqrtP_altitude);
+    double velocityConfidence = 0.0;
+
+    if (avgVelocity < sqrtP_velocity) {
+      velocityConfidence =
+          calculateVelocityConfidence(avgVelocity, sqrtP_velocity);
+
+      // if infinity, set to 1
+      if (std::isinf(velocityConfidence)) {
+        velocityConfidence = 0.0;
+      }
+    }
+    double accelerationConfidence =
+        calculateAccelerationConfidence(avgAcceleration, sqrtP_acceleration);
+
+    // check confidence
+    std::cout << "Confidence_alt: " << altitudeConfidence
+              << " velo: " << velocityConfidence
+              << " acc: " << accelerationConfidence << std::endl;
+
+    // cap confidence at 1
+    if (altitudeConfidence > 1) {
+      altitudeConfidence = 1;
+    }
+
+    if (velocityConfidence > 1) {
+      velocityConfidence = 1;
+    }
+
+    if (accelerationConfidence > 1) {
+      accelerationConfidence = 1;
+    }
+
+    double totalConfidence =
+        (altitudeConfidence * 0.5 + velocityConfidence * 0.5 +
+         accelerationConfidence * 0.5);
+
+    std::cout << "Confidence: " << totalConfidence << std::endl;
+
+    if (totalConfidence >= 1) {
+      std::cout << "Apogee detected at time: " << currentMeasurement.time
+                << " seconds, Altitude: " << avgAltitude << " meters"
+                << std::endl;
+      // stop program
+      exit(0);
+      return true;
+    }
+
+    prevAvgAltitude = avgAltitude;
+    prevAvgVelocity = avgVelocity;
+    prevAvgAcceleration = avgAcceleration;
+
+    return false;
+  }
+
+  int windowSize = 5;
+  double altitudeThreshold = 50.0;
+  double velocityThreshold = 0.0;
+  double accelerationThreshold = -5.0;
+
+ private:
+  void updateBuffer(const Measurement &currentMeasurement) {
+    if (buffer.size() == windowSize) {
+      const Measurement &oldest = buffer.front();
+      altitudeSum -= oldest.altitude;
+      velocitySum -= oldest.velocity;
+      accelerationSum -= oldest.acceleration;
+      buffer.pop_front();
+    }
+
+    buffer.push_back(currentMeasurement);
+    altitudeSum += currentMeasurement.altitude;
+    velocitySum += currentMeasurement.velocity;
+    accelerationSum += currentMeasurement.acceleration;
+  }
+
+  std::deque<Measurement> buffer;
+  double altitudeSum;
+  double velocitySum;
+  double accelerationSum;
+  double prevAvgAltitude = 0.0;
+  double prevAvgVelocity = 0.0;
+  double prevAvgAcceleration = 0.0;
 
  protected:
   MatrixXf sigmaPoints;

@@ -31,6 +31,7 @@ std::string directoryPath = "testSuite/results";
 
 bool isInitialized = false;
 int counter = 0;
+int isBeforeApogeeBoolHALO = 0;
 
 using namespace Eigen;
 
@@ -207,20 +208,24 @@ void HALO::stateUpdate() {
   X0 = this->Xprediction + K * difference;
 
   // check and update before apogee bool
-  if (!this->isBeforeApogeeBoolHALO) {
+  if (isBeforeApogeeBoolHALO == 1) {
+    std::cout << "Apogee\n";
     std::vector<Scenario>* scenarios = this->getScenarios();
 
     for (int i = 0; i < scenarios->size(); i++) {
       scenarios->at(i).setIsBeforeApogee(false);
     }
 
-    printf("Apogee\n");
-
   } else {
+    std::cout << "Checking for apogee\n";
     // check if the rocket is before apogee
-    this->isBeforeApogeeBoolHALO =
-        isBeforeApogee(this->Uaccel, this->Uvelo, this->Ualt,
-                       this->KinematicsHalo.altitudeStore);
+    isBeforeApogeeBoolHALO =
+        // isBeforeApogee(this->Uaccel, this->Uvelo, this->Ualt,
+        //                this->KinematicsHalo.altitudeStore);
+        this->apogeeDetection(
+            Measurement{this->Ualt, this->Uvelo, this->Uaccel, this->time});
+
+    std::cout << "\nBefore apogee: " << isBeforeApogeeBoolHALO << std::endl;
   }
 
   if (std::isnan(X0(0)) || std::isnan(X0(1)) || std::isnan(X0(2))) {
@@ -245,9 +250,6 @@ void HALO::stateUpdate() {
   }
 
   this->KinematicsHalo.altitudeStore = X0(0);
-
-  std::cout << "altitudeStore: " << this->KinematicsHalo.altitudeStore
-            << std::endl;
 
   // update the estimate covariance matrix
   // when variations in the estimate are small then its good
@@ -1045,6 +1047,8 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
 
   return X_pred;
 }
+
+// Apogee detection--------------------------------
 
 /**
  * @brief Check if the rocket is before apogee, based on Everest filter values

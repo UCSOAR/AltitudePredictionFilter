@@ -332,10 +332,17 @@ class HALO {
 
   double altitudeAccumulator = 0;
 
+  double maxAltitude = 0;
+
   double calculateConfidence(double current, double previous, double variance) {
     std::cout << "Current: " << current << " Previous: " << previous
               << " Variance: " << variance << std::endl;
-    double difference = previous - current;
+
+    if (current > maxAltitude) {
+      maxAltitude = current;
+    }
+
+    double difference = maxAltitude - current;
 
     if (difference > 0) {
       altitudeAccumulator += difference;
@@ -359,15 +366,39 @@ class HALO {
     std::cout << "CurrentVelo: " << currentVelo
               << " VarianceVelo: " << varianceVelo << std::endl;
     // velocity should be < 0 for apogee
-    return (1 - (std::abs(varianceVelo) - std::abs(currentVelo)) /
-                    std::abs(varianceVelo));
+    // range
+    double range = 2 * std::abs(varianceVelo);
+    return (range - (std::abs(varianceVelo) + currentVelo)) / range;
   }
 
   double calculateAccelerationConfidence(double currentAcc,
                                          double varianceAcc) {
     std::cout << "CurrentAcc: " << currentAcc << " VarianceAcc: " << varianceAcc
               << std::endl;
-    return std::abs(currentAcc / (9.81 + std::abs(varianceAcc)));
+
+    double lowerBound1 = -9.81 - varianceAcc;
+    double upperBound1 = -9.81 + varianceAcc;
+
+    double lowerBound2 = currentAcc - varianceAcc;
+    double upperBound2 = currentAcc + varianceAcc;
+
+    // Calculate the overlap between the two ranges
+    double overlapLower = std::max(lowerBound1, lowerBound2);
+    double overlapUpper = std::min(upperBound1, upperBound2);
+
+    double overlap = std::max(0.0, overlapUpper - overlapLower);
+    double totalRange = 2 * varianceAcc;
+
+    double confidence = overlap / totalRange;
+
+    std::cout << "LowerBound1: " << lowerBound1
+              << " UpperBound1: " << upperBound1 << std::endl;
+    std::cout << "LowerBound2: " << lowerBound2
+              << " UpperBound2: " << upperBound2 << std::endl;
+    std::cout << "Overlap: " << overlap << " TotalRange: " << totalRange
+              << " Confidence: " << confidence << std::endl;
+
+    return confidence;
   }
 
   bool apogeeDetection(const Measurement &currentMeasurement) {
@@ -427,11 +458,6 @@ class HALO {
     double accelerationConfidence =
         calculateAccelerationConfidence(avgAcceleration, sqrtP_acceleration);
 
-    // check confidence
-    std::cout << "Confidence_alt: " << altitudeConfidence
-              << " velo: " << velocityConfidence
-              << " acc: " << accelerationConfidence << std::endl;
-
     // cap confidence at 1
     if (altitudeConfidence > 1) {
       altitudeConfidence = 1;
@@ -444,6 +470,11 @@ class HALO {
     if (accelerationConfidence > 1) {
       accelerationConfidence = 1;
     }
+
+    // check confidence
+    std::cout << "Confidence_alt: " << altitudeConfidence
+              << " velo: " << velocityConfidence
+              << " acc: " << accelerationConfidence << std::endl;
 
     double totalConfidence =
         (altitudeConfidence * 0.5 + velocityConfidence * 0.5 +

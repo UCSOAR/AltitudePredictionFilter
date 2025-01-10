@@ -3,7 +3,7 @@ import random
 
 # Read the scenario data from a CSV file
 scenarios = []
-with open("beforeSimsF2_Short.csv", "r") as file:
+with open("testSuite/data/beforeSimsF2_Short.csv", "r") as file:
     reader = csv.reader(file)
     next(reader)  # Skip the header row
     for row in reader:
@@ -26,67 +26,69 @@ for i, scenario in enumerate(scenarios):
 
 # Append data to the existing SensorData arrays
 for scenario_id, data in scenario_data.items():
-    # check if the data is not all NUL
-
     # Scenario 1
     cpp_code += f"\nstd::vector<std::vector<float>> sim{1} = {{\n"
+    i = 0
     for entry in data:
         if entry[1] == "":
             break
-        cpp_code += f"    {{{entry[0]}, {entry[1]}, {entry[2]}, {entry[3]}}},\n"
+        cpp_code += f"    {{{entry[0]}, {entry[1]}, {entry[2]}, {entry[3]}, {61 - i}}},\n"
+        i += 1
     cpp_code += "};\n"
 
     # Scenario 2
     cpp_code += f"\nstd::vector<std::vector<float>> sim{2} = {{\n"
+    i = 0
     for entry in data:
         if entry[4] == "":
             break
 
-        cpp_code += f"    {{{entry[4]}, {entry[5]}, {entry[6]}, {entry[7]}}},\n"
+        cpp_code += f"    {{{entry[4]}, {entry[5]}, {entry[6]}, {entry[7]}, {70 - i}}},\n"
+
+        i += 1
     cpp_code += "};\n"
 
     # Scenario 3
+    i = 0
     cpp_code += f"\nstd::vector<std::vector<float>> sim{3} = {{\n"
     for entry in data:
         if entry[8] == "":
             break
 
-        cpp_code += f"    {{{entry[8]}, {entry[9]}, {entry[10]}, {entry[11]}}},\n"
+        cpp_code += f"    {{{entry[8]}, {entry[9]}, {entry[10]}, {entry[11]}, {79 - i}}},\n"
+        i += 1
     cpp_code += "};\n"
 
     # Scenario 4
+    i = 0
     cpp_code += f"\nstd::vector<std::vector<float>> sim{4} = {{\n"
     for entry in data:
         if entry[12] == "":
             break
 
-        cpp_code += f"    {{{entry[12]}, {entry[13]}, {entry[14]}, {entry[15]}}},\n"
+        cpp_code += f"    {{{entry[12]}, {entry[13]}, {entry[14]}, {entry[15]}, {94 - i}}},\n"
+        i += 1
     cpp_code += "};\n"
 
     # Scenario 5
+    i = 0
     cpp_code += f"\nstd::vector<std::vector<float>> sim{5} = {{\n"
     for entry in data:
         if entry[16] == "":
             break
-        cpp_code += f"    {{{entry[16]}, {entry[17]}, {entry[18]}, {entry[19]}}},\n"
+        cpp_code += f"    {{{entry[16]}, {entry[17]}, {entry[18]}, {entry[19]}, {77 - i}}},\n"
+        i += 1
     cpp_code += "};\n"
 
     # Scenario 6
+    i = 0
     cpp_code += f"\nstd::vector<std::vector<float>> sim{6} = {{\n"
     for entry in data:
         if entry[20] == "":
             break
-        cpp_code += f"    {{{entry[20]}, {entry[21]}, {entry[22]}, {entry[23]}}},\n"
+        cpp_code += f"    {{{entry[20]}, {entry[21]}, {entry[22]}, {entry[23]}, {59 - i}}},\n"
+        i += 1
     cpp_code += "};\n"
-
-
-# for Scenario 7, take Scenario 6's data and add random noise (from 0 to )
-# Scenario 7
-cpp_code += f"\nstd::vector<std::vector<float>> sim{7} = {{\n"
-for entry in scenario_data[6]:
-    if entry[20] == "":
-        break
-    cpp_code += f"    {{{entry[20]}, {entry[21] + random(), entry[22] + 0.01, entry[23] + 0.01}}},\n"
 
 
 # Write the generated C++ code to a file

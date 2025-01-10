@@ -37,7 +37,6 @@ using namespace Eigen;
 
 #ifdef LOGON
 FILE* resetGainsFile;
-
 #endif
 
 void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
@@ -1145,6 +1144,7 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
 #endif
 
+  // check if X is nan, if so default to static integration
   if (std::isnan(X(0)) || std::isnan(X(1)) || std::isnan(X(2))) {
     FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
     if (!file) {
@@ -1255,18 +1255,14 @@ void HALO::initializeHALO(float initialAlt, HALO* halo) {
   // process noise Covariance matrix (altitude, velocity, acceleration)
   // Calculated using covarianceCalc.py -> covariance matrix from Altimeter
   // Assuming Altimeter has no process noise (Q = 0)
-
   // unaccounted for noise in envrionment (wind, etc)-> residual from sims
   MatrixXf Q(3, 3);
-  // Q << 100, 0, 0, 0, 40, 0, 0, 0, 8;
   Q << 74777.41, 4458.13, -2164.91, 4458.13, 2413.02, -4.52, -2164.91, -4.52,
       503.78;
 
   // Measurement Covariance matrix (altitude, velocity, acceleration)
   // Calculated using covarianceCalc.py -> residual from Everest
   MatrixXf R0(3, 3);
-  // R0 << 200, 0.5, 0.5, 0.5, 100, 1, 0.5, 1, 10;
-
   R0 << 15438.09, 1528.51, 727.68, 1528.51, 5005.79, -469.20, 727.68, -469.20,
       613.20;
 

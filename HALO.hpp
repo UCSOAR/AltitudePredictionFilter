@@ -352,7 +352,7 @@ class HALO {
       return 1;
     }
 
-    return difference / std::abs(variance);
+    return std::max(difference, altitudeAccumulator) / std::abs(variance);
   }
 
   double calculateVelocityConfidence(double currentVelo, double varianceVelo) {
@@ -362,25 +362,21 @@ class HALO {
     return (range - (std::abs(varianceVelo) + currentVelo)) / range;
   }
 
-  double calculateAccelerationConfidence(double currentAcc,
-                                         double varianceAcc) {
-    double lowerBound1 = -9.81 - varianceAcc;
-    double upperBound1 = -9.81 + varianceAcc;
+double calculateAccelerationConfidence(double currentAcc, double varianceAcc) {
+    double targetAcc = -9.81;
+    double difference = std::abs(currentAcc - targetAcc);
 
-    double lowerBound2 = currentAcc - varianceAcc;
-    double upperBound2 = currentAcc + varianceAcc;
+    double lowerBound = currentAcc - varianceAcc;
+    double upperBound = currentAcc + varianceAcc;
 
-    // Calculate the overlap between the two ranges
-    double overlapLower = std::max(lowerBound1, lowerBound2);
-    double overlapUpper = std::min(upperBound1, upperBound2);
-
-    double overlap = std::max(0.0, overlapUpper - overlapLower);
-    double totalRange = 2 * varianceAcc;
-
-    double confidence = overlap / totalRange;
+    if(lowerBound > targetAcc && upperBound < targetAcc) {
+        return 0;
+    }
+    
+    double confidence = 1.0 - (difference / (2 * varianceAcc));
 
     return confidence;
-  }
+}
 
   bool apogeeDetection(const Measurement &currentMeasurement) {
     updateBuffer(currentMeasurement);
@@ -437,8 +433,8 @@ class HALO {
               << " acc: " << accelerationConfidence << std::endl;
 
     double totalConfidence =
-        (altitudeConfidence * 0.5 + velocityConfidence * 0.5 +
-         accelerationConfidence * 0.5);
+        (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
+         accelerationConfidence * 0.4);
 
     std::cout << "Altitude: " << avgAltitude << " Velocity: " << avgVelocity
               << " Acceleration: " << avgAcceleration << std::endl;

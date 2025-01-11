@@ -8,6 +8,7 @@ Everest_data = pd.read_csv("testSuite/results/HALO.txt")
 Quasar_data = pd.read_csv("covarianceCalc/covariance_Cal_New_CSV.csv")
 HALO_data = pd.read_csv("testSuite/results/HALO.txt")
 p_data = pd.read_csv("testSuite/results/P.txt")
+confidence = pd.read_csv("testSuite/results/confidence.txt")
 
 # ignore first row of Everest
 Everest_data = Everest_data.iloc[1:]
@@ -286,14 +287,14 @@ def everest_Residual():
     halo_acc_np = np.array(acc_HALO)
 
     # get confidence interval
-    upper_alt = halo_alt_np + np.sqrt(np.abs(p_data["alt_std"]))
-    lower_alt = halo_alt_np - np.sqrt(np.abs(p_data["alt_std"]))
+    upper_alt = halo_alt_np[0:] + np.sqrt(np.abs(p_data["alt_std"]))
+    lower_alt = halo_alt_np[0:] - np.sqrt(np.abs(p_data["alt_std"]))
 
-    upper_velo = halo_velo_np + np.sqrt(np.abs(p_data["velo_std"]))
-    lower_velo = halo_velo_np - np.sqrt(np.abs(p_data["velo_std"]))
+    upper_velo = halo_velo_np[0:] + np.sqrt(np.abs(p_data["velo_std"]))
+    lower_velo = halo_velo_np[0:] - np.sqrt(np.abs(p_data["velo_std"]))
 
-    upper_acc = halo_acc_np + np.sqrt(np.abs(p_data["acc_std"]))
-    lower_acc = halo_acc_np - np.sqrt(np.abs(p_data["acc_std"]))
+    upper_acc = halo_acc_np[0:] + np.sqrt(np.abs(p_data["acc_std"]))
+    lower_acc = halo_acc_np[0:] - np.sqrt(np.abs(p_data["acc_std"]))
 
     print("Acc std")
     print(np.sqrt(np.abs(p_data["acc_std"])))
@@ -306,6 +307,7 @@ def everest_Residual():
 
     # substract 2.333 from the time to match the time of the altimeter
     time_HALO = time_HALO - (1 + 2 / 3)
+    time_HALO = time_HALO[1:]
 
     # Special case of Altimeter averaging (every 0.33333 seconds)
     alt_Alt = Quasar_data["alt_Q"]
@@ -351,11 +353,11 @@ def everest_Residual():
     plt.figure(figsize=(10, 6))
     plt.plot(altimeter_Time, avg_Altimeter_Alt, label="Altimeter")
     plt.plot(time_Everest, alt_Everest, label="Everest")
-    plt.plot(time_HALO, alt_HALO, label="HALO")
+    plt.plot(time_HALO, alt_HALO[1:], label="HALO")
     plt.fill_between(
         time_HALO,
-        lower_alt,
-        upper_alt,
+        lower_alt[1:],
+        upper_alt[1:],
         color="gray",
         alpha=0.5,
         label="Confidence Interval",
@@ -379,11 +381,11 @@ def everest_Residual():
     plt.figure(figsize=(10, 6))
     plt.plot(altimeter_Time, avg_Altimeter_Velo, label="Altimeter")
     plt.plot(time_Everest, velo_Everest, label="Everest")
-    plt.plot(time_HALO, velo_HALO, label="HALO")
+    plt.plot(time_HALO, velo_HALO[1:], label="HALO")
     plt.fill_between(
         time_HALO,
-        lower_velo,
-        upper_velo,
+        lower_velo[1:],
+        upper_velo[1:],
         color="gray",
         alpha=0.5,
         label="Confidence Interval",
@@ -406,11 +408,11 @@ def everest_Residual():
     plt.figure(figsize=(10, 6))
     plt.plot(altimeter_Time, avg_Altimeter_Acc, label="Altimeter")
     plt.plot(time_Everest, acc_Everest, label="Everest")
-    plt.plot(time_HALO, acc_HALO, label="HALO")
+    plt.plot(time_HALO, acc_HALO[1:], label="HALO")
     plt.fill_between(
         time_HALO,
-        lower_acc,
-        upper_acc,
+        lower_acc[1:],
+        upper_acc[1:],
         color="gray",
         alpha=0.5,
         label="Confidence Interval",
@@ -429,6 +431,33 @@ def everest_Residual():
     # plot residuals
     plt.plot(time_Everest, residuals_Acc, label="Residual")
 
+    # plot confidence values
+    plt.figure(figsize=(10, 6))
+    plt.plot(
+        time_HALO[9:90], confidence.iloc[:, 0], label="Altitude Confidence", color="red"
+    )
+    plt.plot(
+        time_HALO[9:90], confidence.iloc[:, 3], label="TotalConfidence", color="blue"
+    )
+    plt.plot(
+        time_HALO[9:90],
+        confidence.iloc[:, 1],
+        label="Velocity Confidence",
+        color="green",
+    )
+    plt.plot(
+        time_HALO[9:90],
+        confidence.iloc[:, 2],
+        label="Acceleration Confidence",
+        color="purple",
+    )
+    plt.yticks(np.arange(0, 1.1, step=0.1))
+    plt.xlabel("Time")
+    plt.ylabel("Confidence")
+    plt.title("Confidence vs Time")
+    plt.legend()
+    plt.grid(True)
+
     plt.show()
 
     # Calculate and plot covariance matrix of residuals
@@ -445,9 +474,6 @@ def everest_Residual():
     plt.xticks([0, 1, 2], ["Altitude", "Velocity", "Acceleration"])
     plt.yticks([0, 1, 2], ["Altitude", "Velocity", "Acceleration"])
     plt.show()
-
-    # print acceleration std
-    # print(np.sqrt(np.abs(p_data["acc_std"])))
 
 
 # graph()

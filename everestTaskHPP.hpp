@@ -26,7 +26,7 @@
 
 // Definitions
 // CHANGE
-#define SAMPLE_RATE (3)  // replace this with actual sample rate of baros
+#define SAMPLE_RATE (3)  // replace this with actual sample rate
 #define DELTA_TIME (1.0f / 3.0f)
 #define RATE_BARO (3)
 #define CALIBRATION_TIME (2)
@@ -184,6 +184,19 @@ class EverestTask {
 
   std::vector<double> EverestToHalo(EverestData everestData,
                                     EverestTask* everest);
+
+  std::vector<double> QueueEverest(EverestTask* everest);
+
+  std::vector<int> availableMeasurements = {0, 0, 0, 0};
+
+  EverestData everestData;
+
+  float timeEverest = 0;
+
+  void IMU1_Measurements(IMUData imu1, EverestTask* everest);
+  void IMU2_Measurements(IMUData imu2, EverestTask* everest);
+  void Baro1_Measurements(BarosData baro1, EverestTask* everest);
+  void Baro2_Measurements(BarosData baro2, EverestTask* everest);
 
  protected:
   IMUData internalIMU_1, internalIMU_2;

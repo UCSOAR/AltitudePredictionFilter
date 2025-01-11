@@ -22,6 +22,7 @@
 #endif
 
 using namespace Eigen;
+#define LOGON
 
 /**
  * @brief Measurement struct to store the time, altitude, velocity and
@@ -348,11 +349,9 @@ class HALO {
     // override since altitude has consistently been going down in the range of
     // the variance
     if (altitudeAccumulator >= variance) {
-      std::cout << "Altitude has been consistently going down" << std::endl;
       return 1;
     }
 
-    return std::max(difference, altitudeAccumulator) / std::abs(variance);
     return std::max(difference, altitudeAccumulator) / std::abs(variance);
   }
 
@@ -360,6 +359,7 @@ class HALO {
     // velocity should be < 0 for apogee
     // range
     double range = 2 * std::abs(varianceVelo);
+
     return (range - (std::abs(varianceVelo) + currentVelo)) / range;
   }
 
@@ -370,14 +370,12 @@ class HALO {
 
     double lowerBound = currentAcc - varianceAcc;
     double upperBound = currentAcc + varianceAcc;
-    double lowerBound = currentAcc - varianceAcc;
-    double upperBound = currentAcc + varianceAcc;
 
     if (lowerBound > targetAcc && upperBound < targetAcc) {
       return 0;
     }
 
-    double confidence = 1.0 - (difference / (2 * varianceAcc));
+    double confidence = (difference / (2 * varianceAcc));
 
     return confidence;
   }
@@ -439,8 +437,22 @@ class HALO {
     double totalConfidence =
         (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
          accelerationConfidence * 0.4);
-    (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
-     accelerationConfidence * 0.4);
+
+#ifdef LOGON
+    // write to file confidence values
+    FILE *file = fopen("testSuite/results/confidence.txt",
+                       "a+");  // Open the file for writing
+    if (!file) {
+      fprintf(stderr, "Error opening confidence.txt...exiting\n");
+      exit(1);
+    }
+
+    fprintf(file, "%f,%f,%f,%f\n", altitudeConfidence, velocityConfidence,
+            accelerationConfidence, totalConfidence);
+
+    fclose(file);
+
+#endif
 
     std::cout << "Altitude: " << avgAltitude << " Velocity: " << avgVelocity
               << " Acceleration: " << avgAcceleration << std::endl;
@@ -451,7 +463,7 @@ class HALO {
                 << " seconds, Altitude: " << avgAltitude << " meters"
                 << std::endl;
       // stop program
-      exit(0);
+      // exit(0);
       return true;
     }
 

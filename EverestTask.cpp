@@ -140,6 +140,22 @@ int openFiles() {
       "magneticRecoveryTrigger, initialising, angularRateRecovery, "
       "accelerationRecovery, magneticRecovery, earth.axis.z\n");
 
+  // delete confidence.txt
+  filePath = directoryPath + "/confidence.txt";
+  if (std::remove(filePath.c_str()) == 0) {
+    std::cout << "File deleted successfully: confidence.txt" << std::endl;
+  } else {
+    std::perror("Error deleting file");
+  }
+
+  // creating confidence.txt
+  FILE* file = fopen((directoryPath + "/confidence.txt").c_str(),
+                     "a+");  // Open the file for writing
+  if (!file) {
+    fprintf(stderr, "Error opening confidence.txt...exiting\n");
+    exit(1);
+  }
+
   return 0;
 }
 
@@ -181,6 +197,7 @@ madAhrs* ahrs;
 Infusion* infusion;
 
 EverestTask everest = EverestTask::getEverest();
+float oldTime = everest.timeEverest;
 HALO halo;
 kinematics* Kinematics = everest.getKinematics();  // tare to ground
 
@@ -207,7 +224,6 @@ double EverestTask::TaskWrapper(EverestData everestData,
       alignment, alignment2);
 }
 
-//----------------------------------EVEREST-------------------------------------------//
 /**
  * @brief Only done once. Sets pointers for Madgwick
  *     Internal
@@ -371,6 +387,7 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
   this->internalIMU_2.magZ = imu2.magZ;
 
   if (isinf(internalIMU_1.accelX)) {
+    std::cout << "IMU1 accelX is inf" << std::endl;
     numberOfSamples -= 1;
     this->internalIMU_1.gyroX = 0;
     this->internalIMU_1.gyroY = 0;
@@ -426,6 +443,7 @@ void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
   }
 
   if (isinf(internalIMU_2.accelX)) {
+    // std::cout << "IMU2 is inf" << std::endl;
     numberOfSamples -= 1;
     this->internalIMU_2.gyroX = 0;
     this->internalIMU_2.gyroY = 0;
@@ -729,6 +747,7 @@ double EverestTask::dynamite() {
 
   // if pressure is zero, set gain to zero
   if (everest.baro1.pressure == 0) {
+    // std::cout << "Baro1 pressure is zero" << std::endl;
     everest.state.gain_Baro1 = 0;
   } else if (everest.state.gain_Baro1 == 0) {
     // if not zero, set gain to previous gain
@@ -737,6 +756,7 @@ double EverestTask::dynamite() {
 
   // if not zero, set gain to zero
   if (everest.baro2.pressure == 0) {
+    // std::cout << "Baro2 pressure is zero" << std::endl;
     everest.state.gain_Baro2 = 0;
   } else if (everest.state.gain_Baro2 == 0) {
     // if not zero, set gain to previous gain
@@ -1185,6 +1205,10 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
       // Initialize HALO
       std::cout << "Tareing done, initializing HALO" << std::endl;
       halo = HALO();
+      // Set initial altitude to 1000 if it is zero (no baros in tareing)
+      if (everest->Kinematics.initialAlt == 0) {
+        everest->Kinematics.initialAlt = 1000;
+      }
       halo.initializeHALO(everest->Kinematics.initialAlt, &halo);
       std::cout << "Everest initial altitude: "
                 << everest->Kinematics.initialAlt << std::endl;
@@ -1218,6 +1242,129 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
   return haloData;
 }
 
+// update IMU1
+void EverestTask::IMU1_Measurements(IMUData imu1, EverestTask* everest) {
+  everest->everestData.accelX1 = imu1.accelX;
+  everest->everestData.accelY1 = imu1.accelY;
+  everest->everestData.accelZ1 = imu1.accelZ;
+  everest->everestData.gyroX1 = imu1.gyroX;
+  everest->everestData.gyroY1 = imu1.gyroY;
+  everest->everestData.gyroZ1 = imu1.gyroZ;
+  everest->everestData.magX1 = imu1.magX;
+  everest->everestData.magY1 = imu1.magY;
+  everest->everestData.magZ1 = imu1.magZ;
+  everest->everestData.timeIMU1 = imu1.time;
+  everest->availableMeasurements[0] = 1;
+}
+
+// update IMU2
+void EverestTask::IMU2_Measurements(IMUData imu2, EverestTask* everest) {
+  everest->everestData.accelX2 = imu2.accelX;
+  everest->everestData.accelY2 = imu2.accelY;
+  everest->everestData.accelZ2 = imu2.accelZ;
+  everest->everestData.gyroX2 = imu2.gyroX;
+  everest->everestData.gyroY2 = imu2.gyroY;
+  everest->everestData.gyroZ2 = imu2.gyroZ;
+  everest->everestData.magX2 = imu2.magX;
+  everest->everestData.magY2 = imu2.magY;
+  everest->everestData.magZ2 = imu2.magZ;
+  everest->everestData.timeIMU2 = imu2.time;
+  everest->availableMeasurements[1] = 1;
+}
+
+// update Baro1
+void EverestTask::Baro1_Measurements(BarosData baro1, EverestTask* everest) {
+  everest->everestData.pressure1 = baro1.pressure;
+  everest->everestData.timeBaro1 = baro1.time;
+  everest->availableMeasurements[2] = 1;
+}
+
+// update Baro2
+void EverestTask::Baro2_Measurements(BarosData baro2, EverestTask* everest) {
+  everest->everestData.pressure2 = baro2.pressure;
+  everest->everestData.timeBaro2 = baro2.time;
+  everest->availableMeasurements[3] = 1;
+}
+
+// Custom rounding function
+float roundToDecimalPlaces(double value, int decimalPlaces) {
+  double scale = std::pow(10.0, decimalPlaces);
+  return std::round(value * scale) / scale;
+}
+
+std::vector<double> EverestTask::QueueEverest(EverestTask* everest) {
+  // std::cout << "Time: " << everest->timeEverest << " Old Time: " << oldTime
+  // << std::endl; std::cout << "New time " << oldTime + 1.0/SAMPLE_RATE <<
+  // std::endl; bool condition = roundToDecimalPlaces(everest->timeEverest, 4)
+  // >= roundToDecimalPlaces((oldTime + 1.0 / SAMPLE_RATE), 4); std::cout <<
+  // "Condition: " << condition << std::endl;
+
+  // run timer loop, at constant HALORefreshRate
+  // while(everest->timeEverest < 180){
+  if (everest->timeEverest == 0) {
+    // Setup Madgwick and attach Madgwick to Everest
+    everest->MadgwickSetup();
+  }
+
+  if (roundToDecimalPlaces(everest->timeEverest, 4) >=
+      roundToDecimalPlaces((oldTime + 1.0 / SAMPLE_RATE), 4)) {
+    // std::cout << "Available Measurements: " <<
+    // everest->availableMeasurements[0] << everest->availableMeasurements[1] <<
+    // everest->availableMeasurements[2] << everest->availableMeasurements[3] <<
+    // std::endl; if all measurements are available
+    if (everest->availableMeasurements[0] == 1 &&
+        everest->availableMeasurements[1] == 1 &&
+        everest->availableMeasurements[2] == 1 &&
+        everest->availableMeasurements[3] == 1) {
+      std::vector<double> haloData =
+          everest->EverestToHalo(everest->everestData, everest);
+      // reset available measurements
+      everest->availableMeasurements[0] = 0;
+      everest->availableMeasurements[1] = 0;
+      everest->availableMeasurements[2] = 0;
+      everest->availableMeasurements[3] = 0;
+    } else {
+      // available[0] = IMU1, available[1] = IMU2, available[2] = Baro1,
+      // available[3] = Baro2
+      if (everest->availableMeasurements[0] == 0) {
+        // set to infinity
+        everest->everestData.accelX1 = std::numeric_limits<float>::infinity();
+      }
+
+      if (everest->availableMeasurements[1] == 0) {
+        // set to infinity
+        everest->everestData.accelX2 = std::numeric_limits<float>::infinity();
+      }
+
+      if (everest->availableMeasurements[2] == 0) {
+        everest->everestData.pressure1 = 0;
+      }
+
+      if (everest->availableMeasurements[3] == 0) {
+        everest->everestData.pressure2 = 0;
+      }
+
+      // std::cout << "everestData: " << everest->everestData.accelX1 << " " <<
+      // everest->everestData.accelX2 << " " << everest->everestData.pressure1
+      // << " " << everest->everestData.pressure2 << std::endl;
+
+      std::vector<double> haloData =
+          everest->EverestToHalo(everest->everestData, everest);
+
+      // reset available measurements
+      everest->availableMeasurements[0] = 0;
+      everest->availableMeasurements[1] = 0;
+      everest->availableMeasurements[2] = 0;
+      everest->availableMeasurements[3] = 0;
+    }
+  }
+
+  oldTime = everest->timeEverest;
+  everest->timeEverest += 1.0 / SAMPLE_RATE;
+
+  // }
+}
+
 // --------------------------------------------------- END OF EVEREST
 #define MAX_LINE_LENGTH 1024
 
@@ -1226,7 +1373,7 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
  */
 int main() {
   // Setup Madgwick and attach Madgwick to Everest
-  everest.MadgwickSetup();
+  // everest.MadgwickSetup();
 
   // read first line and preset the deltaTime to timestamp
   char line[MAX_LINE_LENGTH];
@@ -1234,6 +1381,7 @@ int main() {
   float totalTime = 0;
 
   for (int i = 0; i < taberLaunch.size(); i++) {
+    std::cout << "Iteration: " << i << std::endl;
     // Tokenize the line using strtok
     // Parse accelerometer readings (X, Y, Z)
     float time = taberLaunch[i][0];
@@ -1276,26 +1424,19 @@ int main() {
           baro1.pressure, baro2.pressure);
     }
 
-    EverestData everestData = {
-        sensorData.time,    sensorData2.time,   baro1.time,
-        baro2.time,
-
-        baro1.pressure,     baro2.pressure,
-
-        sensorData.accelX,  sensorData.accelY,  sensorData.accelZ,
-        sensorData.gyroX,   sensorData.gyroY,   sensorData.gyroZ,
-        sensorData.magX,    sensorData.magY,    sensorData.magZ,
-
-        sensorData2.accelX, sensorData2.accelY, sensorData2.accelZ,
-        sensorData2.gyroX,  sensorData2.gyroY,  sensorData2.gyroZ,
-        sensorData2.magX,   sensorData2.magY,   sensorData2.magZ,
-    };
+    // update IMU1
+    everest.IMU1_Measurements(sensorData, &everest);
+    everest.IMU2_Measurements(sensorData2, &everest);
+    everest.Baro1_Measurements(baro1, &everest);
+    everest.Baro2_Measurements(baro2, &everest);
 
     // start timer for iteration
     start = std::clock();
 
     // calls the entirety of the power of HALO, peak modularization
-    std::vector<double> haloData = everest.EverestToHalo(everestData, &everest);
+    // std::vector<double> haloData = everest.EverestToHalo(everestData,
+    // &everest);
+    std::vector<double> haloData = everest.QueueEverest(&everest);
 
     clock_t endTime = std::clock();
 

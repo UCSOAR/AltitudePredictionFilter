@@ -216,15 +216,9 @@ void HALO::stateUpdate() {
     }
 
   } else {
-    std::cout << "Checking for apogee\n";
     // check if the rocket is before apogee
-    isBeforeApogeeBoolHALO =
-        // isBeforeApogee(this->Uaccel, this->Uvelo, this->Ualt,
-        //                this->KinematicsHalo.altitudeStore);
-        this->apogeeDetection(
-            Measurement{this->Ualt, this->Uvelo, this->Uaccel, this->time});
-
-    std::cout << "\nBefore apogee: " << isBeforeApogeeBoolHALO << std::endl;
+    isBeforeApogeeBoolHALO = this->apogeeDetection(
+        Measurement{this->Ualt, this->Uvelo, this->Uaccel, this->time});
   }
 
   if (std::isnan(X0(0)) || std::isnan(X0(1)) || std::isnan(X0(2))) {

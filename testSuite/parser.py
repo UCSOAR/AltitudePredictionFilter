@@ -28,6 +28,7 @@ for scenario_id, data in scenario_data.items():
     # Scenario 1
     cpp_code += f"\nstd::vector<std::vector<float>> sim{1} = {{\n"
     i = 0
+    i = 0
     for entry in data:
         if entry[1] == "":
             break
@@ -39,6 +40,7 @@ for scenario_id, data in scenario_data.items():
 
     # Scenario 2
     cpp_code += f"\nstd::vector<std::vector<float>> sim{2} = {{\n"
+    i = 0
     i = 0
     for entry in data:
         if entry[4] == "":
@@ -53,6 +55,7 @@ for scenario_id, data in scenario_data.items():
 
     # Scenario 3
     i = 0
+    i = 0
     cpp_code += f"\nstd::vector<std::vector<float>> sim{3} = {{\n"
     for entry in data:
         if entry[8] == "":
@@ -65,6 +68,7 @@ for scenario_id, data in scenario_data.items():
     cpp_code += "};\n"
 
     # Scenario 4
+    i = 0
     i = 0
     cpp_code += f"\nstd::vector<std::vector<float>> sim{4} = {{\n"
     for entry in data:
@@ -79,6 +83,7 @@ for scenario_id, data in scenario_data.items():
 
     # Scenario 5
     i = 0
+    i = 0
     cpp_code += f"\nstd::vector<std::vector<float>> sim{5} = {{\n"
     for entry in data:
         if entry[16] == "":
@@ -90,6 +95,7 @@ for scenario_id, data in scenario_data.items():
     cpp_code += "};\n"
 
     # Scenario 6
+    i = 0
     i = 0
     cpp_code += f"\nstd::vector<std::vector<float>> sim{6} = {{\n"
     for entry in data:

@@ -353,6 +353,7 @@ class HALO {
     }
 
     return std::max(difference, altitudeAccumulator) / std::abs(variance);
+    return std::max(difference, altitudeAccumulator) / std::abs(variance);
   }
 
   double calculateVelocityConfidence(double currentVelo, double varianceVelo) {
@@ -367,6 +368,8 @@ class HALO {
     double targetAcc = -9.81;
     double difference = std::abs(currentAcc - targetAcc);
 
+    double lowerBound = currentAcc - varianceAcc;
+    double upperBound = currentAcc + varianceAcc;
     double lowerBound = currentAcc - varianceAcc;
     double upperBound = currentAcc + varianceAcc;
 
@@ -436,6 +439,8 @@ class HALO {
     double totalConfidence =
         (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
          accelerationConfidence * 0.4);
+    (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
+     accelerationConfidence * 0.4);
 
     std::cout << "Altitude: " << avgAltitude << " Velocity: " << avgVelocity
               << " Acceleration: " << avgAcceleration << std::endl;

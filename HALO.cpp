@@ -45,7 +45,6 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
   // remove the file if it exists
   std::string filePath = directoryPath + "/resetGainsFile.txt";
   if (std::remove(filePath.c_str()) == 0) {
-    std::cout << "File deleted successfully: resetGainsFile.txt" << std::endl;
   } else {
     std::perror("Error deleting file");
   }
@@ -60,7 +59,6 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
   // deleting P.txt
   filePath = directoryPath + "/P.txt";
   if (std::remove(filePath.c_str()) == 0) {
-    std::cout << "File deleted successfully: P.txt" << std::endl;
   } else {
     std::perror("Error deleting file");
   }

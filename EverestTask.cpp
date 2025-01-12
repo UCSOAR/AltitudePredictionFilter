@@ -19,6 +19,10 @@
 #define printf(...) ;
 FILE* haloFile;
 FILE* everestFile;
+int counterEverest = 0;
+IMUData avgIMU1Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+IMUData avgIMU2Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int isAligned = 0;
 
 int openFiles() {
   // Define the directory path
@@ -935,45 +939,113 @@ double EverestTask::deriveChangeInVelocityToGetAltitude(double estimate) {
  */
 double getFinalAltitude() { return Kinematics->finalAltitude; }
 
-std::vector<MadAxesAlignment> EverestTask::findAlignment(IMUData& imu1,
-                                                         IMUData& imu2) {
-  // find which axis is reading close to -1
-  // if it is close to -1, then it is the axis that is pointing down
-  // if it is close to 1, then it is the axis that is pointing up
+/**
+ * @brief Average IMUs to feed into alignment function
+ */
+int averageIMU(IMUData& imu1, IMUData& imu2) {
+  // average IMU data
+  counterEverest += 1;
+
+  // average IMU1
+  if (counterEverest == 7) {
+    avgIMU1Align.gyroX = avgIMU1Align.gyroX / 7;
+    avgIMU1Align.gyroY = avgIMU1Align.gyroY / 7;
+    avgIMU1Align.gyroZ = avgIMU1Align.gyroZ / 7;
+
+    avgIMU1Align.accelX = avgIMU1Align.accelX / 7;
+    avgIMU1Align.accelY = avgIMU1Align.accelY / 7;
+    avgIMU1Align.accelZ = avgIMU1Align.accelZ / 7;
+
+    avgIMU1Align.magX = avgIMU1Align.magX / 7;
+    avgIMU1Align.magY = avgIMU1Align.magY / 7;
+    avgIMU1Align.magZ = avgIMU1Align.magZ / 7;
+
+    // average IMU2
+    avgIMU2Align.gyroX = avgIMU2Align.gyroX / 7;
+    avgIMU2Align.gyroY = avgIMU2Align.gyroY / 7;
+    avgIMU2Align.gyroZ = avgIMU2Align.gyroZ / 7;
+
+    avgIMU2Align.accelX = avgIMU2Align.accelX / 7;
+    avgIMU2Align.accelY = avgIMU2Align.accelY / 7;
+    avgIMU2Align.accelZ = avgIMU2Align.accelZ / 7;
+
+    avgIMU2Align.magX = avgIMU2Align.magX / 7;
+    avgIMU2Align.magY = avgIMU2Align.magY / 7;
+    avgIMU2Align.magZ = avgIMU2Align.magZ / 7;
+
+    counterEverest = 0;
+    return 1;
+  }
+
+  avgIMU1Align.gyroX += imu1.gyroX;
+  avgIMU1Align.gyroY += imu1.gyroY;
+  avgIMU1Align.gyroZ += imu1.gyroZ;
+
+  avgIMU1Align.accelX += imu1.accelX;
+  avgIMU1Align.accelY += imu1.accelY;
+  avgIMU1Align.accelZ += imu1.accelZ;
+
+  avgIMU1Align.magX += imu1.magX;
+  avgIMU1Align.magY += imu1.magY;
+  avgIMU1Align.magZ += imu1.magZ;
+
+  // average IMU2
+  avgIMU2Align.gyroX += imu2.gyroX;
+  avgIMU2Align.gyroY += imu2.gyroY;
+  avgIMU2Align.gyroZ += imu2.gyroZ;
+
+  avgIMU2Align.accelX += imu2.accelX;
+  avgIMU2Align.accelY += imu2.accelY;
+  avgIMU2Align.accelZ += imu2.accelZ;
+
+  avgIMU2Align.magX += imu2.magX;
+  avgIMU2Align.magY += imu2.magY;
+  avgIMU2Align.magZ += imu2.magZ;
+
+  return 0;
+}
+
+int EverestTask::findAlignment(IMUData& imu1, IMUData& imu2) {
+  // check if averageIMU is ready
+  if (averageIMU(imu1, imu2) == 0) {
+    return 0;
+  }
+
   MadAxesAlignment alignment1;
-  if (imu1.accelX < -0.9) {
+  if (avgIMU1Align.accelX < -0.9) {
     // -x -> z (PZ,PY, PX)
     alignment1 = MadAxesAlignmentPZNYPX;
-  } else if (imu1.accelX > 0.9) {
+  } else if (avgIMU1Align.accelX > 0.9) {
     // x -> z (PZ,PY, NX)
     // alignment1 = MadAxesAlignmentPZNYNX;
-  } else if (imu1.accelY < -0.9) {
+  } else if (avgIMU1Align.accelY < -0.9) {
     // -y -> z (PZ, PX, NY)
     // alignment1 = MadAxesAlignmentPZPXNY;
-  } else if (imu1.accelY > 0.9) {
+  } else if (avgIMU1Align.accelY > 0.9) {
     // y -> z (PZ, NX, PY)
     // alignment1 = MadAxesAlignmentPZNXPY;
   }
 
   MadAxesAlignment alignment2;
 
-  if (imu2.accelX < -0.9) {
+  if (avgIMU2Align.accelX < -0.9) {
     // -x -> z (PZ,PY, PX)
     alignment2 = MadAxesAlignmentPZNYPX;
-  } else if (imu2.accelX > 0.9) {
+  } else if (avgIMU2Align.accelX > 0.9) {
     // x -> z (PZ,PY, NX)
     // alignment2 = MadAxesAlignmentPZNYNX;
-  } else if (imu2.accelY < -0.9) {
+  } else if (avgIMU2Align.accelY < -0.9) {
     // -y -> z (PZ, PX, NY)
     // alignment2 = MadAxesAlignmentPZPXNY;
-  } else if (imu2.accelY > 0.9) {
+  } else if (avgIMU2Align.accelY > 0.9) {
     // y -> z (PZ, NX, PY)
     // alignment2 = MadAxesAlignmentPZNXPY;
   }
 
-  std::vector<MadAxesAlignment> alignments = {alignment1, alignment2};
+  this->alignment1 = alignment1;
+  this->alignment2 = alignment2;
 
-  return alignments;
+  return 1;
 }
 
 /**
@@ -1233,6 +1305,22 @@ bool getIsTared() { return isTared; }
  */
 std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
                                                EverestTask* everest) {
+  if (isAligned == 0) {
+    IMUData imu1 = {everestData.accelX1, everestData.accelY1,
+                    everestData.accelZ1, everestData.gyroX1,
+                    everestData.gyroY1,  everestData.gyroZ1,
+                    everestData.magX1,   everestData.magY1,
+                    everestData.magZ1,   everestData.timeIMU1};
+
+    IMUData imu2 = {everestData.accelX2, everestData.accelY2,
+                    everestData.accelZ2, everestData.gyroX2,
+                    everestData.gyroY2,  everestData.gyroZ2,
+                    everestData.magX2,   everestData.magY2,
+                    everestData.magZ2,   everestData.timeIMU2};
+
+    isAligned = everest->findAlignment(imu1, imu2);
+  }
+
   if (haloInitialized == false) {
     // Done tareing, initialize once
     if (isTared) {
@@ -1247,8 +1335,11 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
     }
   }
 
-  double eAltitude = everest->TaskWrapper(everestData, MadAxesAlignmentPXPYNZ,
-                                          MadAxesAlignmentPXPYNZ);
+  std::cout << "Alignment 1: " << everest->alignment1 << std::endl;
+  std::cout << "Alignment 2: " << everest->alignment2 << std::endl;
+
+  double eAltitude =
+      everest->TaskWrapper(everestData, this->alignment1, this->alignment2);
   double eVelocity = everest->getKinematics()->initialVelo;
   double eAccelerationZ = (everest->state.earthAcceleration - 1) * -9.81;
 

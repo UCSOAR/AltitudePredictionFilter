@@ -2,7 +2,7 @@
 #include <fstream>
 #include "Data.cpp"
 
-#define LOGON
+// #define LOGON
 #define TIMERON
 
 // home
@@ -206,7 +206,6 @@ void HALO::stateUpdate() {
 
   // check and update before apogee bool
   if (isBeforeApogeeBoolHALO == 1) {
-    std::cout << "Apogee\n";
     std::vector<Scenario>* scenarios = this->getScenarios();
 
     for (int i = 0; i < scenarios->size(); i++) {
@@ -1284,7 +1283,7 @@ std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
   }
 
-  if (counter == 536) {
+  if (counter == 525) {
 #ifdef TIMERON
     std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t"
               << haloPointer->updateTime.count() << std::endl;

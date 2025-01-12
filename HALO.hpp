@@ -22,7 +22,7 @@
 #endif
 
 using namespace Eigen;
-#define LOGON
+// #define LOGON
 
 /**
  * @brief Measurement struct to store the time, altitude, velocity and
@@ -429,11 +429,6 @@ class HALO {
       accelerationConfidence = 1;
     }
 
-    // check confidence
-    std::cout << "Confidence_alt: " << altitudeConfidence
-              << " velo: " << velocityConfidence
-              << " acc: " << accelerationConfidence << std::endl;
-
     double totalConfidence =
         (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
          accelerationConfidence * 0.4);
@@ -454,16 +449,7 @@ class HALO {
 
 #endif
 
-    std::cout << "Altitude: " << avgAltitude << " Velocity: " << avgVelocity
-              << " Acceleration: " << avgAcceleration << std::endl;
-    std::cout << "Confidence: " << totalConfidence << std::endl;
-
     if (totalConfidence >= 1) {
-      std::cout << "Apogee detected at time: " << currentMeasurement.time
-                << " seconds, Altitude: " << avgAltitude << " meters"
-                << std::endl;
-      // stop program
-      // exit(0);
       return true;
     }
 

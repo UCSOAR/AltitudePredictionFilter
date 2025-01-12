@@ -14,7 +14,7 @@
 
 #include "input_data.cpp"
 
-#define LOGON
+// #define LOGON
 #define TIMERON
 #define printf(...) ;
 FILE* haloFile;
@@ -935,6 +935,47 @@ double EverestTask::deriveChangeInVelocityToGetAltitude(double estimate) {
  */
 double getFinalAltitude() { return Kinematics->finalAltitude; }
 
+std::vector<MadAxesAlignment> EverestTask::findAlignment(IMUData& imu1,
+                                                         IMUData& imu2) {
+  // find which axis is reading close to -1
+  // if it is close to -1, then it is the axis that is pointing down
+  // if it is close to 1, then it is the axis that is pointing up
+  MadAxesAlignment alignment1;
+  if (imu1.accelX < -0.9) {
+    // -x -> z (PZ,PY, PX)
+    alignment1 = MadAxesAlignmentPZNYPX;
+  } else if (imu1.accelX > 0.9) {
+    // x -> z (PZ,PY, NX)
+    // alignment1 = MadAxesAlignmentPZNYNX;
+  } else if (imu1.accelY < -0.9) {
+    // -y -> z (PZ, PX, NY)
+    // alignment1 = MadAxesAlignmentPZPXNY;
+  } else if (imu1.accelY > 0.9) {
+    // y -> z (PZ, NX, PY)
+    // alignment1 = MadAxesAlignmentPZNXPY;
+  }
+
+  MadAxesAlignment alignment2;
+
+  if (imu2.accelX < -0.9) {
+    // -x -> z (PZ,PY, PX)
+    alignment2 = MadAxesAlignmentPZNYPX;
+  } else if (imu2.accelX > 0.9) {
+    // x -> z (PZ,PY, NX)
+    // alignment2 = MadAxesAlignmentPZNYNX;
+  } else if (imu2.accelY < -0.9) {
+    // -y -> z (PZ, PX, NY)
+    // alignment2 = MadAxesAlignmentPZPXNY;
+  } else if (imu2.accelY > 0.9) {
+    // y -> z (PZ, NX, PY)
+    // alignment2 = MadAxesAlignmentPZNXPY;
+  }
+
+  std::vector<MadAxesAlignment> alignments = {alignment1, alignment2};
+
+  return alignments;
+}
+
 /**
  * @brief Tares the altitude to the ground and calibrates zero ground offset for
  * IMU
@@ -945,6 +986,7 @@ double getFinalAltitude() { return Kinematics->finalAltitude; }
  *
  * Once finished will print the tared altitude and set it as the initial
  * altitude
+ *
  */
 void EverestTask::tare(IMUData& imu1, IMUData& imu2, BarosData baro1,
                        BarosData baro2) {
@@ -1085,6 +1127,7 @@ double EverestTask::finalWrapper(
     float magX2, float magY2, float magZ2, float pressure1, float pressure2,
     float timeIMU1, float timeIMU2, float timeBaro1, float timeBaro2,
     MadAxesAlignment alignment, MadAxesAlignment alignment2) {
+  // converts from m/s to gs
   IMUData sensorData = {
       timeIMU1,
       gyroX1,
@@ -1200,8 +1243,6 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
         everest->Kinematics.initialAlt = 1000;
       }
       halo.initializeHALO(everest->Kinematics.initialAlt, &halo);
-      std::cout << "Everest initial altitude: "
-                << everest->Kinematics.initialAlt << std::endl;
       haloInitialized = true;
     }
   }

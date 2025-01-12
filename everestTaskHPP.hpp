@@ -198,6 +198,8 @@ class EverestTask {
   void Baro1_Measurements(BarosData baro1, EverestTask* everest);
   void Baro2_Measurements(BarosData baro2, EverestTask* everest);
 
+  std::vector<MadAxesAlignment> findAlignment(IMUData& imu1, IMUData& imu2);
+
  protected:
   IMUData internalIMU_1, internalIMU_2;
 

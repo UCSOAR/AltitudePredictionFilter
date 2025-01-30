@@ -150,62 +150,63 @@ class KDTree {
       std::vector<float> const& pt, float const& rad);
 
   // side = 0 means left, side = 1 means right, side = 2 means root
-  void printRecursive(KDNodePtr node, size_t depth, int side,
-                      FILE* pFile) const {
-    if (node == nullptr) {
-      return;
-    }
+  // void printRecursive(KDNodePtr node, size_t depth, int side,
+  //                     FILE* pFile) const {
+  //   if (node == nullptr) {
+  //     return;
+  //   }
 
-    for (size_t i = 0; i < depth; ++i) {
-      fprintf(pFile, "  ");
-    }
+  //   for (size_t i = 0; i < depth; ++i) {
+  //     fprintf(pFile, "  ");
+  //   }
 
-    if (side == 0) {
-      fprintf(pFile, "L- ");
-    } else if (side == 1) {
-      fprintf(pFile, "R- ");
-    } else {
-      fprintf(pFile, "Root- ");
-    }
+  //   if (side == 0) {
+  //     fprintf(pFile, "L- ");
+  //   } else if (side == 1) {
+  //     fprintf(pFile, "R- ");
+  //   } else {
+  //     fprintf(pFile, "Root- ");
+  //   }
 
-    fprintf(pFile, "Index: %zu Point: ", node->index);
-    for (const auto& val : node->x) {
-      fprintf(pFile, "%f ", val);
-    }
-    fprintf(pFile, "\n");
+  //   fprintf(pFile, "Index: %zu Point: ", node->index);
+  //   for (const auto& val : node->x) {
+  //     fprintf(pFile, "%f ", val);
+  //   }
+  //   fprintf(pFile, "\n");
 
-    printRecursive(node->left, depth + 1, 0, pFile);
-    printRecursive(node->right, depth + 1, 1, pFile);
-  }
+  //   printRecursive(node->left, depth + 1, 0, pFile);
+  //   printRecursive(node->right, depth + 1, 1, pFile);
+  // }
 
-  void printBT(const std::string& prefix, const KDNodePtr node, bool isLeft,
-               FILE* pFile) const {
-    if (node != nullptr) {
-      // std::cout << prefix;
-      fprintf(pFile, "%s", prefix.c_str());
+  // void printBT(const std::string& prefix, const KDNodePtr node, bool isLeft,
+  //              FILE* pFile) const {
+  //   if (node != nullptr) {
+  //     // std::cout << prefix;
+  //     fprintf(pFile, "%s", prefix.c_str());
 
-      // std::cout << (isLeft ? "├──" : "└──" );
-      if (node->left != nullptr || node->right != nullptr) {
-        fprintf(pFile, "%s", (isLeft ? "├──" : "└──"));
-      }
+  //     // std::cout << (isLeft ? "├──" : "└──" );
+  //     if (node->left != nullptr || node->right != nullptr) {
+  //       fprintf(pFile, "%s", (isLeft ? "├──" : "└──"));
+  //     }
 
-      // print the value of the node
-      for (const auto& val : node->x) {
-        fprintf(pFile, "%f ", val);
-      }
-      fprintf(pFile, "\n");
+  //     // print the value of the node
+  //     for (const auto& val : node->x) {
+  //       fprintf(pFile, "%f ", val);
+  //     }
+  //     fprintf(pFile, "\n");
 
-      // enter the next tree level - left and right branch
-      if (node->left != nullptr || node->right != nullptr) {
-        printBT(prefix + (isLeft ? "│   " : "    "), node->left, true, pFile);
-        printBT(prefix + (isLeft ? "│   " : "    "), node->right, false, pFile);
-      }
-    }
-  }
+  //     // enter the next tree level - left and right branch
+  //     if (node->left != nullptr || node->right != nullptr) {
+  //       printBT(prefix + (isLeft ? "│   " : "    "), node->left, true,
+  //       pFile); printBT(prefix + (isLeft ? "│   " : "    "), node->right,
+  //       false, pFile);
+  //     }
+  //   }
+  // }
 
-  void printBT(const KDNodePtr node, FILE* pFile) const {
-    printBT("", node, false, pFile);
-  }
+  // void printBT(const KDNodePtr node, FILE* pFile) const {
+  //   printBT("", node, false, pFile);
+  // }
 
   /// Get the indices of points that are at a distance to the input point
   /// which is smaller than the input radius.
@@ -239,24 +240,24 @@ class KDTree {
   KDNodePtr root_;
   KDNodePtr leaf_;
 
-  void printTheTree() const {
-    // Clear tree log file
-    if (remove("tree.txt") == 0) {
-      printf("File deleted successfully tree.txt\n");
-    } else {
-      printf("Error deleting file tree.txt\n");
-    }
+  // void printTheTree() const {
+  //   // Clear tree log file
+  //   if (remove("tree.txt") == 0) {
+  //     printf("File deleted successfully tree.txt\n");
+  //   } else {
+  //     printf("Error deleting file tree.txt\n");
+  //   }
 
-    // Open tree log file
-    FILE* pFile = fopen("tree.txt", "a+");
-    if (pFile == nullptr) {
-      printf("Error opening file tree.txt\n");
-      return;
-    }
+  //   // Open tree log file
+  //   FILE* pFile = fopen("tree.txt", "a+");
+  //   if (pFile == nullptr) {
+  //     printf("Error opening file tree.txt\n");
+  //     return;
+  //   }
 
-    // printRecursive(root_, 0, 2, pFile);
-    printBT(root_, pFile);
+  //   // printRecursive(root_, 0, 2, pFile);
+  //   printBT(root_, pFile);
 
-    fclose(pFile);
-  }
+  //   fclose(pFile);
+  // }
 };

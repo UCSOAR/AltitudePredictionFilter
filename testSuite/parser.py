@@ -2,7 +2,7 @@ import csv
 
 # Read the scenario data from a CSV file
 scenarios = []
-with open("testSuite/data/beforeSimsF2_Short.csv", "r") as file:
+with open("testSuite/data/final_may_sims_formatted.csv", "r") as file:
     reader = csv.reader(file)
     next(reader)  # Skip the header row
     for row in reader:

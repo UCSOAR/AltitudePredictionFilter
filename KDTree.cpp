@@ -51,8 +51,6 @@ KDNodePtr NewKDNodePtr() {
 }
 
 inline float dist2(std::vector<float> const& a, std::vector<float> const& b) {
-  // printf("%f,%f,%f,%f,%f,%f\n", a.at(0), a.at(1), a.at(2), b.at(0), b.at(1),
-  // b.at(2)); printf("a.size() = %d, b.size() =%d\n", a.size(), b.size());
   assert(a.size() == b.size());
   float distc = 0;
   for (size_t i = 0; i < a.size(); i++) {
@@ -132,7 +130,7 @@ void KDTree::node_query_(
   }
   knearest_(branch, pt, level, num_nearest, k_nearest_buffer);
   float const dl = dist2(branch->x, pt);
-  // assert(*branch);
+  assert(*branch);
   auto const node_distance = std::make_pair(branch, dl);
   auto const insert_it =
       std::upper_bound(k_nearest_buffer.begin(), k_nearest_buffer.end(),
@@ -180,8 +178,6 @@ void KDTree::knearest_(
 KDNodePtr KDTree::nearest_(std::vector<float> const& pt) {
   size_t level = 0;
   std::list<std::pair<KDNodePtr, float>> k_buffer{};
-  // printf("nearest_ called\n");
-  // printf("root_ is %f\n", root_.get()->coord(0));
 
   k_buffer.emplace_back(root_,
                         dist2(static_cast<std::vector<float>>(*root_), pt));

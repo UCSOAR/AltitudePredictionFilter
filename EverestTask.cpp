@@ -14,7 +14,7 @@
 
 #include "input_data.cpp"
 
-// #define LOGON
+#define LOGON
 #define TIMERON
 #define printf(...) ;
 FILE* haloFile;
@@ -1334,9 +1334,6 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
       haloInitialized = true;
     }
   }
-
-  std::cout << "Alignment 1: " << everest->alignment1 << std::endl;
-  std::cout << "Alignment 2: " << everest->alignment2 << std::endl;
 
   double eAltitude =
       everest->TaskWrapper(everestData, this->alignment1, this->alignment2);

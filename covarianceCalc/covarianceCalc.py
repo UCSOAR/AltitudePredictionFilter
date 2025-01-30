@@ -434,19 +434,25 @@ def everest_Residual():
     # plot confidence values
     plt.figure(figsize=(10, 6))
     plt.plot(
-        time_HALO[9:90], confidence.iloc[:, 0], label="Altitude Confidence", color="red"
+        time_HALO[: len(confidence)],
+        confidence.iloc[:, 0],
+        label="Altitude Confidence",
+        color="red",
     )
     plt.plot(
-        time_HALO[9:90], confidence.iloc[:, 3], label="TotalConfidence", color="blue"
+        time_HALO[: len(confidence)],
+        confidence.iloc[:, 3],
+        label="TotalConfidence",
+        color="blue",
     )
     plt.plot(
-        time_HALO[9:90],
+        time_HALO[: len(confidence)],
         confidence.iloc[:, 1],
         label="Velocity Confidence",
         color="green",
     )
     plt.plot(
-        time_HALO[9:90],
+        time_HALO[: len(confidence)],
         confidence.iloc[:, 2],
         label="Acceleration Confidence",
         color="purple",
@@ -476,5 +482,5 @@ def everest_Residual():
     plt.show()
 
 
-# graph()
-everest_Residual()
+graph()
+# everest_Residual()

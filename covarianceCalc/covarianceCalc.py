@@ -1,18 +1,15 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import re
 
 # import data from csv
-data = pd.read_csv("covarianceCalc/covariance_Cal_CSV.csv")
 Everest_data = pd.read_csv("testSuite/results/HALO.txt")
-Quasar_data = pd.read_csv("covarianceCalc/covariance_Cal_New_CSV.csv")
+Quasar_and_sims_data = pd.read_csv("covarianceCalc/covariance_Cal_Data.csv")
 HALO_data = pd.read_csv("testSuite/results/HALO.txt")
 p_data = pd.read_csv("testSuite/results/P.txt")
 confidence = pd.read_csv("testSuite/results/confidence.txt")
-
-# ignore first row of Everest
-Everest_data = Everest_data.iloc[1:]
-HALO_data = HALO_data.iloc[1:]
+altimeter_data = pd.read_csv("testSuite/data/altimeter1.csv")
 
 
 def calculate_averages(
@@ -36,8 +33,6 @@ def calculate_averages(
         sum_Acc = 0
         counter_Current_Range_Samples = 0
         i = index
-
-        print(time_interval)
 
         while i < len(time_input):
             if time_input[i] <= time_interval and time_input[i] >= lower_bound:
@@ -66,33 +61,45 @@ def calculate_averages(
 start_time = 0
 interval = 0.1
 
-residual_alt_5 = []
-residual_velo_5 = []
-residual_acc_5 = []
-
-residual_alt_6 = []
-residual_velo_6 = []
-residual_acc_6 = []
-
-residual_alt_7 = []
-residual_velo_7 = []
-residual_acc_7 = []
-
-residual_alt_8 = []
-residual_velo_8 = []
-residual_acc_8 = []
+residuals_alt = {}
+residuals_velo = {}
+residuals_acc = {}
 
 
 # Inputs and graphs
-def graph():
+def sims_Residual():
     plt.figure(figsize=(10, 6))
+
+    # Convert DataFrame to list of lists
+    data_list = Quasar_and_sims_data.values.tolist()
+
+    # Replace invalid strings with NaN and convert to floats
+    invalid_values = ["", "#DIV/0!", "#REF!"]
+    data_list = [
+        [float(value) if value not in invalid_values else float("nan") for value in row]
+        for row in data_list
+    ]
+
+    # Determine the number of scenarios using regex
+    alt_columns = [
+        col for col in Quasar_and_sims_data.columns if re.match(r"alt_\d+", col)
+    ]
+    num_scenarios = len(alt_columns)
+
+    print(f"Number of scenarios: {num_scenarios}")
+
+    # remove first row
+    data_list = data_list[1:]
+
+    # Initialize residuals dictionary
+    residuals = {f"sim{scenario}": [] for scenario in range(1, num_scenarios + 1)}
 
     # Special case for the Altimeter data
     # altimeter altitude, velocity, and acceleration
-    alt_Alt = data["altitude_alt"]
-    velo_Alt = data["velo_alt"]
-    acc_Alt = data["acceleration_alt"]
-    time_Alt = data["new_time_alt"]
+    alt_Alt = Quasar_and_sims_data["altitude_alt"]
+    velo_Alt = Quasar_and_sims_data["velo_alt"]
+    acc_Alt = Quasar_and_sims_data["acceleration_alt"]
+    time_Alt = Quasar_and_sims_data["new_time_alt"]
 
     # drop NaN values
     alt_Alt = alt_Alt.dropna()
@@ -107,20 +114,23 @@ def graph():
     # Plot the Altimeter data for altitude
     plt.plot(altimeter_Time, avg_Altimeter_Alt, label="Altimeter", linestyle="--")
 
-    for i in range(5, 9):
-        label_Alt = "alt_" + str(i)
-        label_Velo = "velo_" + str(i)
-        label_Acc = "acc_" + str(i)
-        label_Time = "time_" + str(i)
+    for scenario in range(1, num_scenarios + 1):
+        label_Alt = "alt_" + str(scenario)
+        label_Velo = "velo_" + str(scenario)
+        label_Acc = "acc_" + str(scenario)
+        label_Time = "time_" + str(scenario)
 
-        alt_i = data[label_Alt].dropna()
-        velo_i = data[label_Velo].dropna()
-        acc_i = data[label_Acc].dropna()
-        time_i = data[label_Time].dropna()
+        alt_i = Quasar_and_sims_data[label_Alt].dropna()
+        velo_i = Quasar_and_sims_data[label_Velo].dropna()
+        acc_i = Quasar_and_sims_data[label_Acc].dropna()
+        time_i = Quasar_and_sims_data[label_Time].dropna()
 
         avg_Alt_i, avg_Velo_i, avg_Acc_i, time_i = calculate_averages(
             time_i, alt_i, velo_i, acc_i, start_time, interval
         )
+
+        residuals_alt[f"sim_time_{scenario}"] = time_i
+        residuals_alt[f"sim_avg_alt_{scenario}"] = avg_Alt_i
 
         # get residuals for each scenario
         residuals = []
@@ -128,20 +138,21 @@ def graph():
             residuals.append(avg_Altimeter_Alt[j] - avg_Alt_i[j])
 
         # calculate covariance matrix of residuals
-        if i == 5:
-            residuals_alt_5 = residuals
-        elif i == 6:
-            residuals_alt_6 = residuals
-        elif i == 7:
-            residuals_alt_7 = residuals
-        elif i == 8:
-            residuals_alt_8 = residuals
+        residuals_alt[f"sim_residual{scenario}"] = residuals
 
         # Plot each set of averages for altitude
-        plt.plot(time_i, avg_Alt_i, label=f"Alt {i}")
+        plt.plot(
+            residuals_alt[f"sim_time_{scenario}"],
+            residuals_alt[f"sim_avg_alt_{scenario}"],
+            label=f"Alt {scenario}",
+        )
 
         # show residuals
-        plt.plot(time_i, residuals, label=f"Residual {i}")
+        plt.plot(
+            residuals_alt[f"sim_time_{scenario}"],
+            residuals_alt[f"sim_residual{scenario}"],
+            label=f"Residual {scenario}",
+        )
 
     # Add labels, title, legend, and grid for altitude
     plt.xlabel("Time")
@@ -153,12 +164,12 @@ def graph():
 
     # Plot velocity
     plt.figure(figsize=(10, 6))
-    for i in range(5, 9):
-        label_Velo = "velo_" + str(i)
-        label_Time = "time_" + str(i)
+    for scenario in range(1, num_scenarios + 1):
+        label_Velo = "velo_" + str(scenario)
+        label_Time = "time_" + str(scenario)
 
-        velo_i = data[label_Velo].dropna()
-        time_i = data[label_Time].dropna()
+        velo_i = Quasar_and_sims_data[label_Velo].dropna()
+        time_i = Quasar_and_sims_data[label_Time].dropna()
 
         avg_Alt_i, avg_Velo_i, avg_Acc_i, time_i = calculate_averages(
             time_i, alt_i, velo_i, acc_i, start_time, interval
@@ -170,20 +181,23 @@ def graph():
             # actual - predicted
             residuals_Velo.append(avg_Altimeter_Velo[j] - avg_Velo_i[j])
 
-        if i == 5:
-            residuals_velo_5 = residuals_Velo
-        elif i == 6:
-            residuals_velo_6 = residuals_Velo
-        elif i == 7:
-            residuals_velo_7 = residuals_Velo
-        elif i == 8:
-            residuals_velo_8 = residuals_Velo
+        residuals_velo[f"sim_time_{scenario}"] = time_i
+        residuals_velo[f"sim_avg_velo_{scenario}"] = avg_Velo_i
+        residuals_velo[f"sim_residual{scenario}"] = residuals_Velo
 
         # Plot each set of averages for velocity
-        plt.plot(time_i, avg_Velo_i, label=f"Velo {i}")
+        plt.plot(
+            residuals_velo[f"sim_time_{scenario}"],
+            residuals_velo[f"sim_avg_velo_{scenario}"],
+            label=f"Velo {scenario}",
+        )
 
         # plot residuals
-        plt.plot(time_i, residuals_Velo, label=f"Residual {i}")
+        plt.plot(
+            residuals_velo[f"sim_time_{scenario}"],
+            residuals_velo[f"sim_residual{scenario}"],
+            label=f"Residual {scenario}",
+        )
 
     # Plot the Altimeter data for velocity
     plt.plot(altimeter_Time, avg_Altimeter_Velo, label="Altimeter Velo", linestyle="--")
@@ -198,12 +212,12 @@ def graph():
 
     # Plot acceleration
     plt.figure(figsize=(10, 6))
-    for i in range(5, 9):
-        label_Acc = "acc_" + str(i)
-        label_Time = "time_" + str(i)
+    for scenario in range(1, num_scenarios + 1):
+        label_Acc = "acc_" + str(scenario)
+        label_Time = "time_" + str(scenario)
 
-        acc_i = data[label_Acc].dropna()
-        time_i = data[label_Time].dropna()
+        acc_i = Quasar_and_sims_data[label_Acc].dropna()
+        time_i = Quasar_and_sims_data[label_Time].dropna()
 
         avg_Alt_i, avg_Velo_i, avg_Acc_i, time_i = calculate_averages(
             time_i, alt_i, velo_i, acc_i, start_time, interval
@@ -214,20 +228,23 @@ def graph():
         for j in range(len(avg_Acc_i)):
             residuals_Acc.append(avg_Altimeter_Acc[j] - avg_Acc_i[j])
 
-        # plot residuals
-        plt.plot(time_i, residuals_Acc, label=f"Residual {i}")
+        residuals_acc[f"sim_time_{scenario}"] = time_i
+        residuals_acc[f"sim_avg_acc_{scenario}"] = avg_Acc_i
+        residuals_acc[f"sim_residual{scenario}"] = residuals_Acc
 
-        if i == 5:
-            residuals_acc_5 = residuals_Acc
-        elif i == 6:
-            residuals_acc_6 = residuals_Acc
-        elif i == 7:
-            residuals_acc_7 = residuals_Acc
-        elif i == 8:
-            residuals_acc_8 = residuals_Acc
+        # plot residuals
+        plt.plot(
+            residuals_acc[f"sim_time_{scenario}"],
+            residuals_acc[f"sim_residual{scenario}"],
+            label=f"Residual {scenario}",
+        )
 
         # Plot each set of averages for acceleration
-        plt.plot(time_i, avg_Acc_i, label=f"Acc {i}")
+        plt.plot(
+            residuals_acc[f"sim_time_{scenario}"],
+            residuals_acc[f"sim_avg_acc_{scenario}"],
+            label=f"Acc {scenario}",
+        )
 
     # Plot the Altimeter data for acceleration
     plt.plot(altimeter_Time, avg_Altimeter_Acc, label="Altimeter Acc", linestyle="--")
@@ -240,27 +257,26 @@ def graph():
     plt.grid(True)
     plt.show()
 
-    # Individually calculate covariance matrix of residuals for each scenario
-    combined_data_5 = np.vstack((residuals_alt_5, residuals_velo_5, residuals_acc_5))
-    covariance_matrix_5 = np.cov(combined_data_5)
+    scenarios_combined_all = {}
+    # Initialize covariance_matrix
+    covariance_matrix = np.zeros((3, 3))
 
-    combined_data_6 = np.vstack((residuals_alt_6, residuals_velo_6, residuals_acc_6))
-    covariance_matrix_6 = np.cov(combined_data_6)
-
-    combined_data_7 = np.vstack((residuals_alt_7, residuals_velo_7, residuals_acc_7))
-    covariance_matrix_7 = np.cov(combined_data_7)
-
-    combined_data_8 = np.vstack((residuals_alt_8, residuals_velo_8, residuals_acc_8))
-    covariance_matrix_8 = np.cov(combined_data_8)
+    # Combine residuals for all scenarios
+    for scenario in range(1, num_scenarios + 1):
+        scenarios_combined_all[f"sim_residual{scenario}"] = np.vstack(
+            (
+                residuals_alt[f"sim_residual{scenario}"],
+                residuals_velo[f"sim_residual{scenario}"],
+                residuals_acc[f"sim_residual{scenario}"],
+            )
+        )
 
     # add all covariance matrices
-    covariance_matrix = (
-        covariance_matrix_5
-        + covariance_matrix_6
-        + covariance_matrix_7
-        + covariance_matrix_8
-    )
-    covariance_matrix = covariance_matrix / 4
+    for scenario in range(1, num_scenarios + 1):
+        covariance_matrix += np.cov(scenarios_combined_all[f"sim_residual{scenario}"])
+
+    # divide by number of scenarios
+    covariance_matrix = covariance_matrix / num_scenarios
 
     print("Covariance Matrix of Altitude, Velocity, and Acceleration Residuals:")
     print(covariance_matrix)
@@ -277,43 +293,43 @@ def graph():
 
 def everest_Residual():
     # HALO data
-    alt_HALO = HALO_data["Halo_Alt"]
-    velo_HALO = HALO_data["Halo_Velo"]
-    acc_HALO = HALO_data["Halo_Accel"]
-    time_HALO = HALO_data["Time"]
-
+    alt_HALO = HALO_data["Halo_Alt"][1:]
+    velo_HALO = HALO_data["Halo_Velo"][1:]
+    acc_HALO = HALO_data["Halo_Accel"][1:]
+    time_HALO = HALO_data["Time"][1:]
     halo_alt_np = np.array(alt_HALO)
     halo_velo_np = np.array(velo_HALO)
     halo_acc_np = np.array(acc_HALO)
 
+    # Ensure both arrays have the same shape
+    min_length = min(len(halo_alt_np), len(p_data["alt_std"]))
+    halo_alt_np = halo_alt_np[:min_length]
+    halo_velo_np = halo_velo_np[:min_length]
+    halo_acc_np = halo_acc_np[:min_length]
+
+    alt_std_np = np.array(p_data["alt_std"])[:min_length]
+    velo_std_np = np.array(p_data["velo_std"])[:min_length]
+    acc_std_np = np.array(p_data["acc_std"])[:min_length]
+
     # get confidence interval
-    upper_alt = halo_alt_np[0:] + np.sqrt(np.abs(p_data["alt_std"]))
-    lower_alt = halo_alt_np[0:] - np.sqrt(np.abs(p_data["alt_std"]))
+    upper_alt = halo_alt_np + np.sqrt(np.abs(alt_std_np))
+    lower_alt = halo_alt_np - np.sqrt(np.abs(alt_std_np))
 
-    upper_velo = halo_velo_np[0:] + np.sqrt(np.abs(p_data["velo_std"]))
-    lower_velo = halo_velo_np[0:] - np.sqrt(np.abs(p_data["velo_std"]))
+    upper_velo = halo_velo_np + np.sqrt(np.abs(velo_std_np))
+    lower_velo = halo_velo_np - np.sqrt(np.abs(velo_std_np))
 
-    upper_acc = halo_acc_np[0:] + np.sqrt(np.abs(p_data["acc_std"]))
-    lower_acc = halo_acc_np[0:] - np.sqrt(np.abs(p_data["acc_std"]))
-
-    print("Acc std")
-    print(np.sqrt(np.abs(p_data["acc_std"])))
-
-    # cut at 89 for apogee
-    # alt_HALO = alt_HALO[1:89]
-    # velo_HALO = velo_HALO[1:89]
-    # acc_HALO = acc_HALO[1:89]
-    # time_HALO = time_HALO[1:89]
+    upper_acc = halo_acc_np + np.sqrt(np.abs(acc_std_np))
+    lower_acc = halo_acc_np - np.sqrt(np.abs(acc_std_np))
 
     # substract 2.333 from the time to match the time of the altimeter
     time_HALO = time_HALO - (1 + 2 / 3)
-    time_HALO = time_HALO[1:]
+    # time_HALO = time_HALO[1:]
 
     # Special case of Altimeter averaging (every 0.33333 seconds)
-    alt_Alt = Quasar_data["alt_Q"]
-    velo_Alt = Quasar_data["velo_Q"]
-    acc_Alt = Quasar_data["acc_Q"]
-    time_Alt = Quasar_data["time_Q"]
+    alt_Alt = Quasar_and_sims_data["alt_Q"]
+    velo_Alt = Quasar_and_sims_data["velo_Q"]
+    acc_Alt = Quasar_and_sims_data["acc_Q"]
+    time_Alt = Quasar_and_sims_data["time_Q"]
 
     # drop NaN values
     alt_Alt = alt_Alt.dropna()
@@ -334,30 +350,41 @@ def everest_Residual():
     acc_Everest = Everest_data["Everest_Accel"]
     time_Everest = Everest_data["Time"]
 
-    # cutoff at Time = 27.333334
-    alt_Everest = alt_Everest[:79]
-    velo_Everest = velo_Everest[:79]
-    acc_Everest = acc_Everest[:79]
-    time_Everest = time_Everest[:79]
+    # Everest Avg
+    avg_Alt_Everest, avg_Velo_Everest, avg_Acc_Everest, time_Everest = (
+        calculate_averages(
+            time_Everest, alt_Everest, velo_Everest, acc_Everest, start_time, interval
+        )
+    )
 
     # drop NaN values
-    alt_Everest = alt_Everest.dropna()
-    velo_Everest = velo_Everest.dropna()
-    acc_Everest = acc_Everest.dropna()
-    time_Everest = time_Everest.dropna()
+    alt_Everest = np.array(avg_Alt_Everest)
+    velo_Everest = np.array(avg_Velo_Everest)
+    acc_Everest = np.array(avg_Acc_Everest)
+    time_Everest = np.array(time_Everest)
+
+    # cast to np array and drop NaN values
+    alt_Everest = alt_Everest[~np.isnan(alt_Everest)]
+    velo_Everest = velo_Everest[~np.isnan(velo_Everest)]
+    acc_Everest = acc_Everest[~np.isnan(acc_Everest)]
+    time_Everest = time_Everest[~np.isnan(time_Everest)]
 
     # substract 2.333 from the time to match the time of the altimeter
     time_Everest = time_Everest - (1 + 2 / 3)
 
     # plot
     plt.figure(figsize=(10, 6))
-    plt.plot(altimeter_Time, avg_Altimeter_Alt, label="Altimeter")
+    # plt.plot(altimeter_Time, avg_Altimeter_Alt, label="Altimeter")
+    # plot altimeter
+    altimeter_uncut = altimeter_data["altitude"]
+    altimeter_Time_uncut = altimeter_data["time"]
+    plt.plot(altimeter_Time_uncut, altimeter_uncut, label="Altimeter")
     plt.plot(time_Everest, alt_Everest, label="Everest")
-    plt.plot(time_HALO, alt_HALO[1:], label="HALO")
+    plt.plot(time_HALO, alt_HALO, label="HALO")
     plt.fill_between(
-        time_HALO,
-        lower_alt[1:],
-        upper_alt[1:],
+        time_HALO[: len(upper_alt)],
+        lower_alt,
+        upper_alt,
         color="gray",
         alpha=0.5,
         label="Confidence Interval",
@@ -372,20 +399,35 @@ def everest_Residual():
     residuals_Alt = []
     i = 0
     for i in range(min(len(avg_Altimeter_Alt), len(alt_Everest))):
-        residuals_Alt.append(avg_Altimeter_Alt[i] - alt_Everest.iloc[i])
+        residuals_Alt.append(avg_Altimeter_Alt[i] - alt_Everest[i])
+
+    # Ensure both arrays have the same shape for plotting residuals
+    min_length_residuals = min(len(time_Everest), len(residuals_Alt))
+    time_Everest_residuals_cut = time_Everest[:min_length_residuals]
+    residuals_Alt_cut = residuals_Alt[:min_length_residuals]
+
+    # Ensure both arrays have the same shape for plotting residuals
+    min_length_residuals = min(len(time_Everest), len(residuals_Alt))
+    time_Everest_residuals_cut = time_Everest[:min_length_residuals]
+    residuals_Alt_cut = residuals_Alt[:min_length_residuals]
+
+    # Ensure both arrays have the same shape for velocity
+    min_length_velo = min(len(time_Everest), len(velo_Everest))
+    time_Everest_velo_cut = time_Everest[:min_length_velo]
+    residuals_Velo_cut = velo_Everest[:min_length_velo]
 
     # plot residuals
-    plt.plot(time_Everest, residuals_Alt, label="Residual")
+    plt.plot(time_Everest_residuals_cut, residuals_Alt_cut, label="Residual")
 
     # plot velo
     plt.figure(figsize=(10, 6))
     plt.plot(altimeter_Time, avg_Altimeter_Velo, label="Altimeter")
-    plt.plot(time_Everest, velo_Everest, label="Everest")
-    plt.plot(time_HALO, velo_HALO[1:], label="HALO")
+    plt.plot(time_Everest_velo_cut, residuals_Velo_cut, label="Everest")
+    plt.plot(time_HALO, velo_HALO, label="HALO")
     plt.fill_between(
-        time_HALO,
-        lower_velo[1:],
-        upper_velo[1:],
+        time_HALO[: len(upper_alt)],
+        lower_velo,
+        upper_velo,
         color="gray",
         alpha=0.5,
         label="Confidence Interval",
@@ -399,20 +441,25 @@ def everest_Residual():
     # get residuals for Everest
     residuals_Velo = []
     for i in range(min(len(avg_Altimeter_Velo), len(velo_Everest))):
-        residuals_Velo.append(avg_Altimeter_Velo[i] - velo_Everest.iloc[i])
+        residuals_Velo.append(avg_Altimeter_Velo[i] - velo_Everest[i])
 
     # plot residuals
-    plt.plot(time_Everest, residuals_Velo, label="Residual")
+    plt.plot(time_Everest_velo_cut, residuals_Velo_cut, label="Residual")
+
+    # Ensure both arrays have the same shape for acceleration
+    min_length_acc = min(len(time_Everest), len(acc_Everest))
+    time_Everest_cut = time_Everest[:min_length_acc]
+    acc_Everest_cut = acc_Everest[:min_length_acc]
 
     # plot accel
     plt.figure(figsize=(10, 6))
     plt.plot(altimeter_Time, avg_Altimeter_Acc, label="Altimeter")
-    plt.plot(time_Everest, acc_Everest, label="Everest")
-    plt.plot(time_HALO, acc_HALO[1:], label="HALO")
+    plt.plot(time_Everest_cut, acc_Everest_cut, label="Everest")
+    plt.plot(time_HALO, acc_HALO, label="HALO")
     plt.fill_between(
-        time_HALO,
-        lower_acc[1:],
-        upper_acc[1:],
+        time_HALO[: len(upper_alt)],
+        lower_acc,
+        upper_acc,
         color="gray",
         alpha=0.5,
         label="Confidence Interval",
@@ -426,10 +473,14 @@ def everest_Residual():
     # get residuals for Everest
     residuals_Acc = []
     for i in range(min(len(avg_Altimeter_Acc), len(acc_Everest))):
-        residuals_Acc.append(avg_Altimeter_Acc[i] - acc_Everest.iloc[i])
+        residuals_Acc.append(avg_Altimeter_Acc[i] - acc_Everest[i])
+
+    residuals_min_length = min(len(time_Everest_cut), len(residuals_Acc))
+    time_Everest_cut = time_Everest[:residuals_min_length]
+    residuals_Acc_cut = residuals_Acc[:residuals_min_length]
 
     # plot residuals
-    plt.plot(time_Everest, residuals_Acc, label="Residual")
+    plt.plot(time_Everest_cut, residuals_Acc_cut, label="Residual")
 
     # plot confidence values
     plt.figure(figsize=(10, 6))
@@ -482,5 +533,5 @@ def everest_Residual():
     plt.show()
 
 
-graph()
-# everest_Residual()
+# sims_Residual()
+everest_Residual()

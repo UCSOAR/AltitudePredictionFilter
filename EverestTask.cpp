@@ -293,8 +293,7 @@ void EverestTask::MadgwickWrapper(IMUData data) {
   madOffset offset = infusion->getOffset();
   gyroscope = infusion->madOffsetUpdate(&offset, gyroscope);
 
-  // Calculate delta time (in seconds) to account for gyroscope sample clock
-  // error
+  // Calculate delta time (in seconds)
   float deltaTime = (float)(timestamp - previousTimestamp);
   previousTimestamp = timestamp;
   this->state.deltaTimeIMU = deltaTime;

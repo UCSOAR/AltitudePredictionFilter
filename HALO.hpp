@@ -358,9 +358,11 @@ class HALO {
   double calculateVelocityConfidence(double currentVelo, double varianceVelo) {
     // velocity should be < 0 for apogee
     // range
-    double range = 2 * std::abs(varianceVelo);
+    if (currentVelo > varianceVelo) {
+      return 0;
+    }
 
-    return (range - (std::abs(varianceVelo) + currentVelo)) / range;
+    return 1 - std::abs((currentVelo) / (2 * std::abs(varianceVelo)));
   }
 
   double calculateAccelerationConfidence(double currentAcc,
@@ -375,7 +377,7 @@ class HALO {
       return 0;
     }
 
-    double confidence = (difference / (2 * varianceAcc));
+    double confidence = 1 - (difference / (2 * varianceAcc));
 
     return confidence;
   }
@@ -387,7 +389,7 @@ class HALO {
     double avgVelocity = velocitySum / buffer.size();
     double avgAcceleration = accelerationSum / buffer.size();
 
-    // Square root the P values
+    // Square root the P values to get std deviation
     double sqrtP_altitude = std::sqrt(this->P(0, 0));
     double sqrtP_velocity = std::sqrt(this->P(1, 1));
     double sqrtP_acceleration = std::sqrt(this->P(2, 2));
@@ -402,6 +404,7 @@ class HALO {
 
     double altitudeConfidence =
         calculateConfidence(avgAltitude, prevAvgAltitude, sqrtP_altitude);
+
     double velocityConfidence = 0.0;
 
     if (avgVelocity < sqrtP_velocity) {
@@ -429,6 +432,11 @@ class HALO {
       accelerationConfidence = 1;
     }
 
+    // prevent misfires
+    if (altitudeConfidence == 0 && velocityConfidence == 0) {
+      accelerationConfidence = 0;
+    }
+
     double totalConfidence =
         (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
          accelerationConfidence * 0.4);
@@ -449,7 +457,30 @@ class HALO {
 
 #endif
 
+    // if (totalConfidence >= 1) {
+    //   return true;
+    // }
+
     if (totalConfidence >= 1) {
+      hitOne = true;
+    }
+
+    // Update the maximum average confidence
+    if (totalConfidence > maxAvgConfidence) {
+      maxAvgConfidence = totalConfidence;
+      return false;
+    }
+
+    // if we've hit one and its decreasing then trigger
+    // if confidence drops below 1 or is 1 trigger
+    if (hitOne) {
+      if (totalConfidence < maxAvgConfidence) {
+        return true;
+      }
+    }
+
+    // if we haven't hit one and it dips then trigger
+    if (maxAvgConfidence > 0.7 && totalConfidence <= (maxAvgConfidence * 0.8)) {
       return true;
     }
 
@@ -488,6 +519,9 @@ class HALO {
   double prevAvgAltitude = 0.0;
   double prevAvgVelocity = 0.0;
   double prevAvgAcceleration = 0.0;
+  double maxAvgConfidence = 0.0;
+  bool hitOne = false;
+  bool wait = false;
 
  protected:
   MatrixXf sigmaPoints;

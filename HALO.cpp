@@ -18,7 +18,7 @@
 
 #ifndef HALO_CPP
 #define HALO_CPP
-#define REFRESH_RATE 20
+#define REFRESH_RATE 3
 
 #define printf(...) ;
 
@@ -205,20 +205,6 @@ void HALO::stateUpdate() {
 
   X0 = this->Xprediction + K * difference;
 
-  // check and update before apogee bool
-  if (isBeforeApogeeBoolHALO == 1) {
-    std::vector<Scenario>* scenarios = this->getScenarios();
-
-    for (int i = 0; i < scenarios->size(); i++) {
-      scenarios->at(i).setIsBeforeApogee(false);
-    }
-
-  } else {
-    // check if the rocket is before apogee
-    isBeforeApogeeBoolHALO = this->apogeeDetection(
-        Measurement{this->Ualt, this->Uvelo, this->Uaccel, this->time});
-  }
-
   if (std::isnan(X0(0)) || std::isnan(X0(1)) || std::isnan(X0(2))) {
     FILE* log = fopen(
         "log.txt",
@@ -238,6 +224,20 @@ void HALO::stateUpdate() {
     X0 = this->Xprediction;
 
     fclose(log);
+  }
+
+  // check and update before apogee bool
+  if (isBeforeApogeeBoolHALO == 1) {
+    std::vector<Scenario>* scenarios = this->getScenarios();
+
+    for (int i = 0; i < scenarios->size(); i++) {
+      scenarios->at(i).setIsBeforeApogee(false);
+    }
+
+  } else {
+    // check if the rocket is before apogee
+    isBeforeApogeeBoolHALO =
+        this->apogeeDetection(Measurement{X0[0], X0[1], X0[2], this->time});
   }
 
   this->KinematicsHalo.altitudeStore = X0(0);
@@ -805,7 +805,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
   Scenario* scenario1 =
       &scenarios->at(distances[lowestDistanceIndex].second.second);
   std::vector<float> currentVector1 = scenario1->evaluateVectorAt(indexFirst);
-  float deltaTime = 0.333333;
+  float deltaTime = 1.0 / REFRESH_RATE;
   float nextTimeStep = currentVector1[3] + deltaTime;
   std::vector<float> futureVector1 =
       scenario1->evaluateVectorAtTime(nextTimeStep);
@@ -1149,8 +1149,9 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
     printf("X is nan, defaulting to static integration\n");
 
-    double finalVelocity = X(1) + X(0) * ((float)1.0 / 3);
-    double altitude = X(2) + (X(1) + finalVelocity) * (1.0 / 3) / 2.0;
+    double finalVelocity = X(1) + X(0) * ((float)1.0 / REFRESH_RATE);
+    double altitude =
+        X(2) + (X(1) + finalVelocity) * (1.0 / REFRESH_RATE) / 2.0;
 
     Xprediction(0) = altitude;
     Xprediction(1) = finalVelocity;
@@ -1279,7 +1280,7 @@ void HALO::initializeHALO(float initialAlt, HALO* halo) {
   // process noise Covariance matrix (altitude, velocity, acceleration)
   // Calculated using covarianceCalc.py -> covariance matrix from Altimeter
   // Assuming Altimeter has no process noise (Q = 0)
-  // unaccounted for noise in envrionment (wind, etc)-> residual from sims
+  // unaccounted for noise in environment (wind, etc)-> residual from sims
   MatrixXf Q(3, 3);
   Q << 74777.41, 4458.13, -2164.91, 4458.13, 2413.02, -4.52, -2164.91, -4.52,
       503.78;
@@ -1293,8 +1294,6 @@ void HALO::initializeHALO(float initialAlt, HALO* halo) {
   // Initial state covariance matrix
   MatrixXf P0(3, 3);
   P0 << 50, 0, 0, 0, 0, 0, 0, 0, 0;
-
-  halo->deltaTime = 1 / 3;
 
   // create scenarios
   createScenarios(halo);

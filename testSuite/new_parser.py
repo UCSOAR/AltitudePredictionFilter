@@ -1,6 +1,7 @@
 import pandas as pd
 import math
 
+# avg_alt_1,avg_velo_1,avg_acc_1,avg_time_1
 data = pd.read_csv("testSuite/data/final_may_sims_formatted.csv")
 
 # Convert DataFrame to list of lists

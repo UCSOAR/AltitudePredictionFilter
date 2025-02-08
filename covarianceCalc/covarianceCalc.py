@@ -350,6 +350,12 @@ def everest_Residual():
     acc_Everest = Everest_data["Everest_Accel"]
     time_Everest = Everest_data["Time"]
 
+    # remove first row
+    alt_Everest = alt_Everest[1:].reset_index(drop=True)
+    velo_Everest = velo_Everest[1:].reset_index(drop=True)
+    acc_Everest = acc_Everest[1:].reset_index(drop=True)
+    time_Everest = time_Everest[1:].reset_index(drop=True)
+
     # Everest Avg
     avg_Alt_Everest, avg_Velo_Everest, avg_Acc_Everest, time_Everest = (
         calculate_averages(
@@ -374,7 +380,6 @@ def everest_Residual():
 
     # plot
     plt.figure(figsize=(10, 6))
-    # plt.plot(altimeter_Time, avg_Altimeter_Alt, label="Altimeter")
     # plot altimeter
     altimeter_uncut = altimeter_data["altitude"]
     altimeter_Time_uncut = altimeter_data["time"]
@@ -397,14 +402,9 @@ def everest_Residual():
 
     # get residuals for Everest
     residuals_Alt = []
-    i = 0
     for i in range(min(len(avg_Altimeter_Alt), len(alt_Everest))):
-        residuals_Alt.append(avg_Altimeter_Alt[i] - alt_Everest[i])
-
-    # Ensure both arrays have the same shape for plotting residuals
-    min_length_residuals = min(len(time_Everest), len(residuals_Alt))
-    time_Everest_residuals_cut = time_Everest[:min_length_residuals]
-    residuals_Alt_cut = residuals_Alt[:min_length_residuals]
+        residual = avg_Altimeter_Alt[i] - alt_Everest[i]
+        residuals_Alt.append(residual)
 
     # Ensure both arrays have the same shape for plotting residuals
     min_length_residuals = min(len(time_Everest), len(residuals_Alt))

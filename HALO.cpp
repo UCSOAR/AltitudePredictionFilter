@@ -1008,7 +1008,7 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
 // not resetting gains, scenarios are the same from prior iteration
 #ifdef LOGON
     // write to resetGainsFile.txt, already opened
-    fprintf(resetGainsFile, "%d\n", 0);
+    fprintf(resetGainsFile, "%d\n", -1);
 #endif
   }
 
@@ -1200,56 +1200,22 @@ void HALO::createScenarios(HALO* halo) {
 
 #endif
 
-  // // Map to store the scenarios
-  //   std::map<std::string, std::vector<std::vector<float>>>
-  //   beforeApogeeScenarios; std::map<std::string,
-  //   std::vector<std::vector<float>>> afterApogeeScenarios;
-
-  //   // Use the number of scenarios declared in Data.cpp
-  //   const int num_scenarios = num_scenarios_parsed;
-
-  //   std::cout << "Number of scenarios: " << num_scenarios << std::endl;
-
-  //   // Populate the maps with the scenarios
-  //   for (int scenario = 1; scenario <= num_scenarios; ++scenario) {
-  //       std::string beforeApogeeSimName = "beforeApogeeSim" +
-  //       std::to_string(scenario); std::string afterApogeeSimName =
-  //       "afterApogeeSim" + std::to_string(scenario);
-
-  //       beforeApogeeScenarios[beforeApogeeSimName] = beforeApogeeSim1;
-  //       afterApogeeScenarios[afterApogeeSimName] = afterApogeeSim1;
-  //   }
-
-  //   // Create Scenario objects and add them to the scenarios list
-  //   std::vector<Scenario> scenarios;
-  //   for (int scenario = 1; scenario <= num_scenarios; ++scenario) {
-  //       std::string beforeApogeeSimName = "beforeApogeeSim" +
-  //       std::to_string(scenario); std::string afterApogeeSimName =
-  //       "afterApogeeSim" + std::to_string(scenario);
-
-  //       // Access the beforeApogeeSim and afterApogeeSim vectors
-  //       auto& beforeApogeeSim = beforeApogeeScenarios[beforeApogeeSimName];
-  //       auto& afterApogeeSim = afterApogeeScenarios[afterApogeeSimName];
-
-  //       // Create Scenario object
-  //       Scenario scenarioObj(beforeApogeeSim, afterApogeeSim, scenario);
-  //       scenarioObj.createTree();
-  //       scenarios.push_back(scenarioObj);
-  //   }
-
   Scenario scenario1 = Scenario{beforeApogeeSim1, afterApogeeSim1, 1};
   scenario1.createTree();
   Scenario scenario2 = Scenario{beforeApogeeSim2, afterApogeeSim2, 2};
   scenario2.createTree();
-  // Scenario scenario3 = Scenario{sim3, sim3, 3};
-  // // scenario3.createTree();
-  // Scenario scenario4 = Scenario{sim4, sim4, 4};
-  // // scenario4.createTree();
-  // Scenario scenario5 = Scenario{sim5, sim5, 5};
-  // // scenario5.createTree();
-  // Scenario scenario6 = Scenario{sim6, sim6, 6};
-  // // scenario6.createTree();
 
+  // TODO: add more as there are more
+  // Scenario scenario3 = Scenario{sim3, sim3, 3};
+  // scenario3.createTree();
+  // Scenario scenario4 = Scenario{sim4, sim4, 4};
+  // scenario4.createTree();
+  // Scenario scenario5 = Scenario{sim5, sim5, 5};
+  // scenario5.createTree();
+  // Scenario scenario6 = Scenario{sim6, sim6, 6};
+  // scenario6.createTree();
+
+  // TODO: add them here as well
   std::vector<Scenario> scenarios = {scenario1, scenario2};
 
 #ifdef TIMERON

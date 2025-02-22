@@ -10,6 +10,13 @@ HALO_data = pd.read_csv("testSuite/results/HALO.txt")
 p_data = pd.read_csv("testSuite/results/P.txt")
 confidence = pd.read_csv("testSuite/results/confidence.txt")
 altimeter_data = pd.read_csv("testSuite/data/altimeter1.csv")
+sims = pd.read_csv("testSuite/data/final_may_sims_formatted.csv")
+
+sims = sims.dropna()
+sims = sims.reset_index(drop=True)
+# remove div/0
+sims = sims.replace("#DIV/0!", np.nan)
+sims = sims.dropna()
 
 
 def calculate_averages(
@@ -56,6 +63,48 @@ def calculate_averages(
         time.append(time_interval)
 
     return avg_Alt, avg_Velo, avg_Acc, time
+
+
+def plot_sims():
+    # Extract the altitude columns for each simulation
+    altitude_columns = [col for col in sims.columns if col.startswith("avg_alt_")]
+
+    # Special case for the Altimeter data
+    # altimeter altitude, velocity, and acceleration
+    alt_Alt = Quasar_and_sims_data["altitude_alt"]
+    velo_Alt = Quasar_and_sims_data["velo_alt"]
+    acc_Alt = Quasar_and_sims_data["acceleration_alt"]
+    time_Alt = Quasar_and_sims_data["new_time_alt"]
+
+    # drop NaN values
+    alt_Alt = alt_Alt.dropna()
+    velo_Alt = velo_Alt.dropna()
+    acc_Alt = acc_Alt.dropna()
+    time_Alt = time_Alt.dropna()
+
+    avg_Altimeter_Alt, avg_Altimeter_Velo, avg_Altimeter_Acc, altimeter_Time = (
+        calculate_averages(time_Alt, alt_Alt, velo_Alt, acc_Alt, 0, 1 / 2.3)
+    )
+
+    num_scenarios = len(altitude_columns)
+
+    for i in range(num_scenarios):
+        # Plot the altitudes for each simulation
+        plt.figure(figsize=(10, 6))
+        plt.plot(sims[altitude_columns[i]], label=f"Scenario {i + 1}")
+
+        plt.plot(avg_Altimeter_Alt, label="Altimeter", linestyle="--")
+
+        plt.xlabel("Time")
+        plt.ylabel("Altitude")
+        plt.title("Altitude vs Time for Multiple Scenarios")
+        plt.legend()
+        plt.grid(True)
+
+    plt.show()
+
+
+plot_sims()
 
 
 start_time = 0
@@ -136,6 +185,7 @@ def sims_Residual():
         residuals = []
         for j in range(len(avg_Alt_i)):
             residuals.append(avg_Altimeter_Alt[j] - avg_Alt_i[j])
+            # residuals.append(np.random.randint(100, 900))
 
         # calculate covariance matrix of residuals
         residuals_alt[f"sim_residual{scenario}"] = residuals
@@ -394,16 +444,18 @@ def everest_Residual():
         alpha=0.5,
         label="Confidence Interval",
     )
-    plt.xlabel("Time")
-    plt.ylabel("Altitude")
-    plt.title("Altimeter vs Everest Altitude")
-    plt.legend()
-    plt.grid(True)
+
+    avg_Altimeter_Alt = avg_Altimeter_Alt[6:]
+    avg_Altimeter_Velo = avg_Altimeter_Velo[6:]
+    avg_Altimeter_Acc = avg_Altimeter_Acc[6:]
+    altimeter_Time = altimeter_Time[6:]
 
     # get residuals for Everest
     residuals_Alt = []
     for i in range(min(len(avg_Altimeter_Alt), len(alt_Everest))):
         residual = avg_Altimeter_Alt[i] - alt_Everest[i]
+        # random from 300 to 500
+        # residual = np.random.randint(300, 500)
         residuals_Alt.append(residual)
 
     # Ensure both arrays have the same shape for plotting residuals
@@ -418,6 +470,12 @@ def everest_Residual():
 
     # plot residuals
     plt.plot(time_Everest_residuals_cut, residuals_Alt_cut, label="Residual")
+
+    plt.xlabel("Time")
+    plt.ylabel("Altitude")
+    plt.title("Altimeter vs Everest Altitude")
+    plt.legend()
+    plt.grid(True)
 
     # plot velo
     plt.figure(figsize=(10, 6))
@@ -515,11 +573,9 @@ def everest_Residual():
     plt.legend()
     plt.grid(True)
 
-    plt.show()
-
     # Calculate and plot covariance matrix of residuals
-    combined_data = np.vstack((residuals_Alt, residuals_Velo, residuals_Acc))
-    covariance_matrix = np.cov(combined_data)
+    combined_data = np.vstack((residuals_Alt, residuals_Velo, residuals_Acc)).T
+    covariance_matrix = np.cov(combined_data, rowvar=False)
 
     print("Covariance Matrix of Altitude, Velocity, and Acceleration Residuals:")
     print(covariance_matrix)

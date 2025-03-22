@@ -413,8 +413,6 @@ void HALO::calculateSigmaPoints() {
 
   // propagate sigma points through the dynamic model
   for (int i = 0; i < (2 * this->N1) + 1; i++) {
-    // load variables
-
 #ifdef TIMERON
 
     std::chrono::high_resolution_clock::time_point startPredictLoop =
@@ -422,6 +420,7 @@ void HALO::calculateSigmaPoints() {
 
 #endif
 
+    // load variables
     VectorXf column = sigmaPoints.col(i);
     this->firstTimeForPoint = firstTime[i];
     this->prevGain1 = this->listOfGainsSigmaPoints[i].first;
@@ -1039,32 +1038,6 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   return X_pred;
 }
 
-// Apogee detection--------------------------------
-
-/**
- * @brief Check if the rocket is before apogee, based on Everest filter values
- */
-bool HALO::isBeforeApogee(float acceleration, float velocity, float altitude,
-                          float lastAltitude) {
-  if (acceleration < -9.81 || velocity < 0.5 || altitude < lastAltitude) {
-    printf("Apogee at %f\n", altitude);
-
-    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
-    if (!file) {
-      fprintf(stderr, "Error opening log.txt...exiting\n");
-      exit(1);
-    }
-
-    fprintf(file, "Apogee at %f\n", altitude);
-
-    fclose(file);
-
-    return false;
-  }
-
-  return true;
-}
-
 /**
  * @brief Take the filtered values from Everest filter
  */
@@ -1080,37 +1053,6 @@ void HALO::setStateVector(float filteredAcc, float filteredVelo,
   this->X = X_in;
 
   this->stateUpdate();
-}
-
-void HALO::overrideStateWithGPS(float GPS) {
-  float lowest = std::numeric_limits<float>::max();
-  float highest = std::numeric_limits<float>::min();
-
-  for (int i = 0; i <= 7; i++) {
-    if (this->sigmaPoints(0, i) < lowest) {
-      lowest = this->sigmaPoints(0, i);
-    }
-
-    if (this->sigmaPoints(0, i) > highest) {
-      highest = this->sigmaPoints(0, i);
-    }
-  }
-
-  if (GPS > (lowest) && GPS < highest) {
-    this->X[2] = GPS;
-    printf("Override GPS (%f, %f, %f)", this->X[0], this->X[1], this->X[2]);
-
-    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
-    if (!file) {
-      fprintf(stderr, "Error opening log.txt...exiting\n");
-      exit(1);
-    }
-
-    fprintf(file, "Override GPS (%f, %f, %f), where GPS(%f)\n", this->X[0],
-            this->X[1], this->X[2], GPS);
-
-    fclose(file);
-  }
 }
 
 // prediction step based on the dynamic model
@@ -1215,7 +1157,7 @@ void HALO::createScenarios(HALO* halo) {
   // Scenario scenario6 = Scenario{sim6, sim6, 6};
   // scenario6.createTree();
 
-  // TODO: add them here as well
+  // TODO: add them here as well {scenario3, scenario4, scenario5, scenario6}
   std::vector<Scenario> scenarios = {scenario1, scenario2};
 
 #ifdef TIMERON

@@ -121,6 +121,8 @@ typedef struct {
   float magY2;
   float magZ2;
 
+  float altitudeGPS;
+
 } EverestData;
 
 class EverestTask {
@@ -187,7 +189,7 @@ class EverestTask {
 
   std::vector<double> QueueEverest(EverestTask* everest);
 
-  std::vector<int> availableMeasurements = {0, 0, 0, 0};
+  std::vector<int> availableMeasurements = {0, 0, 0, 0, 0};
 
   EverestData everestData;
 
@@ -202,10 +204,14 @@ class EverestTask {
 
   MadAxesAlignment alignment1, alignment2;
 
- protected:
-  IMUData internalIMU_1, internalIMU_2;
+  void GPS_Measurements(float altitude, EverestTask* everest);
 
   BarosData baro1, baro2;
+
+  void updateGainsWithGPS();
+
+ protected:
+  IMUData internalIMU_1, internalIMU_2;
 
   std::vector<double> zeroOffsetAccel = {0, 0, 0};
   std::vector<double> zeroOffsetAccel2 = {0, 0, 0};

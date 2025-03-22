@@ -14,6 +14,8 @@
 
 #include "input_data.cpp"
 
+#include "gpsData.cpp"
+
 #define LOGON
 #define TIMERON
 #define printf(...) ;
@@ -788,6 +790,17 @@ double EverestTask::dynamite() {
     printf("Normalised Altitude: %f\n\n", normalised_Altitude);
   }
 
+  // overrides normalised altitude with GPS altitude if available
+  if (everest.availableMeasurements[4] == 1) {
+    std::cout << "GPS Altitude: " << everest.everestData.altitudeGPS
+              << std::endl;
+    std::cout << "Normalised Altitude before: " << normalised_Altitude
+              << std::endl;
+    normalised_Altitude = everest.everestData.altitudeGPS;
+    std::cout << "Normalised Altitude after: " << normalised_Altitude
+              << std::endl;
+  }
+
   // Update Kinematics
   Kinematics.finalAltitude = normalised_Altitude;
 
@@ -807,6 +820,10 @@ double EverestTask::dynamite() {
   Kinematics.initialAlt = Kinematics.finalAltitude;
 
   recalculateGain(normalised_Altitude);
+
+  if (everest.availableMeasurements[4] == 1) {
+    updateGainsWithGPS();
+  }
 
   // Save the gains that are not zero as previous gains
   // so once we have recovery phase these old gains are used
@@ -830,6 +847,38 @@ double EverestTask::dynamite() {
   }
 
   return normalised_Altitude;
+}
+
+/**
+ * @brief Updates the gains with GPS data
+ *
+ */
+void EverestTask::updateGainsWithGPS() {
+  float gpsAltitude = everest.everestData.altitudeGPS;
+  float imuGPSDiff = fabsf(everest.state.avgIMU.altitude - gpsAltitude);
+  float baro1GPSDiff = fabsf(everest.baro1.altitude - gpsAltitude);
+  float baro2GPSDiff = fabsf(everest.baro2.altitude - gpsAltitude);
+
+  float totalDiff = imuGPSDiff + baro1GPSDiff + baro2GPSDiff;
+
+  float gain_IMU = everest.state.gain_IMU * (1 - imuGPSDiff / totalDiff);
+  float gain_Baro1 = everest.state.gain_Baro1 * (1 - baro1GPSDiff / totalDiff);
+  float gain_Baro2 = everest.state.gain_Baro2 * (1 - baro2GPSDiff / totalDiff);
+
+  if (debug == Dynamite || debug == ALL) {
+    printf("\nUpdate Gains with GPS\n");
+    printf("IMU GPS Diff: %f\n", imuGPSDiff);
+    printf("Baro1 GPS Diff: %f\n", baro1GPSDiff);
+    printf("Baro2 GPS Diff: %f\n", baro2GPSDiff);
+    printf("Total Diff: %f\n", totalDiff);
+    printf("New Gain IMU: %f\n", gain_IMU);
+    printf("New Gain Baro1: %f\n", gain_Baro1);
+    printf("New Gain Baro2: %f\n", gain_Baro2);
+  }
+
+  everest.state.gain_IMU = gain_IMU;
+  everest.state.gain_Baro1 = gain_Baro1;
+  everest.state.gain_Baro2 = gain_Baro2;
 }
 
 /**
@@ -1404,6 +1453,12 @@ void EverestTask::Baro2_Measurements(BarosData baro2, EverestTask* everest) {
   everest->availableMeasurements[3] = 1;
 }
 
+// update GPS
+void EverestTask::GPS_Measurements(float altitude, EverestTask* everest) {
+  everest->everestData.altitudeGPS = altitude;
+  everest->availableMeasurements[4] = 1;
+}
+
 // Custom rounding function
 float roundToDecimalPlaces(double value, int decimalPlaces) {
   double scale = std::pow(10.0, decimalPlaces);
@@ -1470,6 +1525,21 @@ std::vector<double> EverestTask::QueueEverest(EverestTask* everest) {
   // }
 }
 
+float findClosestTime(float time) {
+  // cycle through the times until you find one bigger and return one or after
+  // before it
+  float altitude = 1000;
+  int once = 0;
+  for (int i = 0; i < gpsData1.size(); i++) {
+    if (gpsData1[i][0] > time) {
+      altitude = gpsData1[i][1];
+      once = 1;
+      break;
+    }
+  }
+  return altitude;
+}
+
 // --------------------------------------------------- END OF EVEREST
 #define MAX_LINE_LENGTH 1024
 
@@ -1515,6 +1585,8 @@ int main() {
 
     BarosData baro2 = {time, pressure, 0, 0};
 
+    float gps = findClosestTime(time);
+
     // Print all sensor readings
     if (debug == RAW || debug == ALL) {
       printf(
@@ -1530,6 +1602,7 @@ int main() {
     everest.IMU2_Measurements(sensorData2, &everest);
     everest.Baro1_Measurements(baro1, &everest);
     everest.Baro2_Measurements(baro2, &everest);
+    everest.GPS_Measurements(findClosestTime(time), &everest);
 
     // start timer for iteration
     start = std::clock();

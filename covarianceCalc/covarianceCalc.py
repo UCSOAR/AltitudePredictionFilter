@@ -16,6 +16,7 @@ sims = sims.dropna()
 sims = sims.reset_index(drop=True)
 # remove div/0
 sims = sims.replace("#DIV/0!", np.nan)
+sims = sims.replace("#REF!", np.nan)
 sims = sims.dropna()
 
 
@@ -27,6 +28,17 @@ def calculate_averages(
     avg_Velo = []
     avg_Acc = []
     time = []
+
+    time_df = pd.DataFrame(time_input)
+    alt_df = pd.DataFrame(alt_input)
+    velo_df = pd.DataFrame(velo_input)
+    acc_df = pd.DataFrame(acc_input)
+
+    # Convert all values to numeric, coercing errors to NaN
+    velo_df = velo_df.apply(pd.to_numeric, errors="coerce")
+    alt_df = alt_df.apply(pd.to_numeric, errors="coerce")
+    acc_df = acc_df.apply(pd.to_numeric, errors="coerce")
+    time_df = time_df.apply(pd.to_numeric, errors="coerce")
 
     # for every time thats within 0.1 interval average velocity, altitude, and acceleration
     lower_bound = start_time
@@ -44,11 +56,11 @@ def calculate_averages(
         while i < len(time_input):
             if time_input[i] <= time_interval and time_input[i] >= lower_bound:
                 if i < len(alt_input):
-                    sum_Alt += alt_input.iloc[i]
+                    sum_Alt += alt_df.iloc[i]
                 if i < len(velo_input):
-                    sum_Velo += velo_input.iloc[i]
+                    sum_Velo += velo_df.iloc[i]
                 if i < len(acc_input):
-                    sum_Acc += acc_input.iloc[i]
+                    sum_Acc += acc_df.iloc[i]
                 counter_Current_Range_Samples += 1
             i += 1
 
@@ -91,7 +103,9 @@ def plot_sims():
     for i in range(num_scenarios):
         # Plot the altitudes for each simulation
         plt.figure(figsize=(10, 6))
-        plt.plot(sims[altitude_columns[i]], label=f"Scenario {i + 1}")
+        plt.plot(
+            sims["avg_time_1"], sims[altitude_columns[i]], label=f"Scenario {i + 1}"
+        )
 
         plt.plot(avg_Altimeter_Alt, label="Altimeter", linestyle="--")
 
@@ -428,11 +442,56 @@ def everest_Residual():
     # substract 2.333 from the time to match the time of the altimeter
     time_Everest = time_Everest - (1 + 2 / 3)
 
+    alt_alt_2 = np.asarray(sims["avg_alt_2"]).astype(float)
+    # alt_alt_2= pd.DataFrame(sims["avg_alt_2"])
+
+    time_sims_1 = np.asarray(sims["avg_time_1"]).astype(float)
+    # time_sims_1 = pd.DataFrame(sims["avg_time_1"])
+
+    time_sims_2 = np.asarray(sims["avg_time_2"]).astype(float)
+    # time_sims_2 = pd.DataFrame(sims["avg_time_2"])
+
+    alt_velo_1 = pd.DataFrame(sims["avg_velo_1"])
+    alt_velo_2 = pd.DataFrame(sims["avg_velo_2"])
+
+    alt_acc_1 = pd.DataFrame(sims["avg_acc_1"])
+    alt_acc_2 = pd.DataFrame(sims["avg_acc_2"])
+
+    alt_alt_1 = pd.DataFrame(sims["avg_alt_1"])
+
+    start = 0
+    interval = 1 / 3
+
+    # new_alt_df = pd.DataFrame(alt_alt_1)
+    # new_time_df = pd.DataFrame(time_sims_1)
+    # new_velo_df = pd.DataFrame(alt_velo_1)
+    # new_acc_df = pd.DataFrame(alt_acc_1)
+
+    # new_alt_df_1 = pd.DataFrame(alt_alt_2)
+    # new_time_df_1 = pd.DataFrame(time_sims_2)
+    # new_velo_df_1 = pd.DataFrame(alt_velo_2)
+    # new_acc_df_1 = pd.DataFrame(alt_acc_2)
+
+    # avg_Alt, avg_Velo, avg_Acc, time
+
+    avg_alt_1, avg_velo_1, avg_acc_1, avg_time_1 = calculate_averages(
+        time_sims_1, alt_alt_1, alt_velo_1, alt_acc_1, start, interval
+    )
+
+    avg_alt_2, avg_velo_2, avg_acc_2, avg_time_2 = calculate_averages(
+        time_sims_2, alt_alt_2, alt_velo_2, alt_acc_2, start, interval
+    )
+
+    # Extract the altitude columns for each simulation
+    altitude_columns = [col for col in sims.columns if col.startswith("avg_alt_")]
+
     # plot
     plt.figure(figsize=(10, 6))
     # plot altimeter
     altimeter_uncut = altimeter_data["altitude"]
     altimeter_Time_uncut = altimeter_data["time"]
+    plt.plot(sims["avg_time_1"], sims[altitude_columns[0]], label=f"Scenario {0}")
+    # plt.plot(sims["avg_time_1"], sims[altitude_columns[1]], label=f"Scenario {1}")
     plt.plot(altimeter_Time_uncut, altimeter_uncut, label="Altimeter")
     plt.plot(time_Everest, alt_Everest, label="Everest")
     plt.plot(time_HALO, alt_HALO, label="HALO")
@@ -455,7 +514,6 @@ def everest_Residual():
     for i in range(min(len(avg_Altimeter_Alt), len(alt_Everest))):
         residual = avg_Altimeter_Alt[i] - alt_Everest[i]
         # random from 300 to 500
-        # residual = np.random.randint(300, 500)
         residuals_Alt.append(residual)
 
     # Ensure both arrays have the same shape for plotting residuals
@@ -479,6 +537,7 @@ def everest_Residual():
 
     # plot velo
     plt.figure(figsize=(10, 6))
+    # plot sims
     plt.plot(altimeter_Time, avg_Altimeter_Velo, label="Altimeter")
     plt.plot(time_Everest_velo_cut, residuals_Velo_cut, label="Everest")
     plt.plot(time_HALO, velo_HALO, label="HALO")

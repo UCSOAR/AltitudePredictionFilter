@@ -1210,6 +1210,23 @@ void HALO::initializeHALO(float initialAlt, HALO* halo) {
   halo->init(X0, P0, Q, R0);
 }
 
+void HALO::initializeHALOWithQR(float initialAlt, HALO* halo, MatrixXf& Q,
+                                MatrixXf& R0) {
+  // set initial state (altitude, velocity, acceleration)
+  VectorXf X0(3);
+  X0 << initialAlt, 0, 0;
+
+  // Initial state covariance matrix
+  MatrixXf P0(3, 3);
+  P0 << 50, 0, 0, 0, 0, 0, 0, 0, 0;
+
+  // create scenarios
+  createScenarios(halo);
+
+  // Initialize with tare / GPS values
+  halo->init(X0, P0, Q, R0);
+}
+
 std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
                                      double eAccelerationZ, double eVelocity,
                                      double eAltitude, float time) {

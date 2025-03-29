@@ -318,6 +318,9 @@ class HALO {
   std::chrono::duration<double> getScenarioTime;
   std::chrono::duration<double> treeCreationTime;
 
+  void initializeHALOWithQR(float initialAlt, HALO *halo, MatrixXf &Q,
+                            MatrixXf &R0);
+
  private:
   float Uaccel;
   float Ualt;

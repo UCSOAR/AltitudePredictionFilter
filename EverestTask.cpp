@@ -1602,7 +1602,7 @@ int main() {
     everest.IMU2_Measurements(sensorData2, &everest);
     everest.Baro1_Measurements(baro1, &everest);
     everest.Baro2_Measurements(baro2, &everest);
-    everest.GPS_Measurements(findClosestTime(time), &everest);
+    // everest.GPS_Measurements(findClosestTime(time), &everest);
 
     // start timer for iteration
     start = std::clock();

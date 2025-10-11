@@ -18,7 +18,7 @@
 
 #define LOGON
 #define TIMERON
-#define printf(...) ;
+// #define printf(...) ;
 FILE* haloFile;
 FILE* everestFile;
 int counterEverest = 0;
@@ -738,8 +738,8 @@ double EverestTask::dynamite() {
     printf("\nDynamite\n");
     printf("Baro1 Altitude: %f\n", BaroAltitude1);
     printf("Baro2 Altitude: %f\n", BaroAltitude2);
-    printf("Baro3 Altitude: %f\n", BaroAltitude3);
-    printf("Real Baro Altitude: %f\n", RealBaroAltitude);
+    // printf("Baro3 Altitude: %f\n", BaroAltitude3);
+    // printf("Real Baro Altitude: %f\n", RealBaroAltitude);
     printf("IMU Altitude: %f\n", IMUAltitude);
   }
 
@@ -842,8 +842,8 @@ double EverestTask::dynamite() {
     printf("Prev Gain IMU: %f\n", everest.state.prev_gain_IMU);
     printf("Prev Gain Baro1: %f\n", everest.state.prev_gain_Baro1);
     printf("Prev Gain Baro2: %f\n", everest.state.prev_gain_Baro2);
-    printf("Prev Gain Baro3: %f\n", everest.state.prev_gain_Baro3);
-    printf("Prev Gain Real Baro: %f\n\n", everest.state.prev_gain_Real_Baro);
+    // printf("Prev Gain Baro3: %f\n", everest.state.prev_gain_Baro3);
+    // printf("Prev Gain Real Baro: %f\n\n", everest.state.prev_gain_Real_Baro);
   }
 
   return normalised_Altitude;
@@ -917,8 +917,8 @@ void EverestTask::recalculateGain(double estimate) {
     printf("New Gain IMU: %f\n", this->state.gain_IMU);
     printf("New Gain Baro1: %f\n", this->state.gain_Baro1);
     printf("New Gain Baro2: %f\n", this->state.gain_Baro2);
-    printf("New Gain Baro3: %f\n", this->state.gain_Baro3);
-    printf("New Gain Real Baro: %f\n\n", this->state.gain_Real_Baro);
+    // printf("New Gain Baro3: %f\n", this->state.gain_Baro3);
+    // printf("New Gain Real Baro: %f\n\n", this->state.gain_Real_Baro);
   }
 }
 
@@ -1602,7 +1602,7 @@ int main() {
     everest.IMU2_Measurements(sensorData2, &everest);
     everest.Baro1_Measurements(baro1, &everest);
     everest.Baro2_Measurements(baro2, &everest);
-    // everest.GPS_Measurements(findClosestTime(time), &everest);
+    everest.GPS_Measurements(findClosestTime(time), &everest);
 
     // start timer for iteration
     start = std::clock();

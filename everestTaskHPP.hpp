@@ -21,7 +21,7 @@
 #endif
 
 #ifndef HOME
-#include "C:\Users\Andrey\Documents\UKFRepo\UnscentedKalmanFilter\EverestLibrary_HALO\EverestL\EverestLibrary\HALO.hpp"
+#include "C:\Users\Andrey\Documents\AllRepos\AltitudePredictionFilter\HALO.hpp"
 #endif
 
 // Definitions

@@ -17,11 +17,16 @@
 #include <sstream>
 
 #ifdef HOME
-#include "C:\Users\andin\OneDrive\Documents\AllRepos\UnscentedKalmanFilter\EverestLibrary_HALO\EverestL\EverestLibrary\HALO.hpp"
+<<<<<<< Updated upstream
+#include "C:\Users\Harry\Desktop\SOAR\extra\HALO.hpp"
+    == == ==
+    =
+#include "C:\Users\harry\Desktop\soar\extra\HALO.hpp"
+        >>>>>>> Stashed changes
 #endif
 
 #ifndef HOME
-#include "C:\Users\Andrey\Documents\AllRepos\AltitudePredictionFilter\HALO.hpp"
+#include "C:\Users\harry\Desktop\soar\extra\HALO.hpp"
 #endif
 
 // Definitions
@@ -31,8 +36,14 @@
 #define RATE_BARO (3)
 #define CALIBRATION_TIME (2)
 
-/* Macros/Enums ------------------------------------------------------------*/
-enum EVEREST_TASK_COMMANDS { EVEREST_NONE = 0, UPDATE, TEST, RETARE };
+        /* Macros/Enums
+           ------------------------------------------------------------*/
+        enum EVEREST_TASK_COMMANDS {
+          EVEREST_NONE = 0,
+          UPDATE,
+          TEST,
+          RETARE
+        };
 
 /*Defines------------------------------------------------------------------*/
 typedef struct {
@@ -60,15 +71,18 @@ typedef struct {
   float gain_IMU;
   float gain_Baro1;
   float gain_Baro2;
+  float gain_GPS;
 
   // prev gains
   float prev_gain_IMU;
   float prev_gain_Baro1;
   float prev_gain_Baro2;
+  float prev_gain_GPS;
 
   float std_IMU;
   float std_Baro1;
   float std_Baro2;
+  float std_GPS;
 
   IMUData avgIMU;
   float deltaTimeIMU;
@@ -223,9 +237,10 @@ class EverestTask {
 
 void EverestTask::initialize1(systemState& state) {
   // Initially we trust systems equally
-  this->state.gain_IMU = 4 / 10.0;  // change to actual initial trusts
-  this->state.gain_Baro1 = 3 / 10.0;
-  state.gain_Baro2 = 3 / 10.0;
+  this->state.gain_IMU = 2.5 / 10.0;  // change to actual initial trusts
+  this->state.gain_Baro1 = 2.5 / 10.0;
+  state.gain_Baro2 = 2.5 / 10.0;
+  this->state.gain_GPS = 2.5 / 10.0;
 
   Kinematics.initialVelo = 0;
   Kinematics.initialAlt = 0;

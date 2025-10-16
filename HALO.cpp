@@ -8,19 +8,19 @@
 
 // home
 #ifdef HOME
-#include "C:\Users\andin\OneDrive\Documents\AllRepos\UnscentedKalmanFilter\eigen-3.4.0\Eigen\Dense"
+#include "C:\Users\harry\Desktop\soar\eigen-3.4.0\eigen-3.4.0\Eigen\Dense"
 #endif
 
 // away
 #ifndef HOME
-#include "C:\Users\Andrey\Downloads\eigen-5.0.0\eigen-5.0.0\Eigen\Dense"
+#include "C:\Users\harry\Desktop\soar\eigen-3.4.0\eigen-3.4.0\Eigen\Dense"
 #endif
 
 #ifndef HALO_CPP
 #define HALO_CPP
 #define REFRESH_RATE 3
 
-// #define printf(...) ;
+#define printf(...) ;
 
 // Constants for the UKF
 #define N 6

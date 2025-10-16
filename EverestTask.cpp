@@ -18,7 +18,8 @@
 
 #define LOGON
 #define TIMERON
-// #define printf(...) ;
+#define printf(...) ;
+
 FILE* haloFile;
 FILE* everestFile;
 int counterEverest = 0;
@@ -734,6 +735,8 @@ double EverestTask::dynamite() {
   double BaroAltitude2 = convertToAltitude(everest.baro2.pressure);
   this->baro2.altitude = BaroAltitude2;
 
+  double GPSAltitude = everest.everestData.altitudeGPS;
+
   if (debug == Dynamite || debug == ALL) {
     printf("\nDynamite\n");
     printf("Baro1 Altitude: %f\n", BaroAltitude1);
@@ -741,6 +744,7 @@ double EverestTask::dynamite() {
     // printf("Baro3 Altitude: %f\n", BaroAltitude3);
     // printf("Real Baro Altitude: %f\n", RealBaroAltitude);
     printf("IMU Altitude: %f\n", IMUAltitude);
+    printf("GPSAltitude: %f\n", GPSAltitude);
   }
 
   // if pressure is zero, set gain to zero
@@ -765,11 +769,12 @@ double EverestTask::dynamite() {
       (BaroAltitude1 * everest.state.gain_Baro1);
   double distributed_Baro_Altitude2 =
       (BaroAltitude2 * everest.state.gain_Baro2);
+  double distributed_GPS_altitude = (GPSAltitude * everest.state.gain_GPS);
 
   // summation of distributed measurements
   double distributed_Sum = distributed_IMU_Altitude +
                            distributed_Baro_Altitude1 +
-                           distributed_Baro_Altitude2;
+                           distributed_Baro_Altitude2 + GPSAltitude;
 
   if (debug == Dynamite || debug == ALL) {
     printf("Distributed Sum: %f\n\n", distributed_Sum);
@@ -777,7 +782,7 @@ double EverestTask::dynamite() {
 
   // summation of gains
   double sumGain = everest.state.gain_IMU + everest.state.gain_Baro1 +
-                   everest.state.gain_Baro2;
+                   everest.state.gain_Baro2 + everest.state.gain_GPS;
 
   if (debug == Dynamite || debug == ALL) {
     printf("Sum Gain: %f\n\n", sumGain);
@@ -790,8 +795,8 @@ double EverestTask::dynamite() {
     printf("Normalised Altitude: %f\n\n", normalised_Altitude);
   }
 
-  // overrides normalised altitude with GPS altitude if available
-  if (everest.availableMeasurements[4] == 1) {
+  // overrides normalised altitude with GPS altitude if available, Don't!!
+  /*if (everest.availableMeasurements[4] == 1) {
     std::cout << "GPS Altitude: " << everest.everestData.altitudeGPS
               << std::endl;
     std::cout << "Normalised Altitude before: " << normalised_Altitude
@@ -799,7 +804,7 @@ double EverestTask::dynamite() {
     normalised_Altitude = everest.everestData.altitudeGPS;
     std::cout << "Normalised Altitude after: " << normalised_Altitude
               << std::endl;
-  }
+  }*/
 
   // Update Kinematics
   Kinematics.finalAltitude = normalised_Altitude;
@@ -821,9 +826,10 @@ double EverestTask::dynamite() {
 
   recalculateGain(normalised_Altitude);
 
+  /*
   if (everest.availableMeasurements[4] == 1) {
     updateGainsWithGPS();
-  }
+  }*/
 
   // Save the gains that are not zero as previous gains
   // so once we have recovery phase these old gains are used
@@ -836,6 +842,9 @@ double EverestTask::dynamite() {
   if (everest.state.gain_Baro2 != 0) {
     everest.state.prev_gain_Baro2 = everest.state.gain_Baro2;
   }
+  if (everest.state.gain_GPS != 0) {
+    everest.state.prev_gain_GPS = everest.state.gain_GPS;
+  }
 
   if (debug == Dynamite || debug == ALL) {
     printf("Previous Gains\n");
@@ -844,6 +853,7 @@ double EverestTask::dynamite() {
     printf("Prev Gain Baro2: %f\n", everest.state.prev_gain_Baro2);
     // printf("Prev Gain Baro3: %f\n", everest.state.prev_gain_Baro3);
     // printf("Prev Gain Real Baro: %f\n\n", everest.state.prev_gain_Real_Baro);
+    printf("Prev Gain GPS: %f\n", everest.state.prev_gain_GPS);
   }
 
   return normalised_Altitude;
@@ -894,29 +904,38 @@ void EverestTask::recalculateGain(double estimate) {
                 this->state.avgIMU.altitude);  // change to previous trusts
   double gain_Baro1 = 1 / fabsf(gainedEstimate - this->baro1.altitude);
   double gain_Baro2 = 1 / fabsf(gainedEstimate - this->baro2.altitude);
+  double gain_GPS = 1 / fabsf(gainedEstimate - this->everestData.altitudeGPS);
 
   if (debug == Third || debug == ALL) {
     printf("\nRecalculate Gain - Before normalization\n");
     printf("Gain IMU: %f\n", gain_IMU);
     printf("Gain Baro1: %f\n", gain_Baro1);
     printf("Gain Baro2: %f\n", gain_Baro2);
+    printf("Gain GPS: %f\n", gain_GPS);
     printf("Gained Estimate: %f\n", gainedEstimate);
 
     printf("Altitude: %f\n", estimate);
     printf("Baro1: %f\n", this->baro1.altitude);
     printf("Baro2: %f\n", this->baro2.altitude);
+    printf("GPS Altitude: %f\n", this->everestData.altitudeGPS);
   }
 
   // normalise
-  this->state.gain_IMU = gain_IMU / (gain_IMU + gain_Baro1 + gain_Baro2);
-  this->state.gain_Baro1 = gain_Baro1 / (gain_IMU + gain_Baro1 + gain_Baro2);
-  this->state.gain_Baro2 = gain_Baro2 / (gain_IMU + gain_Baro1 + gain_Baro2);
+  this->state.gain_IMU =
+      gain_IMU / (gain_IMU + gain_Baro1 + gain_Baro2 + gain_GPS);
+  this->state.gain_Baro1 =
+      gain_Baro1 / (gain_IMU + gain_Baro1 + gain_Baro2 + gain_GPS);
+  this->state.gain_Baro2 =
+      gain_Baro2 / (gain_IMU + gain_Baro1 + gain_Baro2 + gain_GPS);
+  this->state.gain_GPS =
+      gain_GPS / (gain_IMU + gain_Baro1 + gain_Baro2 + gain_GPS);
 
   if (debug == Dynamite || debug == ALL) {
     printf("\nRecalculate Gain\n");
     printf("New Gain IMU: %f\n", this->state.gain_IMU);
     printf("New Gain Baro1: %f\n", this->state.gain_Baro1);
     printf("New Gain Baro2: %f\n", this->state.gain_Baro2);
+    printf("New Gain GPS: %f\n", this->state.gain_GPS);
     // printf("New Gain Baro3: %f\n", this->state.gain_Baro3);
     // printf("New Gain Real Baro: %f\n\n", this->state.gain_Real_Baro);
   }

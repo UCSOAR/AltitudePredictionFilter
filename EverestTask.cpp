@@ -774,7 +774,7 @@ double EverestTask::dynamite() {
   // summation of distributed measurements
   double distributed_Sum = distributed_IMU_Altitude +
                            distributed_Baro_Altitude1 +
-                           distributed_Baro_Altitude2 + GPSAltitude;
+                           distributed_Baro_Altitude2 + distributed_GPS_altitude;
 
   if (debug == Dynamite || debug == ALL) {
     printf("Distributed Sum: %f\n\n", distributed_Sum);
@@ -899,12 +899,15 @@ void EverestTask::recalculateGain(double estimate) {
   double gainedEstimate = deriveChangeInVelocityToGetAltitude(
       estimate);  // pre-integrated for altitude
 
+  // epsilon prevents gains from approaching 0 or infinity.
+  double epsilon = 100;
+
   double gain_IMU =
-      1 / fabsf(gainedEstimate -
-                this->state.avgIMU.altitude);  // change to previous trusts
-  double gain_Baro1 = 1 / fabsf(gainedEstimate - this->baro1.altitude);
-  double gain_Baro2 = 1 / fabsf(gainedEstimate - this->baro2.altitude);
-  double gain_GPS = 1 / fabsf(gainedEstimate - this->everestData.altitudeGPS);
+      1 / (fabsf(gainedEstimate -
+                this->state.avgIMU.altitude) + epsilon);  // change to previous trusts
+  double gain_Baro1 = 1 / (fabsf(gainedEstimate - this->baro1.altitude) + epsilon);
+  double gain_Baro2 = 1 / (fabsf(gainedEstimate - this->baro2.altitude) + epsilon);
+  double gain_GPS = 1 / (fabsf(gainedEstimate - this->everestData.altitudeGPS) + epsilon);
 
   if (debug == Third || debug == ALL) {
     printf("\nRecalculate Gain - Before normalization\n");

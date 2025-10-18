@@ -132,7 +132,7 @@ void HALO::stateUpdate() {
   zMean = observedValues * WeightsForSigmaPoints;
   this->Z = zMean;
 
-  // calculate covariance of Z
+  // calculate covariance of Z, find matrix of deviations of observations.
   MatrixXf zCovar(3, 7);
   zCovar.setZero(3, (2 * 3) + 1);
 

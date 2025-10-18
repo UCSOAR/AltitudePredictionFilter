@@ -236,11 +236,11 @@ class EverestTask {
 };
 
 void EverestTask::initialize1(systemState& state) {
-  // Initially we trust systems equally
-  this->state.gain_IMU = 2.5 / 10.0;  // change to actual initial trusts
-  this->state.gain_Baro1 = 2.5 / 10.0;
-  state.gain_Baro2 = 2.5 / 10.0;
-  this->state.gain_GPS = 2.5 / 10.0;
+  // Initially we trust GPS more, since it is supposed to be high accuracy.
+  this->state.gain_IMU = 1 / 10.0;  // change to actual initial trusts
+  this->state.gain_Baro1 = 1 / 10.0;
+  state.gain_Baro2 = 1 / 10.0;
+  this->state.gain_GPS = 7 / 10.0;
 
   Kinematics.initialVelo = 0;
   Kinematics.initialAlt = 0;

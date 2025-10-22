@@ -71,13 +71,11 @@ typedef struct {
   float gain_IMU;
   float gain_Baro1;
   float gain_Baro2;
-  float gain_GPS;
 
   // prev gains
   float prev_gain_IMU;
   float prev_gain_Baro1;
   float prev_gain_Baro2;
-  float prev_gain_GPS;
 
   float std_IMU;
   float std_Baro1;
@@ -236,11 +234,9 @@ class EverestTask {
 };
 
 void EverestTask::initialize1(systemState& state) {
-  // Initially we trust GPS more, since it is supposed to be high accuracy.
-  this->state.gain_IMU = 1 / 10.0;  // change to actual initial trusts
-  this->state.gain_Baro1 = 1 / 10.0;
-  state.gain_Baro2 = 1 / 10.0;
-  this->state.gain_GPS = 7 / 10.0;
+  this->state.gain_IMU = 4 / 10.0;  // change to actual initial trusts
+  this->state.gain_Baro1 = 3 / 10.0;
+  state.gain_Baro2 = 3 / 10.0;
 
   Kinematics.initialVelo = 0;
   Kinematics.initialAlt = 0;

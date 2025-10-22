@@ -20,14 +20,18 @@
 #define HALO_CPP
 #define REFRESH_RATE 3
 
-#define printf(...) ;
+//#define printf(...) ;
 
-// Constants for the UKF
+/* Constants for the UKF... do we ever use it?
 #define N 6
 #define dim 6
 #define alpha 0.1
 #define beta 2
 #define k 3 - dim  // 3 dimensions
+*/
+
+#define OBSERVATION_DIMENSIONS 4
+
 std::string directoryPath = "testSuite/results";
 
 bool isInitialized = false;
@@ -119,49 +123,60 @@ void HALO::stateUpdate() {
   stateUpdateTime = std::chrono::high_resolution_clock::now();
 #endif
 
-  MatrixXf observedValues(3, 7);
-  observedValues.setZero(3, 7);
+  // Observation dimensions is the dimension of our observation vector. At the moment, it is the 3 values from Everest and 1 GPS altitude.
+  MatrixXf observedValues(OBSERVATION_DIMENSIONS, 7);
+  observedValues.setZero(OBSERVATION_DIMENSIONS, 7);
 
-  for (int i = 0; i < (2 * this->N1) + 1; i++) {
-    observedValues.col(i) = sigPoints.col(i);
+  for (int i = 0; i < 7; i++) {
+      observedValues(0, i) = sigPoints(0, i);  
+      observedValues(1, i) = sigPoints(1, i); 
+      observedValues(2, i) = sigPoints(2, i);  
+      observedValues(3, i) = sigPoints(0, i);  
   }
 
+
   // calculate the mean of the observed values
-  VectorXf zMean(3);
-  zMean.setZero(3);
+  VectorXf zMean(OBSERVATION_DIMENSIONS);
+  zMean.setZero(OBSERVATION_DIMENSIONS);
   zMean = observedValues * WeightsForSigmaPoints;
   this->Z = zMean;
 
   // calculate covariance of Z, find matrix of deviations of observations.
-  MatrixXf zCovar(3, 7);
-  zCovar.setZero(3, (2 * 3) + 1);
+  MatrixXf zCovar(OBSERVATION_DIMENSIONS, 7);
+  zCovar.setZero(OBSERVATION_DIMENSIONS, 7);
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < OBSERVATION_DIMENSIONS; i++) {
     zCovar.row(i) =
         (observedValues.row(i).array() - zMean.row(i).value()).matrix();
   }
 
+  // create a new measurement noise matrix that is 4x4, with GPS measurement noise added. GPS is an independent altitude measurement, so it has 0 for its cross values.
+  MatrixXf R_GPS(OBSERVATION_DIMENSIONS, OBSERVATION_DIMENSIONS);
+  R_GPS.setZero();
+  R_GPS.block<3,3>(0,0) = this->R;  // original 3x3 R matrix
+  R_GPS(3, 3) = 25; // dummy value for 5m std dev. low R for GPS means higher trust!
+
   // calculate the innovation covariance, measurement covariance
-  MatrixXf Pz(3, 3);
-  Pz.setZero(3, 3);
+  MatrixXf Pz(OBSERVATION_DIMENSIONS, OBSERVATION_DIMENSIONS);
+  Pz.setZero(OBSERVATION_DIMENSIONS, OBSERVATION_DIMENSIONS);
   Pz = (zCovar * WeightsForSigmaPoints.asDiagonal() * zCovar.transpose()) +
-       this->R;
+       R_GPS;
 
   // calculate the cross covariance
-  MatrixXf Pxz(3, 2);
+  MatrixXf Pxz(3, OBSERVATION_DIMENSIONS);
   Pxz.setZero();
 
   Pxz = projectError * WeightsForSigmaPoints.asDiagonal() * zCovar.transpose();
 
   // calculate the Kalman gain
-  MatrixXf K(3, 3);
+  MatrixXf K(3, OBSERVATION_DIMENSIONS);
   K.setZero();
   K = Pxz * Pz.inverse();
 
   bool kZero = false;
 
   for (int row = 0; row < 3; row++) {
-    for (int col = 0; col < 3; col++) {
+    for (int col = 0; col < OBSERVATION_DIMENSIONS; col++) {
       if (std::isnan(K(row, col))) {
         FILE* log = fopen("log.txt", "a+");  // Open the file for appending or
                                              // create it if it doesn't exist
@@ -196,12 +211,15 @@ void HALO::stateUpdate() {
     fclose(log);
   }
 
-  VectorXf difference(3, 1);
+  VectorXf difference(OBSERVATION_DIMENSIONS, 1);
   difference.setZero();
   // flipped X, order should be Alt, Velo, Accel, thats why
   // the order is 2, 1, 0
-  difference << this->X[2] - zMean(0), this->X[1] - zMean(1),
-      this->X[0] - zMean(2);
+  // gpsAlt isn't part of the X vector, so it doesn't get flipped.
+  difference << (this->X[2] - zMean(0)), 
+                (this->X[1] - zMean(1)), 
+                (this->X[0] - zMean(2)), 
+                (this->gpsAlt - zMean(3));
 
   X0 = this->Xprediction + K * difference;
 
@@ -1042,10 +1060,11 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
  * @brief Take the filtered values from Everest filter
  */
 void HALO::setStateVector(float filteredAcc, float filteredVelo,
-                          float filteredAlt) {
+                          float filteredAlt, float gpsAlt) {
   this->Uaccel = filteredAcc;
   this->Uvelo = filteredVelo;
   this->Ualt = filteredAlt;
+  this->gpsAlt = gpsAlt;
 
   VectorXf X_in(3);
   X_in << this->Uaccel, this->Uvelo, this->Ualt;
@@ -1195,6 +1214,7 @@ void HALO::initializeHALO(float initialAlt, HALO* halo) {
 
   // Measurement Covariance matrix (altitude, velocity, acceleration)
   // Calculated using covarianceCalc.py -> residual from Everest
+  // Below, we expand the matrix with the measurement noise for GPS.
   MatrixXf R0(3, 3);
   R0 << 15438.09, 1528.51, 727.68, 1528.51, 5005.79, -469.20, 727.68, -469.20,
       613.20;
@@ -1229,12 +1249,12 @@ void HALO::initializeHALOWithQR(float initialAlt, HALO* halo, MatrixXf& Q,
 
 std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
                                      double eAccelerationZ, double eVelocity,
-                                     double eAltitude, float time) {
+                                     double eAltitude, double gpsAltitude, float time) {
   std::vector<double> unitedStates = {0, 0, 0};
 
   if (isInitialized) {
     haloPointer->setTime(time);
-    haloPointer->setStateVector(eAccelerationZ, eVelocity, eAltitude);
+    haloPointer->setStateVector(eAccelerationZ, eVelocity, eAltitude, gpsAltitude);
 
     // X0 = {eAltitude, eVelocity, eAccelerationZ};
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};

@@ -221,6 +221,12 @@ class HALO {
   // Takes Altitude, Velocity, Acceleration
   void calculateSigmaPoints();
 
+  // calculate sigma points and run predict loop a single time. Should not mutate any class variales.
+  std::tuple<VectorXf, MatrixXf> calculateSigmaOnce(VectorXf X_in, MatrixXf P_in);
+
+  // loop through calculateSigmaOnce n times.
+  VectorXf predictNStates(int n);
+
   // Acceleration, Velocity, Altitude
   VectorXf X;  // state vector
 

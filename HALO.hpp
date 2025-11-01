@@ -22,7 +22,7 @@
 #endif
 
 using namespace Eigen;
-#define LOGON
+// #define LOGON
 
 /**
  * @brief Measurement struct to store the time, altitude, velocity and
@@ -213,7 +213,8 @@ class HALO {
                              VectorXf &X_in, int scenario1Index,
                              int scenario2Index);
 
-  void setStateVector(float filteredAcc, float filteredVelo, float filteredAlt, float gpsAlt);
+  void setStateVector(float filteredAcc, float filteredVelo, float filteredAlt,
+                      float gpsAlt);
 
   std::pair<std::vector<int>, std::vector<std::vector<float>>>
   findNearestScenarios(std::vector<Scenario> *scenarios, VectorXf &measurement);
@@ -221,8 +222,10 @@ class HALO {
   // Takes Altitude, Velocity, Acceleration
   void calculateSigmaPoints();
 
-  // calculate sigma points and run predict loop a single time. Should not mutate any class variales.
-  std::tuple<VectorXf, MatrixXf> calculateSigmaOnce(VectorXf X_in, MatrixXf P_in);
+  // calculate sigma points and run predict loop a single time. Should not
+  // mutate any class variales.
+  std::tuple<VectorXf, MatrixXf> calculateSigmaOnce(VectorXf X_in,
+                                                    MatrixXf P_in);
 
   // loop through calculateSigmaOnce n times.
   VectorXf predictNStates(int n);
@@ -259,13 +262,13 @@ class HALO {
 
   float deltaTime = 1.0 / 3;
 
-  void setDeltaTime(float deltaTime) { this->deltaTime; }
+  void setDeltaTime(float deltaTime) { this->deltaTime = deltaTime; }
 
   float getDeltaTime() { return this->deltaTime; }
 
   float time = 0;
 
-  void setTime(float time) { this->time; }
+  void setTime(float time) { this->time = time; }
 
   float euclideanDistance(const std::vector<float> &vec1, const VectorXf &vec2);
 
@@ -294,7 +297,8 @@ class HALO {
 
   std::vector<double> Halo_Input(HALO *haloPointer, bool isInitialized,
                                  double eAccelerationZ, double eVelocity,
-                                 double eAltitude, double gpsAltitude, float time);
+                                 double eAltitude, double gpsAltitude,
+                                 float time);
 
   // for predictNextValues
   int counterSigmaPoint = 0;

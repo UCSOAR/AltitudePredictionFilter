@@ -16,9 +16,9 @@
 
 #include "gpsData.cpp"
 
-#define LOGON
+// #define LOGON
 #define TIMERON
-//#define printf(...) ;
+#define printf(...) ;
 
 FILE* haloFile;
 FILE* everestFile;
@@ -58,7 +58,8 @@ int openFiles() {
                                         "sigmaPoints3.txt",
                                         "sigmaPoints4.txt",
                                         "sigmaPoints5.txt",
-                                        "sigmaPoints6.txt"};
+                                        "sigmaPoints6.txt",
+                                        "predictnalt.txt"};
 
   // Deleting files
   for (size_t i = 0; i < fileNames.size(); ++i) {
@@ -89,7 +90,8 @@ int openFiles() {
                      "lowestDistance,secondLowestDistance,firstScenario,"
                      "SecondScenario\n"),
       std::make_pair("nearestScenariosFormatted.txt",
-                     "Header_formatted_scenarios\n")};
+                     "Header_formatted_scenarios\n"),
+      std::make_pair("predictnalt.txt", "time,predicted_alt\n")};
 
   for (size_t i = 0; i < filesToCreate.size(); ++i) {
     std::string filePath = directoryPath + "/" + filesToCreate[i].first;
@@ -896,11 +898,12 @@ void EverestTask::recalculateGain(double estimate) {
   // epsilon prevents gains from approaching 0 or infinity.
   double epsilon = 100;
 
-  double gain_IMU =
-      1 / (fabsf(gainedEstimate -
-                this->state.avgIMU.altitude) + epsilon);  // change to previous trusts
-  double gain_Baro1 = 1 / (fabsf(gainedEstimate - this->baro1.altitude) + epsilon);
-  double gain_Baro2 = 1 / (fabsf(gainedEstimate - this->baro2.altitude) + epsilon);
+  double gain_IMU = 1 / (fabsf(gainedEstimate - this->state.avgIMU.altitude) +
+                         epsilon);  // change to previous trusts
+  double gain_Baro1 =
+      1 / (fabsf(gainedEstimate - this->baro1.altitude) + epsilon);
+  double gain_Baro2 =
+      1 / (fabsf(gainedEstimate - this->baro2.altitude) + epsilon);
 
   if (debug == Third || debug == ALL) {
     printf("\nRecalculate Gain - Before normalization\n");
@@ -916,12 +919,9 @@ void EverestTask::recalculateGain(double estimate) {
   }
 
   // normalise
-  this->state.gain_IMU =
-      gain_IMU / (gain_IMU + gain_Baro1 + gain_Baro2);
-  this->state.gain_Baro1 =
-      gain_Baro1 / (gain_IMU + gain_Baro1 + gain_Baro2);
-  this->state.gain_Baro2 =
-      gain_Baro2 / (gain_IMU + gain_Baro1 + gain_Baro2);
+  this->state.gain_IMU = gain_IMU / (gain_IMU + gain_Baro1 + gain_Baro2);
+  this->state.gain_Baro1 = gain_Baro1 / (gain_IMU + gain_Baro1 + gain_Baro2);
+  this->state.gain_Baro2 = gain_Baro2 / (gain_IMU + gain_Baro1 + gain_Baro2);
 
   if (debug == Dynamite || debug == ALL) {
     printf("\nRecalculate Gain\n");
@@ -1409,7 +1409,8 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
 
     // Update HALO
     haloData = halo.Halo_Input(&halo, haloInitialized, eAccelerationZ,
-                               eVelocity, eAltitude, everestData.altitudeGPS, everestData.timeIMU1);
+                               eVelocity, eAltitude, everestData.altitudeGPS,
+                               everestData.timeIMU1);
 
 #ifdef LOGON
     fprintf(haloFile, "%f,%f,%f\n", haloData[0], haloData[1], haloData[2]);

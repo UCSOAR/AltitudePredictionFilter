@@ -3,7 +3,7 @@
 #include "Data.cpp"
 #include <map>
 
-#define LOGON
+// #define LOGON
 #define TIMERON
 
 // home
@@ -20,7 +20,7 @@
 #define HALO_CPP
 #define REFRESH_RATE 3
 
-//#define printf(...) ;
+#define printf(...) ;
 
 /* Constants for the UKF... do we ever use it?
 #define N 6
@@ -123,17 +123,17 @@ void HALO::stateUpdate() {
   stateUpdateTime = std::chrono::high_resolution_clock::now();
 #endif
 
-  // Observation dimensions is the dimension of our observation vector. At the moment, it is the 3 values from Everest and 1 GPS altitude.
+  // Observation dimensions is the dimension of our observation vector. At the
+  // moment, it is the 3 values from Everest and 1 GPS altitude.
   MatrixXf observedValues(OBSERVATION_DIMENSIONS, 7);
   observedValues.setZero(OBSERVATION_DIMENSIONS, 7);
 
   for (int i = 0; i < 7; i++) {
-      observedValues(0, i) = sigPoints(0, i);  
-      observedValues(1, i) = sigPoints(1, i); 
-      observedValues(2, i) = sigPoints(2, i);  
-      observedValues(3, i) = sigPoints(0, i);  
+    observedValues(0, i) = sigPoints(0, i);
+    observedValues(1, i) = sigPoints(1, i);
+    observedValues(2, i) = sigPoints(2, i);
+    observedValues(3, i) = sigPoints(0, i);
   }
-
 
   // calculate the mean of the observed values
   VectorXf zMean(OBSERVATION_DIMENSIONS);
@@ -150,11 +150,14 @@ void HALO::stateUpdate() {
         (observedValues.row(i).array() - zMean.row(i).value()).matrix();
   }
 
-  // create a new measurement noise matrix that is 4x4, with GPS measurement noise added. GPS is an independent altitude measurement, so it has 0 for its cross values.
+  // create a new measurement noise matrix that is 4x4, with GPS measurement
+  // noise added. GPS is an independent altitude measurement, so it has 0 for
+  // its cross values.
   MatrixXf R_GPS(OBSERVATION_DIMENSIONS, OBSERVATION_DIMENSIONS);
   R_GPS.setZero();
-  R_GPS.block<3,3>(0,0) = this->R;  // original 3x3 R matrix
-  R_GPS(3, 3) = 25; // dummy value for 5m std dev. low R for GPS means higher trust!
+  R_GPS.block<3, 3>(0, 0) = this->R;  // original 3x3 R matrix
+  R_GPS(3, 3) =
+      25;  // dummy value for 5m std dev. low R for GPS means higher trust!
 
   // calculate the innovation covariance, measurement covariance
   MatrixXf Pz(OBSERVATION_DIMENSIONS, OBSERVATION_DIMENSIONS);
@@ -216,10 +219,8 @@ void HALO::stateUpdate() {
   // flipped X, order should be Alt, Velo, Accel, thats why
   // the order is 2, 1, 0
   // gpsAlt isn't part of the X vector, so it doesn't get flipped.
-  difference << (this->X[2] - zMean(0)), 
-                (this->X[1] - zMean(1)), 
-                (this->X[0] - zMean(2)), 
-                (this->gpsAlt - zMean(3));
+  difference << (this->X[2] - zMean(0)), (this->X[1] - zMean(1)),
+      (this->X[0] - zMean(2)), (this->gpsAlt - zMean(3));
 
   X0 = this->Xprediction + K * difference;
 
@@ -600,35 +601,36 @@ void HALO::calculateSigmaPoints() {
 }
 
 // Prediction--------------------------------------
-std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in, MatrixXf P_in) {
+std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
+                                                        MatrixXf P_in) {
   float mutliplier = 3;  // N - lambda
-/*
-  std::chrono::high_resolution_clock::time_point tTime;
+                         /*
+                           std::chrono::high_resolution_clock::time_point tTime;
 
-#ifdef TIMERON
+                         #ifdef TIMERON
 
-  tTime = std::chrono::high_resolution_clock::now();
+                           tTime = std::chrono::high_resolution_clock::now();
 
-#endif
-*/
+                         #endif
+                         */
 
   MatrixXf L(((mutliplier)*P_in).llt().matrixL());
-/*
-#ifdef TIMERON
+  /*
+  #ifdef TIMERON
 
-  this->triangulationTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          std::chrono::high_resolution_clock::now() - tTime);
+    this->triangulationTime +=
+        std::chrono::duration_cast<std::chrono::duration<double>>(
+            std::chrono::high_resolution_clock::now() - tTime);
 
-#endif
+  #endif
 
-#ifdef TIMERON
+  #ifdef TIMERON
 
-  std::chrono::high_resolution_clock::time_point startSPoint =
-      std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point startSPoint =
+        std::chrono::high_resolution_clock::now();
 
-#endif
-*/
+  #endif
+  */
 
   // Initialize sigma points matrix
   MatrixXf sigmaPoints(3, 7);
@@ -646,73 +648,74 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in, MatrixXf 
     sigmaPoints.col(j) = X_in - L.col(j - this->N1 - 1);
   }
 
-/*
-#ifdef TIMERON
+  /*
+  #ifdef TIMERON
 
-  this->sPointTime += std::chrono::duration_cast<std::chrono::duration<double>>(
-      std::chrono::high_resolution_clock::now() - startSPoint);
+    this->sPointTime +=
+  std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::high_resolution_clock::now() - startSPoint);
 
-#endif
+  #endif
 
-#ifdef LOGON
+  #ifdef LOGON
 
-  FILE* file = fopen((directoryPath + "/gains.txt").c_str(), "a+");
-  if (!file) {
-    fprintf(stderr, "Error opening gains.txt...exiting\n");
-    exit(1);
-  }
+    FILE* file = fopen((directoryPath + "/gains.txt").c_str(), "a+");
+    if (!file) {
+      fprintf(stderr, "Error opening gains.txt...exiting\n");
+      exit(1);
+    }
 
-  FILE* sigmaPointsFile =
-      fopen((directoryPath + "/sigmaPoints.txt").c_str(), "a+");
-  if (!sigmaPointsFile) {
-    fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
-    exit(1);
-  }
+    FILE* sigmaPointsFile =
+        fopen((directoryPath + "/sigmaPoints.txt").c_str(), "a+");
+    if (!sigmaPointsFile) {
+      fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
+      exit(1);
+    }
 
-  FILE* sigmaPointsFile1 =
-      fopen((directoryPath + "/sigmaPoints1.txt").c_str(), "a+");
-  if (!sigmaPointsFile1) {
-    fprintf(stderr, "Error opening sigmaPoints1.txt...exiting\n");
-    exit(1);
-  }
+    FILE* sigmaPointsFile1 =
+        fopen((directoryPath + "/sigmaPoints1.txt").c_str(), "a+");
+    if (!sigmaPointsFile1) {
+      fprintf(stderr, "Error opening sigmaPoints1.txt...exiting\n");
+      exit(1);
+    }
 
-  FILE* sigmaPointsFile2 =
-      fopen((directoryPath + "/sigmaPoints2.txt").c_str(), "a+");
-  if (!sigmaPointsFile2) {
-    fprintf(stderr, "Error opening sigmaPoints2.txt...exiting\n");
-    exit(1);
-  }
+    FILE* sigmaPointsFile2 =
+        fopen((directoryPath + "/sigmaPoints2.txt").c_str(), "a+");
+    if (!sigmaPointsFile2) {
+      fprintf(stderr, "Error opening sigmaPoints2.txt...exiting\n");
+      exit(1);
+    }
 
-  FILE* sigmaPointsFile3 =
-      fopen((directoryPath + "/sigmaPoints3.txt").c_str(), "a+");
-  if (!sigmaPointsFile3) {
-    fprintf(stderr, "Error opening sigmaPoints3.txt...exiting\n");
-    exit(1);
-  }
+    FILE* sigmaPointsFile3 =
+        fopen((directoryPath + "/sigmaPoints3.txt").c_str(), "a+");
+    if (!sigmaPointsFile3) {
+      fprintf(stderr, "Error opening sigmaPoints3.txt...exiting\n");
+      exit(1);
+    }
 
-  FILE* sigmaPointsFile4 =
-      fopen((directoryPath + "/sigmaPoints4.txt").c_str(), "a+");
-  if (!sigmaPointsFile4) {
-    fprintf(stderr, "Error opening sigmaPoints4.txt...exiting\n");
-    exit(1);
-  }
+    FILE* sigmaPointsFile4 =
+        fopen((directoryPath + "/sigmaPoints4.txt").c_str(), "a+");
+    if (!sigmaPointsFile4) {
+      fprintf(stderr, "Error opening sigmaPoints4.txt...exiting\n");
+      exit(1);
+    }
 
-  FILE* sigmaPointsFile5 =
-      fopen((directoryPath + "/sigmaPoints5.txt").c_str(), "a+");
-  if (!sigmaPointsFile5) {
-    fprintf(stderr, "Error opening sigmaPoints5.txt...exiting\n");
-    exit(1);
-  }
+    FILE* sigmaPointsFile5 =
+        fopen((directoryPath + "/sigmaPoints5.txt").c_str(), "a+");
+    if (!sigmaPointsFile5) {
+      fprintf(stderr, "Error opening sigmaPoints5.txt...exiting\n");
+      exit(1);
+    }
 
-  FILE* sigmaPointsFile6 =
-      fopen((directoryPath + "/sigmaPoints6.txt").c_str(), "a+");
-  if (!sigmaPointsFile6) {
-    fprintf(stderr, "Error opening sigmaPoints6.txt...exiting\n");
-    exit(1);
-  }
+    FILE* sigmaPointsFile6 =
+        fopen((directoryPath + "/sigmaPoints6.txt").c_str(), "a+");
+    if (!sigmaPointsFile6) {
+      fprintf(stderr, "Error opening sigmaPoints6.txt...exiting\n");
+      exit(1);
+    }
 
-#endif
-*/
+  #endif
+  */
 
   // propagate sigma points through the dynamic model
   for (int i = 0; i < (2 * this->N1) + 1; i++) {
@@ -730,54 +733,54 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in, MatrixXf 
     this->firstTimeForPoint = firstTime[i];
     this->prevGain1 = this->listOfGainsSigmaPoints[i].first;
     this->prevGain2 = this->listOfGainsSigmaPoints[i].second;
-/*
-#ifdef TIMERON
+    /*
+    #ifdef TIMERON
 
-    this->predictLoopTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
-            std::chrono::high_resolution_clock::now() - startPredictLoop);
+        this->predictLoopTime +=
+            std::chrono::duration_cast<std::chrono::duration<double>>(
+                std::chrono::high_resolution_clock::now() - startPredictLoop);
 
-#endif
+    #endif
 
-    std::chrono::high_resolution_clock::time_point dynamicTime;
+        std::chrono::high_resolution_clock::time_point dynamicTime;
 
-#ifdef TIMERON
+    #ifdef TIMERON
 
-    dynamicTime = std::chrono::high_resolution_clock::now();
+        dynamicTime = std::chrono::high_resolution_clock::now();
 
-#endif
-*/
+    #endif
+    */
 
     sigmaPoints.col(i) = dynamicModel(column);
-/*
-#ifdef TIMERON
+    /*
+    #ifdef TIMERON
 
-    this->dynamicModelTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
-            std::chrono::high_resolution_clock::now() - dynamicTime);
+        this->dynamicModelTime +=
+            std::chrono::duration_cast<std::chrono::duration<double>>(
+                std::chrono::high_resolution_clock::now() - dynamicTime);
 
-#endif
+    #endif
 
-#ifdef TIMERON
+    #ifdef TIMERON
 
-    std::chrono::high_resolution_clock::time_point endPredictLoop =
-        std::chrono::high_resolution_clock::now();
+        std::chrono::high_resolution_clock::time_point endPredictLoop =
+            std::chrono::high_resolution_clock::now();
 
-#endif
+    #endif
 
-    this->listOfGainsSigmaPoints[i] = {this->prevGain1, this->prevGain2};
-    this->firstTime[i] = this->firstTimeForPoint;
+        this->listOfGainsSigmaPoints[i] = {this->prevGain1, this->prevGain2};
+        this->firstTime[i] = this->firstTimeForPoint;
 
-#ifdef LOGON
-    fprintf(file, " ");
-#endif
+    #ifdef LOGON
+        fprintf(file, " ");
+    #endif
 
-#ifdef TIMERON
-    this->endPredictLoopTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
-            std::chrono::high_resolution_clock::now() - endPredictLoop);
-#endif
-  */
+    #ifdef TIMERON
+        this->endPredictLoopTime +=
+            std::chrono::duration_cast<std::chrono::duration<double>>(
+                std::chrono::high_resolution_clock::now() - endPredictLoop);
+    #endif
+      */
   }
 
   /*
@@ -812,14 +815,14 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in, MatrixXf 
 #endif
 */
 
-/*
-#ifdef TIMERON
+  /*
+  #ifdef TIMERON
 
-  std::chrono::high_resolution_clock::time_point preMeanStart =
-      std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point preMeanStart =
+        std::chrono::high_resolution_clock::now();
 
-#endif
-*/
+  #endif
+  */
 
   // calculate the mean and covariance of the sigma points
   VectorXf xPreMean(3, 1);
@@ -831,24 +834,24 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in, MatrixXf 
     xPreMean(row) = sum00;
   }
 
-/*
-#ifdef TIMERON
+  /*
+  #ifdef TIMERON
 
-  this->preMeanTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          std::chrono::high_resolution_clock::now() - preMeanStart);
+    this->preMeanTime +=
+        std::chrono::duration_cast<std::chrono::duration<double>>(
+            std::chrono::high_resolution_clock::now() - preMeanStart);
 
-#endif
+  #endif
 
-  this->Xprediction = xPreMean;
+    this->Xprediction = xPreMean;
 
-#ifdef TIMERON
+  #ifdef TIMERON
 
-  std::chrono::high_resolution_clock::time_point projErrorStart =
-      std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point projErrorStart =
+        std::chrono::high_resolution_clock::now();
 
-#endif
-*/
+  #endif
+  */
 
   MatrixXf projError(3, 7);
   projError.setZero(3, 7);
@@ -861,14 +864,14 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in, MatrixXf 
 
   this->projectError = projError;
 
-/*
-#ifdef TIMERON
+  /*
+  #ifdef TIMERON
 
-  this->projErrorTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          std::chrono::high_resolution_clock::now() - projErrorStart);
-#endif
-*/
+    this->projErrorTime +=
+        std::chrono::duration_cast<std::chrono::duration<double>>(
+            std::chrono::high_resolution_clock::now() - projErrorStart);
+  #endif
+  */
 
   MatrixXf Pprediction(3, 3);
   Pprediction.setZero(3, 3);
@@ -888,25 +891,39 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in, MatrixXf 
 
   this->Pprediction = Pprediction;
 
-/*
-#ifdef TIMERON
+  /*
+  #ifdef TIMERON
 
-  this->PpredictionTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          std::chrono::high_resolution_clock::now() - pPredictionStart);
+    this->PpredictionTime +=
+        std::chrono::duration_cast<std::chrono::duration<double>>(
+            std::chrono::high_resolution_clock::now() - pPredictionStart);
 
-#endif
-*/
+  #endif
+  */
 
   return {Xprediction, Pprediction};
 }
 
-
 VectorXf HALO::predictNStates(int n) {
-  std::tuple<VectorXf, MatrixXf> calculation = this->calculateSigmaOnce(this->X0, this->P);
+  std::tuple<VectorXf, MatrixXf> calculation =
+      this->calculateSigmaOnce(this->X0, this->P);
   for (int i = 0; i < n; i++) {
-    calculation = this->calculateSigmaOnce(std::get<0>(calculation), std::get<1>(calculation));
+    calculation = this->calculateSigmaOnce(std::get<0>(calculation),
+                                           std::get<1>(calculation));
   }
+
+#ifdef LOGON
+
+  FILE* file = fopen((directoryPath + "/predictnalt.txt").c_str(), "a+");
+  if (!file) {
+    fprintf(stderr, "Error opening predictnalt.txt...exiting\n");
+    exit(1);
+  }
+
+  fprintf(file, "%f,%f\n", this->time + n * timeStep,
+          std::get<0>(calculation)(0));
+
+#endif
 
   return std::get<0>(calculation);
 }
@@ -1561,16 +1578,20 @@ void HALO::initializeHALOWithQR(float initialAlt, HALO* halo, MatrixXf& Q,
 
 std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
                                      double eAccelerationZ, double eVelocity,
-                                     double eAltitude, double gpsAltitude, float time) {
+                                     double eAltitude, double gpsAltitude,
+                                     float time) {
   std::vector<double> unitedStates = {0, 0, 0};
 
   if (isInitialized) {
     haloPointer->setTime(time);
-    haloPointer->setStateVector(eAccelerationZ, eVelocity, eAltitude, gpsAltitude);
+    haloPointer->setStateVector(eAccelerationZ, eVelocity, eAltitude,
+                                gpsAltitude);
 
     // X0 = {eAltitude, eVelocity, eAccelerationZ};
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
-    std::cout << "vector in 5 time slices: " << predictNStates(5) << std::endl;
+
+    // std::cout << "vector in 5 time slices: " <<
+    // haloPointer->predictNStates(5) << std::endl;
   }
 
   if (counter == 525) {

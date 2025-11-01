@@ -17,6 +17,8 @@
 #include "gpsData.cpp"
 
 // #define LOGON
+#define LOGPREDICTIONS
+
 #define TIMERON
 #define printf(...) ;
 
@@ -273,7 +275,7 @@ void EverestTask::MadgwickSetup() {
   infusion->madAhrsSetSettings(ahrs, &settings);
 
 // open files
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGPREDICTIONS)
   openFiles();
 #endif
 }

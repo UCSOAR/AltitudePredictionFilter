@@ -4,6 +4,7 @@
 #include <map>
 
 // #define LOGON
+#define LOGPREDICTIONS
 #define TIMERON
 
 // home
@@ -912,9 +913,10 @@ VectorXf HALO::predictNStates(int n) {
                                            std::get<1>(calculation));
   }
 
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGPREDICTIONS)
 
-  FILE* file = fopen((directoryPath + "/predictnalt.txt").c_str(), "a+");
+  std::string filePath = directoryPath + "/predictnalt.txt";
+  FILE* file = fopen((filePath).c_str(), "a+");
   if (!file) {
     fprintf(stderr, "Error opening predictnalt.txt...exiting\n");
     exit(1);
@@ -1589,6 +1591,9 @@ std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
 
     // X0 = {eAltitude, eVelocity, eAccelerationZ};
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
+
+    // predict 5 slices every 50 time slices.
+    if ((int)floor(time) % 50 == 0) haloPointer->predictNStates(100);
 
     // std::cout << "vector in 5 time slices: " <<
     // haloPointer->predictNStates(5) << std::endl;

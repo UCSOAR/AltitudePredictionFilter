@@ -50,19 +50,36 @@ plt.title("Altimeter Acceleration vs Halo acceleration absolute difference")
 plt.legend()
 plt.grid(True)
 
-error_alt = abs(merged["Halo_Alt"] - merged["altitude"]) / merged["altitude"] * 100
-error_speed = abs(merged["speed"] - abs(merged["Halo_Velo"])) / merged["speed"] * 100
+error_alt = (abs(merged["Halo_Alt"] - merged["altitude"]) / merged["altitude"]) * 100
+error_speed = (abs(merged["Halo_Velo"] - merged["speed"]) / merged["speed"]) * 100
 error_acc = (
-    abs(merged["Halo_Accel"] - merged["acceleration"]) / merged["acceleration"] * 100
-)
+    abs(merged["Halo_Accel"] - merged["acceleration"]) / merged["acceleration"]
+) * 100
 
-avg = error_alt * 0.6 + error_acc * 0.4 + error_speed * 0.4
+
+avg = (error_alt + error_acc + error_speed) / 3
 
 plt.figure(figsize=(10, 6))
+
+plt.plot(
+    merged["time"],
+    error_alt,
+    label="Altitude",
+)
+plt.plot(
+    merged["time"],
+    error_speed,
+    label="Speed",
+)
+plt.plot(
+    merged["time"],
+    error_speed,
+    label="Acceleration",
+)
 plt.plot(
     merged["time"],
     avg,
-    label="HALO vs Altimeter",
+    label="Average",
 )
 plt.xlabel("Time")
 plt.ylabel("Error")

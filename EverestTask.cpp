@@ -16,8 +16,8 @@
 
 #include "gpsData.cpp"
 
-// #define LOGON
-#define LOGPREDICTIONS
+#define LOGON
+#define LOGMETRICS
 
 #define TIMERON
 #define printf(...) ;
@@ -275,7 +275,7 @@ void EverestTask::MadgwickSetup() {
   infusion->madAhrsSetSettings(ahrs, &settings);
 
 // open files
-#if defined(LOGON) || defined(LOGPREDICTIONS)
+#ifndef LOGON
   openFiles();
 #endif
 }
@@ -1364,20 +1364,32 @@ bool getIsTared() { return isTared; }
 /**
  * @brief initialized Halo, and passes Everest filtered values to HALO
  */
-std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
-                                               EverestTask* everest) {
+std::vector<float> EverestTask::EverestToHalo(EverestData everestData,
+                                              EverestTask* everest) {
   if (isAligned == 0) {
-    IMUData imu1 = {everestData.accelX1, everestData.accelY1,
-                    everestData.accelZ1, everestData.gyroX1,
-                    everestData.gyroY1,  everestData.gyroZ1,
-                    everestData.magX1,   everestData.magY1,
-                    everestData.magZ1,   everestData.timeIMU1};
+    IMUData imu1 = {everestData.timeIMU1,
+                    everestData.accelX1,
+                    everestData.accelY1,
+                    everestData.accelZ1,
+                    everestData.gyroX1,
+                    everestData.gyroY1,
+                    everestData.gyroZ1,
+                    everestData.magX1,
+                    everestData.magY1,
+                    everestData.magZ1,
+                    0.0f};
 
-    IMUData imu2 = {everestData.accelX2, everestData.accelY2,
-                    everestData.accelZ2, everestData.gyroX2,
-                    everestData.gyroY2,  everestData.gyroZ2,
-                    everestData.magX2,   everestData.magY2,
-                    everestData.magZ2,   everestData.timeIMU2};
+    IMUData imu2 = {everestData.timeIMU2,
+                    everestData.accelX2,
+                    everestData.accelY2,
+                    everestData.accelZ2,
+                    everestData.gyroX2,
+                    everestData.gyroY2,
+                    everestData.gyroZ2,
+                    everestData.magX2,
+                    everestData.magY2,
+                    everestData.magZ2,
+                    0.0f};
 
     isAligned = everest->findAlignment(imu1, imu2);
   }
@@ -1401,10 +1413,10 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
   double eVelocity = everest->getKinematics()->initialVelo;
   double eAccelerationZ = (everest->state.earthAcceleration - 1) * -9.81;
 
-  std::vector<double> haloData = {0, 0, 0};
+  std::vector<float> haloData = {0, 0, 0};
 
   if (isTared) {
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGMETRICS)
     fprintf(haloFile, "%f,%f,%f,%f,", everestData.timeIMU1, eAltitude,
             eVelocity, eAccelerationZ);
 #endif
@@ -1414,7 +1426,7 @@ std::vector<double> EverestTask::EverestToHalo(EverestData everestData,
                                eVelocity, eAltitude, everestData.altitudeGPS,
                                everestData.timeIMU1);
 
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGMETRICS)
     fprintf(haloFile, "%f,%f,%f\n", haloData[0], haloData[1], haloData[2]);
 #endif
   }
@@ -1479,7 +1491,7 @@ float roundToDecimalPlaces(double value, int decimalPlaces) {
   return std::round(value * scale) / scale;
 }
 
-std::vector<double> EverestTask::QueueEverest(EverestTask* everest) {
+std::vector<float> EverestTask::QueueEverest(EverestTask* everest) {
   // run timer loop, at constant HALORefreshRate
   // uncomment for launch (without max time)
   // while(everest->timeEverest < 180){
@@ -1494,7 +1506,7 @@ std::vector<double> EverestTask::QueueEverest(EverestTask* everest) {
         everest->availableMeasurements[1] == 1 &&
         everest->availableMeasurements[2] == 1 &&
         everest->availableMeasurements[3] == 1) {
-      std::vector<double> haloData =
+      std::vector<float> haloData =
           everest->EverestToHalo(everest->everestData, everest);
       // reset available measurements
       everest->availableMeasurements[0] = 0;
@@ -1522,7 +1534,7 @@ std::vector<double> EverestTask::QueueEverest(EverestTask* everest) {
         everest->everestData.pressure2 = 0;
       }
 
-      std::vector<double> haloData =
+      std::vector<float> haloData =
           everest->EverestToHalo(everest->everestData, everest);
 
       // reset available measurements
@@ -1622,7 +1634,7 @@ int main() {
     start = std::clock();
 
     // calls the entirety of the power of HALO, peak modularization
-    std::vector<double> haloData = everest.QueueEverest(&everest);
+    std::vector<float> haloData = everest.QueueEverest(&everest);
 
     clock_t endTime = std::clock();
 
@@ -1635,7 +1647,7 @@ int main() {
     }
   }
 
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGMETRICS)
   fclose(haloFile);
   fclose(everestFile);
 #endif

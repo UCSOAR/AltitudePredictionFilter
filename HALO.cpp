@@ -3,7 +3,7 @@
 #include "Data.cpp"
 #include <map>
 
-// #define LOGON
+#define LOGON
 #define LOGPREDICTIONS
 #define TIMERON
 
@@ -80,6 +80,7 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
   fprintf(file, "alt_std,velo_std,acc_std\n");
   fclose(file);
 #endif
+
   // Initial Guess
   this->X0 = X0;
   this->P = P0;
@@ -301,7 +302,7 @@ void HALO::stateUpdate() {
 
   endUpdateTime = std::chrono::high_resolution_clock::now();
 
-  this->updateTime += std::chrono::duration_cast<std::chrono::duration<double>>(
+  this->updateTime += std::chrono::duration_cast<std::chrono::duration<float>>(
       std::chrono::high_resolution_clock::now() - stateUpdateTime);
 
   predictTimer = std::chrono::high_resolution_clock::now();
@@ -312,9 +313,8 @@ void HALO::stateUpdate() {
 
 #ifdef TIMERON
 
-  this->predictTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          std::chrono::high_resolution_clock::now() - predictTimer);
+  this->predictTime += std::chrono::duration_cast<std::chrono::duration<float>>(
+      std::chrono::high_resolution_clock::now() - predictTimer);
 
 #endif
 }
@@ -337,7 +337,7 @@ void HALO::calculateSigmaPoints() {
 #ifdef TIMERON
 
   this->triangulationTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::duration_cast<std::chrono::duration<float>>(
           std::chrono::high_resolution_clock::now() - tTime);
 
 #endif
@@ -367,7 +367,7 @@ void HALO::calculateSigmaPoints() {
 
 #ifdef TIMERON
 
-  this->sPointTime += std::chrono::duration_cast<std::chrono::duration<double>>(
+  this->sPointTime += std::chrono::duration_cast<std::chrono::duration<float>>(
       std::chrono::high_resolution_clock::now() - startSPoint);
 
 #endif
@@ -449,7 +449,7 @@ void HALO::calculateSigmaPoints() {
 #ifdef TIMERON
 
     this->predictLoopTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - startPredictLoop);
 
 #endif
@@ -467,7 +467,7 @@ void HALO::calculateSigmaPoints() {
 #ifdef TIMERON
 
     this->dynamicModelTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - dynamicTime);
 
 #endif
@@ -487,7 +487,7 @@ void HALO::calculateSigmaPoints() {
 
 #ifdef TIMERON
     this->endPredictLoopTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - endPredictLoop);
 #endif
   }
@@ -541,9 +541,8 @@ void HALO::calculateSigmaPoints() {
 
 #ifdef TIMERON
 
-  this->preMeanTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          std::chrono::high_resolution_clock::now() - preMeanStart);
+  this->preMeanTime += std::chrono::duration_cast<std::chrono::duration<float>>(
+      std::chrono::high_resolution_clock::now() - preMeanStart);
 
 #endif
 
@@ -570,7 +569,7 @@ void HALO::calculateSigmaPoints() {
 #ifdef TIMERON
 
   this->projErrorTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::duration_cast<std::chrono::duration<float>>(
           std::chrono::high_resolution_clock::now() - projErrorStart);
 #endif
 
@@ -593,7 +592,7 @@ void HALO::calculateSigmaPoints() {
 #ifdef TIMERON
 
   this->PpredictionTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::duration_cast<std::chrono::duration<float>>(
           std::chrono::high_resolution_clock::now() - pPredictionStart);
 
 #endif
@@ -620,7 +619,7 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
   #ifdef TIMERON
 
     this->triangulationTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - tTime);
 
   #endif
@@ -653,7 +652,7 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
   #ifdef TIMERON
 
     this->sPointTime +=
-  std::chrono::duration_cast<std::chrono::duration<double>>(
+  std::chrono::duration_cast<std::chrono::duration<float>>(
         std::chrono::high_resolution_clock::now() - startSPoint);
 
   #endif
@@ -738,7 +737,7 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
     #ifdef TIMERON
 
         this->predictLoopTime +=
-            std::chrono::duration_cast<std::chrono::duration<double>>(
+            std::chrono::duration_cast<std::chrono::duration<float>>(
                 std::chrono::high_resolution_clock::now() - startPredictLoop);
 
     #endif
@@ -757,7 +756,7 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
     #ifdef TIMERON
 
         this->dynamicModelTime +=
-            std::chrono::duration_cast<std::chrono::duration<double>>(
+            std::chrono::duration_cast<std::chrono::duration<float>>(
                 std::chrono::high_resolution_clock::now() - dynamicTime);
 
     #endif
@@ -778,7 +777,7 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
 
     #ifdef TIMERON
         this->endPredictLoopTime +=
-            std::chrono::duration_cast<std::chrono::duration<double>>(
+            std::chrono::duration_cast<std::chrono::duration<float>>(
                 std::chrono::high_resolution_clock::now() - endPredictLoop);
     #endif
       */
@@ -839,7 +838,7 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
   #ifdef TIMERON
 
     this->preMeanTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - preMeanStart);
 
   #endif
@@ -869,7 +868,7 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
   #ifdef TIMERON
 
     this->projErrorTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - projErrorStart);
   #endif
   */
@@ -896,7 +895,7 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(VectorXf X_in,
   #ifdef TIMERON
 
     this->PpredictionTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - pPredictionStart);
 
   #endif
@@ -980,7 +979,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #ifdef TIMERON
 
     this->getListsTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - getListsStart);
 
 #endif
@@ -1002,7 +1001,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #ifdef TIMERON
 
     this->othersTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - othersTimeStart);
 
 #endif
@@ -1019,7 +1018,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #ifdef TIMERON
 
     this->KDTreeTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - KDTreeTimeStart);
 
 #endif
@@ -1038,7 +1037,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #ifdef TIMERON
 
     this->euclideanTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - euclideanStart);
 
 #endif
@@ -1058,7 +1057,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #ifdef TIMERON
 
     this->emplaceBackTime +=
-        std::chrono::duration_cast<std::chrono::duration<double>>(
+        std::chrono::duration_cast<std::chrono::duration<float>>(
             std::chrono::high_resolution_clock::now() - emplace_BackStart);
 
 #endif
@@ -1067,7 +1066,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #ifdef TIMERON
 
   this->loopScenariosTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::duration_cast<std::chrono::duration<float>>(
           std::chrono::high_resolution_clock::now() - loopScenariosStart);
 
 #endif
@@ -1100,7 +1099,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #ifdef TIMERON
 
   this->twoDistancesTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::duration_cast<std::chrono::duration<float>>(
           std::chrono::high_resolution_clock::now() - startTime);
 
 #endif
@@ -1168,9 +1167,8 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 
 #ifdef TIMERON
 
-  this->vectorsTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          std::chrono::high_resolution_clock::now() - startVectors);
+  this->vectorsTime += std::chrono::duration_cast<std::chrono::duration<float>>(
+      std::chrono::high_resolution_clock::now() - startVectors);
 
 #endif
 
@@ -1190,7 +1188,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #ifdef TIMERON
 
   this->push_backTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::duration_cast<std::chrono::duration<float>>(
           std::chrono::high_resolution_clock::now() - push_backStart);
 
 #endif
@@ -1335,7 +1333,7 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   }
 
   fprintf(gainsFile, "%f, %f, %f,", gainV1[0], gainV1[1], gainV1[2]);
-  fprintf(gainsFile, "%f, %f, %f", gainV2[0], gainV2[1], gainV2[2]);
+  fprintf(gainsFile, "%f, %f, %f\n", gainV2[0], gainV2[1], gainV2[2]);
 
   fclose(gainsFile);
 
@@ -1423,7 +1421,7 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 #ifdef TIMERON
 
   this->getScenarioTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::duration_cast<std::chrono::duration<float>>(
           std::chrono::high_resolution_clock::now() - getScenario);
 
 #endif
@@ -1441,9 +1439,8 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
     printf("X is nan, defaulting to static integration\n");
 
-    double finalVelocity = X(1) + X(0) * ((float)1.0 / REFRESH_RATE);
-    double altitude =
-        X(2) + (X(1) + finalVelocity) * (1.0 / REFRESH_RATE) / 2.0;
+    float finalVelocity = X(1) + X(0) * ((float)1.0 / REFRESH_RATE);
+    float altitude = X(2) + (X(1) + finalVelocity) * (1.0 / REFRESH_RATE) / 2.0;
 
     Xprediction(0) = altitude;
     Xprediction(1) = finalVelocity;
@@ -1464,13 +1461,14 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
   std::vector<std::vector<float>> nearestVectors =
       nearestVectorsWithIndex.second;
+
   int scenario1Index = nearestVectorsWithIndex.first[0];
   int scenario2Index = nearestVectorsWithIndex.first[1];
 
 #ifdef TIMERON
 
   this->nearestScenariosTime +=
-      std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::duration_cast<std::chrono::duration<float>>(
           std::chrono::high_resolution_clock::now() - nearestVectorsStart);
 
 #endif
@@ -1515,9 +1513,9 @@ void HALO::createScenarios(HALO* halo) {
   std::chrono::high_resolution_clock::time_point treeCreationEnd =
       std::chrono::high_resolution_clock::now();
 
-  std::chrono::duration<double> treeCreationTime =
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-          treeCreationEnd - treeCreation);
+  std::chrono::duration<float> treeCreationTime =
+      std::chrono::duration_cast<std::chrono::duration<float>>(treeCreationEnd -
+                                                               treeCreation);
 
   halo->treeCreationTime = treeCreationTime;
 
@@ -1578,11 +1576,11 @@ void HALO::initializeHALOWithQR(float initialAlt, HALO* halo, MatrixXf& Q,
   halo->init(X0, P0, Q, R0);
 }
 
-std::vector<double> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
-                                     double eAccelerationZ, double eVelocity,
-                                     double eAltitude, double gpsAltitude,
-                                     float time) {
-  std::vector<double> unitedStates = {0, 0, 0};
+std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
+                                    float eAccelerationZ, float eVelocity,
+                                    float eAltitude, float gpsAltitude,
+                                    float time) {
+  std::vector<float> unitedStates = {0, 0, 0};
 
   if (isInitialized) {
     haloPointer->setTime(time);

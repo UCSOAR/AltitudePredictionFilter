@@ -196,10 +196,10 @@ class EverestTask {
 
   bool getIsTared();
 
-  std::vector<double> EverestToHalo(EverestData everestData,
-                                    EverestTask* everest);
+  std::vector<float> EverestToHalo(EverestData everestData,
+                                   EverestTask* everest);
 
-  std::vector<double> QueueEverest(EverestTask* everest);
+  std::vector<float> QueueEverest(EverestTask* everest);
 
   std::vector<int> availableMeasurements = {0, 0, 0, 0, 0};
 

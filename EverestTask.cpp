@@ -275,7 +275,7 @@ void EverestTask::MadgwickSetup() {
   infusion->madAhrsSetSettings(ahrs, &settings);
 
 // open files
-#ifndef LOGON
+#if defined(LOGON) || defined(LOGMETRICS)
   openFiles();
 #endif
 }

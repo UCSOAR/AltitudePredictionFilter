@@ -966,6 +966,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #endif
 
   for (size_t s = 0; s < scenarios->size(); s++) {
+
 #ifdef TIMERON
 
     std::chrono::high_resolution_clock::time_point getListsStart =
@@ -1164,6 +1165,9 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
   float nextTimeStep2 = currentVector2[3] + deltaTime;
   std::vector<float> futureVector2 =
       scenario2->evaluateVectorAtTime(nextTimeStep2);
+
+
+
 
 #ifdef TIMERON
 
@@ -1590,8 +1594,13 @@ std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
     // X0 = {eAltitude, eVelocity, eAccelerationZ};
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
 
-    // predict 5 slices every 50 time slices.
-    if ((int)floor(time) % 50 == 0) haloPointer->predictNStates(100);
+    // predict 5 states every 50 time slices.
+    int t = (int)floor(time);
+
+    if (t % 50 == 0 && t != lastTriggerTime) {
+        haloPointer->predictNStates(100);
+        lastTriggerTime = t;
+    }
 
     // std::cout << "vector in 5 time slices: " <<
     // haloPointer->predictNStates(5) << std::endl;

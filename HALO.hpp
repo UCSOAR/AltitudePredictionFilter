@@ -341,6 +341,9 @@ class HALO {
 
   float timeStep = 1 / 3;
 
+  // last time that a prediction was made. done to prevent multiple triggers. 
+  int lastTriggerTime = -1;
+
   std::vector<float> prevGain1 = {0.5, 0.5, 0.5};
   std::vector<float> prevGain2 = {0.5, 0.5, 0.5};
 

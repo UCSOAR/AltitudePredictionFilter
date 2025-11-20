@@ -22,7 +22,7 @@
 #endif
 
 using namespace Eigen;
-#define LOGON
+// #define LOGON
 
 /**
  * @brief Measurement struct to store the time, altitude, velocity and

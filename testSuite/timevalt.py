@@ -2,8 +2,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 df = pd.read_csv("testSuite/results/HALO.txt")
+alt = pd.read_csv("testSuite/data/Altimeter(in)(in).csv")
 
 sims = pd.read_csv("testSuite/data/final_may_sims_formatted.csv")
+
+imu = pd.read_csv("testSuite/data/imu_baro.csv")
+imu = pd.read_csv("testSuite/data/imu_baro.csv")
 
 print(sims)
 sims["avg_alt_1"] = pd.to_numeric(sims["avg_alt_1"], errors="coerce")
@@ -27,6 +31,7 @@ plt.figure(figsize=(10, 6))
 # plt.plot(df['Time'], df['IMU_Alt'], label='IMU Alt')
 plt.plot(df["Time"], df["Everest_Alt"], label="Everest Alt")
 plt.plot(df["Time"], df["Halo_Alt"], label="HALO Alt")
+plt.plot(alt["time"], alt["altitude"], label="Altimeter Alt")
 # plt.plot(df['Time'], df['GPS_Alt'], label='GPS Alt')
 # plt.plot(df['Time'], df['Sigma_Alt_Upper'], label='Sigma Alt Upper', marker = "x")
 # plt.plot(df['Time'], df['Sigma_Alt_Lower'], label='Sigma Alt Lower', marker = "o")

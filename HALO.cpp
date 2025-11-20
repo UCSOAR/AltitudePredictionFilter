@@ -3,7 +3,7 @@
 #include "Data.cpp"
 #include <map>
 
-#define LOGON
+// #define LOGON
 #define LOGPREDICTIONS
 #define TIMERON
 
@@ -43,6 +43,13 @@ using namespace Eigen;
 
 #ifdef LOGON
 FILE* resetGainsFile;
+#endif
+
+#if defined(LOGON) || defined(LOGPREDICTIONS)
+static FILE* predictnalt =
+    fopen((directoryPath + "/predictnalt.txt").c_str(), "a+");
+static FILE* kalmangains =
+    fopen((directoryPath + "/kalmangains.txt").c_str(), "a+");
 #endif
 
 void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
@@ -177,6 +184,20 @@ void HALO::stateUpdate() {
   MatrixXf K(3, OBSERVATION_DIMENSIONS);
   K.setZero();
   K = Pxz * Pz.inverse();
+
+#if defined(LOGON) || defined(LOGPREDICTIONS)
+
+  if (!kalmangains) {
+    perror("Error opening kalmangains.txt");  // Prints actual OS error
+    fprintf(stderr, "Errno: %d\n", errno);
+    exit(1);
+  }
+  for (int rows = 0; rows < 3; rows++) {
+    fprintf(kalmangains, "%f,%f,%f,%f,%f\n", time, K(rows, 0), K(rows, 1),
+            K(rows, 2), K(rows, 3));
+  }
+
+#endif
 
   bool kZero = false;
 
@@ -914,14 +935,12 @@ VectorXf HALO::predictNStates(int n) {
 
 #if defined(LOGON) || defined(LOGPREDICTIONS)
 
-  std::string filePath = directoryPath + "/predictnalt.txt";
-  FILE* file = fopen((filePath).c_str(), "a+");
-  if (!file) {
+  if (!predictnalt) {
     fprintf(stderr, "Error opening predictnalt.txt...exiting\n");
     exit(1);
   }
 
-  fprintf(file, "%f,%f\n", this->time + n * timeStep,
+  fprintf(predictnalt, "%f,%f\n", this->time + n * timeStep,
           std::get<0>(calculation)(0));
 
 #endif

@@ -16,7 +16,7 @@
 
 #include "gpsData.cpp"
 
-#define LOGON
+// #define LOGON
 #define LOGMETRICS
 
 #define TIMERON
@@ -61,14 +61,16 @@ int openFiles() {
                                         "sigmaPoints4.txt",
                                         "sigmaPoints5.txt",
                                         "sigmaPoints6.txt",
-                                        "predictnalt.txt"};
+                                        "predictnalt.txt",
+                                        "kalmangains.txt"};
 
   // Deleting files
   for (size_t i = 0; i < fileNames.size(); ++i) {
     std::string filePath = directoryPath + "/" + fileNames[i];
     if (std::remove(filePath.c_str()) == 0) {
     } else {
-      std::perror("Error deleting file");
+      std::string msg = "Error deleting " + fileNames[i];
+      std::perror(msg.c_str());
     }
   }
 
@@ -93,7 +95,8 @@ int openFiles() {
                      "SecondScenario\n"),
       std::make_pair("nearestScenariosFormatted.txt",
                      "Header_formatted_scenarios\n"),
-      std::make_pair("predictnalt.txt", "time,predicted_alt\n")};
+      std::make_pair("predictnalt.txt", "time,predicted_alt\n"),
+      std::make_pair("kalmangains.txt", "time,alt,velo,acc,gps_alt\n")};
 
   for (size_t i = 0; i < filesToCreate.size(); ++i) {
     std::string filePath = directoryPath + "/" + filesToCreate[i].first;
@@ -112,14 +115,14 @@ int openFiles() {
   std::string filePath = directoryPath + "/HALO.txt";
   if (std::remove(filePath.c_str()) == 0) {
   } else {
-    std::perror("Error deleting file");
+    std::perror("Error deleting HALO.txt");
   }
 
   // deleting infusion.txt
   filePath = directoryPath + "/infusion.txt";
   if (std::remove(filePath.c_str()) == 0) {
   } else {
-    std::perror("Error deleting file");
+    std::perror("Error deleting infusion.txt");
   }
 
   haloFile = fopen((directoryPath + "/HALO.txt").c_str(),
@@ -151,7 +154,7 @@ int openFiles() {
   filePath = directoryPath + "/confidence.txt";
   if (std::remove(filePath.c_str()) == 0) {
   } else {
-    std::perror("Error deleting file");
+    std::perror("Error deleting confidence.txt");
   }
 
   // creating confidence.txt
@@ -679,6 +682,7 @@ double EverestTask::deriveForAltitudeIMU(IMUData avgIMU) {
 
   // Derive altitude from IMU
   double finalVelocity = initialVelocity + accelerationZ * deltaTime;
+
   double altitude =
       initialAltitude + (initialVelocity + finalVelocity) * deltaTime / 2.0;
 

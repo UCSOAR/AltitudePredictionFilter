@@ -4,7 +4,7 @@
 #include <map>
 
 // #define LOGON
-#define LOGPREDICTIONS
+#define LOGMETRICS
 #define TIMERON
 
 // home
@@ -45,11 +45,9 @@ using namespace Eigen;
 FILE* resetGainsFile;
 #endif
 
-#if defined(LOGON) || defined(LOGPREDICTIONS)
-static FILE* predictnalt =
-    fopen((directoryPath + "/predictnalt.txt").c_str(), "a+");
-static FILE* kalmangains =
-    fopen((directoryPath + "/kalmangains.txt").c_str(), "a+");
+#if defined(LOGON) || defined(LOGMETRICS)
+static FILE* predictnalt = NULL;
+static FILE* kalmangains = NULL;
 #endif
 
 void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
@@ -185,10 +183,14 @@ void HALO::stateUpdate() {
   K.setZero();
   K = Pxz * Pz.inverse();
 
-#if defined(LOGON) || defined(LOGPREDICTIONS)
+#if defined(LOGON) || defined(LOGMETRICS)
+
+  if (kalmangains == NULL) {
+    kalmangains = fopen((directoryPath + "/kalmangains.txt").c_str(), "a+");
+  }
 
   if (!kalmangains) {
-    perror("Error opening kalmangains.txt");  // Prints actual OS error
+    perror("Error opening kalmangains.txt");
     fprintf(stderr, "Errno: %d\n", errno);
     exit(1);
   }
@@ -933,7 +935,11 @@ VectorXf HALO::predictNStates(int n) {
                                            std::get<1>(calculation));
   }
 
-#if defined(LOGON) || defined(LOGPREDICTIONS)
+#if defined(LOGON) || defined(LOGMETRICS)
+
+  if (predictnalt == NULL) {
+    predictnalt = fopen((directoryPath + "/predictnalt.txt").c_str(), "a+");
+  }
 
   if (!predictnalt) {
     fprintf(stderr, "Error opening predictnalt.txt...exiting\n");
@@ -1609,16 +1615,13 @@ std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
     // X0 = {eAltitude, eVelocity, eAccelerationZ};
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
 
-    // predict 5 states every 50 time slices.
+    // predict 100 slices every 5 time slices.
     int t = (int)floor(time);
 
-    if (t % 50 == 0 && t != lastTriggerTime) {
+    if (t % 5 == 0 && t != lastTriggerTime) {
       haloPointer->predictNStates(100);
       lastTriggerTime = t;
     }
-
-    // std::cout << "vector in 5 time slices: " <<
-    // haloPointer->predictNStates(5) << std::endl;
   }
 
   if (counter == 525) {
@@ -1671,6 +1674,11 @@ std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
     std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t"
               << (haloPointer->treeCreationTime).count() << std::endl;
 
+#endif
+
+#ifdef LOGMETRICS
+    fclose(predictnalt);
+    fclose(kalmangains);
 #endif
   }
 

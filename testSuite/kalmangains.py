@@ -2,10 +2,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 df = pd.read_csv("testSuite/results/kalmangains.txt")
+print(df.dtypes)
+print(df.head())
+
+df = df.apply(pd.to_numeric, errors="coerce")
 
 df = df.groupby("time").mean().reset_index()
-print(df)
-
 
 plt.figure(figsize=(10, 6))
 plt.plot(

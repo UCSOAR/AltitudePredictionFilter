@@ -32,7 +32,7 @@ plt.plot(
     label="HALO vs Altimeter",
 )
 plt.xlabel("Time")
-plt.ylabel("Altitude")
+plt.ylabel("Speed")
 plt.title("Altimeter Speed vs Halo Velocity (absolute) absolute difference")
 plt.legend()
 plt.grid(True)
@@ -45,7 +45,7 @@ plt.plot(
     label="HALO vs Altimeter",
 )
 plt.xlabel("Time")
-plt.ylabel("Altitude")
+plt.ylabel("Acceleration")
 plt.title("Altimeter Acceleration vs Halo acceleration absolute difference")
 plt.legend()
 plt.grid(True)

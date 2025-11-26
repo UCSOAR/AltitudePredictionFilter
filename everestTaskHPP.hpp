@@ -150,7 +150,7 @@ class EverestTask {
 
   void Baro_Update(const BarosData& baro1, const BarosData& baro2);
 
-  double dynamite();
+  float dynamite();
 
   kinematics Kinematics;
 
@@ -160,19 +160,19 @@ class EverestTask {
 
   altitudeList AltitudeList;
 
-  void recalculateGain(double estimate);
+  void recalculateGain(float estimate);
 
-  double deriveChangeInVelocityToGetAltitude(double estimate);
+  float deriveChangeInVelocityToGetAltitude(float estimate);
 
   void MadgwickWrapper(IMUData data);
 
-  double ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
-                        BarosData baro2);
+  float ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
+                       BarosData baro2);
 
-  double deriveForAltitudeIMU(IMUData avgIMU);
+  float deriveForAltitudeIMU(IMUData avgIMU);
 
-  double AlignedExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
-                               BarosData baro2, MadAxesAlignment alignment);
+  float AlignedExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
+                              BarosData baro2, MadAxesAlignment alignment);
 
   void tare(IMUData& imu1, IMUData& imu2, BarosData baro1, BarosData baro2);
 
@@ -182,17 +182,17 @@ class EverestTask {
 
   void calculateSTDCoefficients();
 
-  double TaskWrapper(EverestData everestData, MadAxesAlignment alignment,
-                     MadAxesAlignment alignment2);
+  float TaskWrapper(EverestData everestData, MadAxesAlignment alignment,
+                    MadAxesAlignment alignment2);
 
-  double finalWrapper(float accelX1, float accelY1, float accelZ1, float gyroX1,
-                      float gyroY1, float gyroZ1, float accelX2, float magX1,
-                      float magY1, float magZ1, float accelY2, float accelZ2,
-                      float gyroX2, float gyroY2, float gyroZ2, float magX2,
-                      float magY2, float magZ2, float pressure1,
-                      float pressure2, float timeIMU1, float timeIMU2,
-                      float timeBaro1, float timeBaro2,
-                      MadAxesAlignment alignment, MadAxesAlignment alignment2);
+  float finalWrapper(float accelX1, float accelY1, float accelZ1, float gyroX1,
+                     float gyroY1, float gyroZ1, float accelX2, float magX1,
+                     float magY1, float magZ1, float accelY2, float accelZ2,
+                     float gyroX2, float gyroY2, float gyroZ2, float magX2,
+                     float magY2, float magZ2, float pressure1, float pressure2,
+                     float timeIMU1, float timeIMU2, float timeBaro1,
+                     float timeBaro2, MadAxesAlignment alignment,
+                     MadAxesAlignment alignment2);
 
   bool getIsTared();
 
@@ -225,10 +225,10 @@ class EverestTask {
  protected:
   IMUData internalIMU_1, internalIMU_2;
 
-  std::vector<double> zeroOffsetAccel = {0, 0, 0};
-  std::vector<double> zeroOffsetAccel2 = {0, 0, 0};
-  std::vector<double> zeroOffsetGyro = {0, 0, 0};
-  std::vector<double> zeroOffsetGyro2 = {0, 0, 0};
+  std::vector<float> zeroOffsetAccel = {0, 0, 0};
+  std::vector<float> zeroOffsetAccel2 = {0, 0, 0};
+  std::vector<float> zeroOffsetGyro = {0, 0, 0};
+  std::vector<float> zeroOffsetGyro2 = {0, 0, 0};
 
  private:
 };

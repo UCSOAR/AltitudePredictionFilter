@@ -88,6 +88,7 @@ int openFiles() {
       std::make_pair(
           "gains.txt",
           "sigmaPoint1->gain_v1[0],[1],[2],s1->gain_vector2[0],[1],[2]...\n"),
+      std::make_pair("log.txt", ""),
       std::make_pair("sigmaPoints.txt", "alt,velo,acc\n"),
       std::make_pair("sigmaPoints1.txt", "alt,velo,acc\n"),
       std::make_pair("sigmaPoints2.txt", "alt,velo,acc\n"),
@@ -100,7 +101,9 @@ int openFiles() {
                      "SecondScenario\n"),
       std::make_pair("nearestScenariosFormatted.txt",
                      "Header_formatted_scenarios\n"),
-      std::make_pair("predictnalt.txt", "time,predicted_alt\n"),
+      std::make_pair(
+          "predictnalt.txt",
+          "time,predicted_alt,predicted_vel,predicted_acc,prediction\n"),
       std::make_pair("kalmangains.txt", "time,alt,velo,acc,gps_alt\n"),
       std::make_pair("everestgains.txt",
                      "time,gain_IMU,gain_Baro1,gain_Baro2,gainedEstimate\n")};

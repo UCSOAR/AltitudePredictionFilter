@@ -48,6 +48,9 @@ FILE* resetGainsFile;
 #if defined(LOGON) || defined(LOGMETRICS)
 static FILE* predictnalt = NULL;
 static FILE* kalmangains = NULL;
+
+// how many predictions have been made.
+int predictionCounter = 0;
 #endif
 
 void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
@@ -628,8 +631,10 @@ void HALO::calculateSigmaPoints() {
  * variables.
  *
  */
-std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(const VectorXf& X_in,
-                                                        const MatrixXf& P_in) {
+std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
+    const VectorXf& X_in, const MatrixXf& P_in, int firstTimeForPoint,
+    std::vector<float>& prevGain1, std::vector<float>& prevGain2,
+    std::vector<std::vector<int>>& scenariosGainsList, int& counterSigmaPoint) {
   float multiplier = 3.0f;
 
   MatrixXf L(((multiplier)*P_in).llt().matrixL());
@@ -645,26 +650,29 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(const VectorXf& X_in,
     sigmaPoints.col(j) = X_in - L.col(j - N1 - 1);
   }
 
-  MatrixXf propagatedSigma = sigmaPoints;
-
   for (int i = 0; i < (2 * N1) + 1; i++) {
-    VectorXf column = propagatedSigma.col(i);
-    propagatedSigma.col(i) = dynamicModel(column);
+    VectorXf column = sigmaPoints.col(i);
+    firstTimeForPoint = firstTime[i];
+    prevGain1 = this->listOfGainsSigmaPoints[i].first;
+    prevGain2 = this->listOfGainsSigmaPoints[i].second;
+
+    sigmaPoints.col(i) =
+        dynamicModelOnce(column, firstTimeForPoint, prevGain1, prevGain2,
+                         scenariosGainsList, counterSigmaPoint);
   }
 
   VectorXf Xprediction(3);
   for (int row = 0; row < N1; row++) {
     float sum = 0.0f;
     for (int col = 0; col < 2 * N1 + 1; col++) {
-      sum += propagatedSigma(row, col) * WeightsForSigmaPoints(col);
+      sum += sigmaPoints(row, col) * WeightsForSigmaPoints(col);
     }
     Xprediction(row) = sum;
   }
 
   MatrixXf projError(3, 7);
   for (int i = 0; i < N1; i++) {
-    projError.row(i) =
-        (propagatedSigma.row(i).array() - Xprediction(i)).matrix();
+    projError.row(i) = (sigmaPoints.row(i).array() - Xprediction(i)).matrix();
   }
 
   MatrixXf Pprediction =
@@ -675,28 +683,48 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(const VectorXf& X_in,
 }
 
 VectorXf HALO::predictNStates(int n) {
-  std::tuple<VectorXf, MatrixXf> calculation =
-      this->calculateSigmaOnce(this->X0, this->P);
-  for (int i = 0; i < n; i++) {
-    calculation = this->calculateSigmaOnce(std::get<0>(calculation),
-                                           std::get<1>(calculation));
-  }
+  // values to be referenced
+  int firstTimeForPoint = 1;
+  std::vector<float> prevGain1_storage = {0.5, 0.5, 0.5};
+  std::vector<float> prevGain2_storage = {0.5, 0.5, 0.5};
+  std::vector<std::vector<int>> scenariosGainsList_storage = {
+      {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
+  int counterSigmaPoint_storage = 0;
+
+  // references
+  std::vector<float>& prevGain1 = prevGain1_storage;
+  std::vector<float>& prevGain2 = prevGain2_storage;
+  std::vector<std::vector<int>>& scenariosGainsList =
+      scenariosGainsList_storage;
+  int& counterSigmaPoint = counterSigmaPoint_storage;
+
+  std::tuple<VectorXf, MatrixXf> calculation = this->calculateSigmaOnce(
+      this->X0, this->P, firstTimeForPoint, prevGain1, prevGain2,
+      scenariosGainsList, counterSigmaPoint);
 
 #if defined(LOGON) || defined(LOGMETRICS)
+  predictionCounter++;
 
-  if (predictnalt == NULL) {
+  if (predictnalt == nullptr) {
     predictnalt = fopen((directoryPath + "/predictnalt.txt").c_str(), "a+");
+    if (!predictnalt) {
+      fprintf(stderr, "Error opening predictnalt.txt...exiting\n");
+      exit(1);
+    }
   }
-
-  if (!predictnalt) {
-    fprintf(stderr, "Error opening predictnalt.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(predictnalt, "%f,%f\n", this->time + n * timeStep,
-          std::get<0>(calculation)(0));
-
 #endif
+
+  for (int i = 0; i < n; i++) {
+    calculation = this->calculateSigmaOnce(
+        std::get<0>(calculation), std::get<1>(calculation), firstTimeForPoint,
+        prevGain1, prevGain2, scenariosGainsList, counterSigmaPoint);
+
+#if defined(LOGON) || defined(LOGMETRICS)
+    VectorXf Xpred = std::get<0>(calculation);
+    fprintf(predictnalt, "%f,%f,%f,%f,%d\n", this->time + (float)i * timeStep,
+            Xpred(0), Xpred(1), Xpred(2), predictionCounter);
+#endif
+  }
 
   return std::get<0>(calculation);
 }
@@ -738,7 +766,6 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #endif
 
   for (size_t s = 0; s < scenarios->size(); s++) {
-
 #ifdef TIMERON
 
     std::chrono::high_resolution_clock::time_point getListsStart =
@@ -787,6 +814,10 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #endif
 
     vect = (scenarios->at(s)).nearestKDTree(measurementVec);
+
+    /*std::cout << "Time: " << this->time << " {";
+    for (auto& f : vect.first) std::cout << f << " ";
+    std::cout << "}, " << vect.second << "\n";*/
 
 #ifdef TIMERON
 
@@ -938,9 +969,6 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
   std::vector<float> futureVector2 =
       scenario2->evaluateVectorAtTime(nextTimeStep2);
 
-
-
-
 #ifdef TIMERON
 
   this->vectorsTime += std::chrono::duration_cast<std::chrono::duration<float>>(
@@ -1084,6 +1112,7 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   }
 
   if (this->firstTimeForPoint == 1) {
+#ifdef LOGON
     FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
     if (!file) {
       fprintf(stderr, "Error opening log.txt...exiting\n");
@@ -1094,6 +1123,7 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
             X_in(2));
 
     fclose(file);
+#endif
 
     this->prevGain1 = gainV1;
     this->prevGain2 = gainV2;
@@ -1117,7 +1147,7 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
 
   // check if scenario indices are the same
   // if not reset the gains
-  if (this->scenariosGainsList[this->counterSigmaPoint][0] != scenario1Index |
+  if (this->scenariosGainsList[this->counterSigmaPoint][0] != scenario1Index ||
       this->scenariosGainsList[this->counterSigmaPoint][1] != scenario2Index) {
     this->prevGain1 = {0.5, 0.5, 0.5};
     this->prevGain2 = {0.5, 0.5, 0.5};
@@ -1161,6 +1191,128 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   return X_pred;
 }
 
+/**
+ * @brief Predicts the next values based on the interpolated scenarios
+ */
+VectorXf HALO::predictNextValuesOnce(
+    std::vector<std::vector<float>>& vectors, VectorXf& X_in,
+    int firstTimeForPoint, int scenario1Index, int scenario2Index,
+    std::vector<float>& prevGain1, std::vector<float>& prevGain2,
+    std::vector<std::vector<int>>& scenariosGainsList, int& counterSigmaPoint) {
+  std::vector<float> gainV1 = {0, 0, 0};
+  std::vector<float> gainV2 = {0, 0, 0};
+  std::vector<float> vector1 = vectors[0];
+  std::vector<float> vector1Future = vectors[1];
+
+  std::vector<float> vector2 = vectors[2];
+  std::vector<float> vector2Future = vectors[3];
+  bool both = false;
+  bool vector1Further = false;
+
+  for (int i = 0; i < 3; i++) {
+    float distance = std::abs(vector1[i] - vector2[i]);
+
+    if (distance < 1) {
+      // similar so defaulting
+      gainV1[i] = 0.5;
+      gainV2[i] = 0.5;
+    } else {
+      if (vector1[i] > X_in(i)) {
+        // below vector1
+        if (vector2[i] > X_in(i)) {
+          // point below both lines
+          both = true;
+          if (vector1[i] > vector2[i]) {
+            // vector1 on top
+            vector1Further = true;
+          } else {
+            vector1Further = false;
+          }
+        }
+      } else {
+        if (vector2[i] > X_in(i)) {
+          // point between lines
+        } else {
+          // point above both lines
+          if (vector1[i] < vector2[i]) {
+            vector1Further = true;
+          } else {
+            vector1Further = false;
+          }
+          both = true;
+        }
+      }
+
+      // point below both lines
+      // -----------------------------------------------------------
+      if (both) {
+        float longestDistance = 0;
+        float distance1 = 0;
+
+        if (vector1Further) {
+          longestDistance = std::abs(vector1[i] - X_in(i));
+          distance1 = std::abs(vector2[i] - X_in(i));
+        } else {
+          longestDistance = std::abs(vector2[i] - X_in(i));
+          distance1 = std::abs(vector1[i] - X_in(i));
+        }
+
+        float relativeFactor = longestDistance / distance1;
+
+        if (!vector1Further) {
+          gainV1[i] = relativeFactor / (relativeFactor + 1);
+        } else {
+          gainV1[i] = 1 - (relativeFactor / (relativeFactor + 1));
+        }
+
+        gainV2[i] = 1 - gainV1[i];
+      } else {
+        // point between lines
+        // ------------------------------------------------------------
+        gainV1[i] =
+            1 - (std::abs(vector1[i] - X_in(i)) /
+                 distance);  // get distance between vector1 and current state
+        gainV2[i] = 1 - gainV1[i];
+        //--------------------------------------------------------------------------------
+      }
+    }
+  }
+
+  if (firstTimeForPoint == 1) {
+    prevGain1 = gainV1;
+    prevGain2 = gainV2;
+    firstTimeForPoint = 0;
+  }
+
+  /*
+  if (scenariosGainsList[counterSigmaPoint][0] != scenario1Index ||
+      scenariosGainsList[counterSigmaPoint][1] != scenario2Index) {
+    prevGain1 = {0.5, 0.5, 0.5};
+    prevGain2 = {0.5, 0.5, 0.5};
+  }*/
+
+  float predicted_interpolated_alt =
+      prevGain1[0] * vector1Future[0] + prevGain2[0] * vector2Future[0];
+  float predicted_interpolated_velo =
+      prevGain1[1] * vector1Future[1] + prevGain2[1] * vector2Future[1];
+  float predicted_interpolated_acc =
+      prevGain1[2] * vector1Future[2] + prevGain2[2] * vector2Future[2];
+
+  scenariosGainsList[counterSigmaPoint] = {scenario1Index, scenario2Index};
+
+  prevGain1 = gainV1;
+  prevGain2 = gainV2;
+
+  VectorXf X_pred(3, 1);
+  X_pred << predicted_interpolated_alt, predicted_interpolated_velo,
+      predicted_interpolated_acc;
+
+  counterSigmaPoint = counterSigmaPoint + 1;
+  // reset counter
+  counterSigmaPoint = counterSigmaPoint % 6;
+
+  return X_pred;
+}
 /**
  * @brief Take the filtered values from Everest filter
  */
@@ -1251,6 +1403,56 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
   Xprediction =
       predictNextValues(nearestVectors, X, scenario1Index, scenario2Index);
+
+  return Xprediction;
+}
+
+// prediction step based on the dynamic model
+VectorXf HALO::dynamicModelOnce(
+    VectorXf& X, int firstTimeForPoint, std::vector<float>& prevGain1,
+    std::vector<float>& prevGain2,
+    std::vector<std::vector<int>>& scenariosGainsList, int& counterSigmaPoint) {
+  VectorXf Xprediction(3, 1);
+
+  // for every scenario get lists and find nearest 2 vectors to the current
+  // state
+  std::vector<Scenario>* scenarios = this->getScenarios();
+
+  // check if X is nan, if so default to static integration
+  if (std::isnan(X(0)) || std::isnan(X(1)) || std::isnan(X(2))) {
+    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
+    if (!file) {
+      fprintf(stderr, "Error opening log.txt...exiting\n");
+      exit(1);
+    }
+    fprintf(file, "At %f X is nan, defaulting to static integration\n",
+            this->time);
+    fclose(file);
+
+    printf("X is nan, defaulting to static integration\n");
+
+    float finalVelocity = X(1) + X(0) * ((float)1.0 / REFRESH_RATE);
+    float altitude = X(2) + (X(1) + finalVelocity) * (1.0 / REFRESH_RATE) / 2.0;
+
+    Xprediction(0) = altitude;
+    Xprediction(1) = finalVelocity;
+    Xprediction(2) = X(0);
+
+    return Xprediction;
+  }
+
+  std::pair<std::vector<int>, std::vector<std::vector<float>>>
+      nearestVectorsWithIndex = this->findNearestScenarios(scenarios, X);
+
+  std::vector<std::vector<float>> nearestVectors =
+      nearestVectorsWithIndex.second;
+
+  int scenario1Index = nearestVectorsWithIndex.first[0];
+  int scenario2Index = nearestVectorsWithIndex.first[1];
+
+  Xprediction = predictNextValuesOnce(
+      nearestVectors, X, scenario1Index, scenario2Index, firstTimeForPoint,
+      prevGain1, prevGain2, scenariosGainsList, counterSigmaPoint);
 
   return Xprediction;
 }

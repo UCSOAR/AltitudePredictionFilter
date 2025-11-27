@@ -189,6 +189,7 @@ struct kinematicsHalo {
   float altitudeStore;
 };
 
+
 class HALO {
  public:
   void init(VectorXf &X0, MatrixXf &P0, MatrixXf Q_input, MatrixXf &R0);
@@ -213,6 +214,12 @@ class HALO {
                              VectorXf &X_in, int scenario1Index,
                              int scenario2Index);
 
+  VectorXf predictNextValuesOnce(std::vector<std::vector<float>>& vectors,
+      VectorXf& X_in, int scenario1Index,
+      int scenario2Index, int firstTimeForPoint, 
+      std::vector<float>& prevGain1, std::vector<float>& prevGain2, 
+      std::vector<std::vector<int>>& scenariosGainsList, int& counterSigmaPoint);
+
   void setStateVector(float filteredAcc, float filteredVelo, float filteredAlt,
                       float gpsAlt);
 
@@ -224,8 +231,15 @@ class HALO {
 
   // calculate sigma points and run predict loop a single time. Should not
   // mutate any class variables.
-  std::tuple<VectorXf, MatrixXf> calculateSigmaOnce(const VectorXf &X_in,
-                                                    const MatrixXf &P_in);
+  std::tuple<VectorXf, MatrixXf> calculateSigmaOnce(
+      const VectorXf& X_in,
+      const MatrixXf& P_in,
+      int firstTimeForPoint,
+      std::vector<float>& prevGain1,
+      std::vector<float>& prevGain2,
+      std::vector<std::vector<int>>& scenariosGainsList,
+      int& counterSigmaPoint
+  );
 
   // loop through calculateSigmaOnce n times.
   VectorXf predictNStates(int n);
@@ -248,6 +262,12 @@ class HALO {
   VectorXf Z;  // measurement vector
 
   VectorXf dynamicModel(VectorXf &X);
+
+  VectorXf dynamicModelOnce(VectorXf& X, int firstTimeForPoint,
+    std::vector<float>& prevGain1,
+    std::vector<float>& prevGain2,
+    std::vector<std::vector<int>>& scenariosGainsList,
+    int& counterSigmaPoint);
 
   void setScenarios(std::vector<Scenario> &scenarios) {
     this->scenarios = scenarios;
@@ -339,7 +359,7 @@ class HALO {
   VectorXf X_in;
   VectorXf X_pred;
 
-  float timeStep = 1 / 3;
+  float timeStep = 1.0f / 3.0f;
 
   // last time that a prediction was made. done to prevent multiple triggers. 
   int lastTriggerTime = -1;

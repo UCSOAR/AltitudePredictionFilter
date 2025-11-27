@@ -9,7 +9,6 @@ sims = pd.read_csv("testSuite/data/final_may_sims_formatted.csv")
 imu = pd.read_csv("testSuite/data/imu_baro.csv")
 imu = pd.read_csv("testSuite/data/imu_baro.csv")
 
-print(sims)
 sims["avg_alt_1"] = pd.to_numeric(sims["avg_alt_1"], errors="coerce")
 sims["avg_velo_1"] = pd.to_numeric(sims["avg_velo_1"], errors="coerce")
 sims["avg_acc_1"] = pd.to_numeric(sims["avg_acc_1"], errors="coerce")
@@ -20,8 +19,6 @@ sims["avg_velo_2"] = pd.to_numeric(sims["avg_velo_2"], errors="coerce")
 sims["avg_acc_2"] = pd.to_numeric(sims["avg_acc_2"], errors="coerce")
 sims["avg_time_2"] = pd.to_numeric(sims["avg_time_2"], errors="coerce")
 sims = sims.dropna()
-
-print(sims)
 
 
 # plot altitude (altimeter, baro, imu, everest, halo, gps, sigmaPoints, scenarios)

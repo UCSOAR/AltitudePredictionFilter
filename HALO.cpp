@@ -4,7 +4,7 @@
 #include <map>
 
 // #define LOGON
-// #define LOGMETRICS
+#define LOGMETRICS
 #define TIMERON
 
 // home
@@ -632,7 +632,10 @@ void HALO::calculateSigmaPoints() {
  *
  */
 std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
-    const VectorXf& X_in, const MatrixXf& P_in, int firstTimeForPoint,
+    const VectorXf& X_in, const MatrixXf& P_in, std::vector<int>& firstTime,
+    int& firstTimeForPoint,
+    std::vector<std::pair<std::vector<float>, std::vector<float>>>&
+        listOfGainsSigmaPoints,
     std::vector<float>& prevGain1, std::vector<float>& prevGain2,
     std::vector<std::vector<int>>& scenariosGainsList, int& counterSigmaPoint) {
   std::chrono::high_resolution_clock::time_point tTime;
@@ -689,8 +692,8 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
 
     VectorXf column = sigmaPoints.col(i);
     firstTimeForPoint = firstTime[i];
-    prevGain1 = this->listOfGainsSigmaPoints[i].first;
-    prevGain2 = this->listOfGainsSigmaPoints[i].second;
+    prevGain1 = listOfGainsSigmaPoints[i].first;
+    prevGain2 = listOfGainsSigmaPoints[i].second;
 
     sigmaPoints.col(i) =
         dynamicModelOnce(column, firstTimeForPoint, prevGain1, prevGain2,
@@ -711,6 +714,10 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
     dynamicTime = std::chrono::high_resolution_clock::now();
 
 #endif
+
+    listOfGainsSigmaPoints[i] = {prevGain1, prevGain2};
+
+    firstTime[i] = firstTimeForPoint;
 
     sigmaPoints.col(i) = dynamicModel(column);
 
@@ -802,27 +809,34 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
 
 VectorXf HALO::predictNStates(int n) {
   // values to be referenced
-  int firstTimeForPoint = 1;
+  int firstTimeForPoint_storage = 1;
+  std::vector<int> firstTime_storage = {1, 1, 1, 1, 1, 1, 1};
   std::vector<float> prevGain1_storage = {0.5, 0.5, 0.5};
   std::vector<float> prevGain2_storage = {0.5, 0.5, 0.5};
   std::vector<std::vector<int>> scenariosGainsList_storage = {
       {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
+  std::vector<std::pair<std::vector<float>, std::vector<float>>>
+      listOfGainsSigmaPoints_storage = {{{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                        {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                        {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                        {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                        {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                        {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}},
+                                        {{0.5, 0.5, 0.5}, {0.5, 0.5, 0.5}}};
   int counterSigmaPoint_storage = 0;
 
   // references
+  int& firstTimeForPoint = firstTimeForPoint_storage;
+  std::vector<int>& firstTime = firstTime_storage;
   std::vector<float>& prevGain1 = prevGain1_storage;
   std::vector<float>& prevGain2 = prevGain2_storage;
   std::vector<std::vector<int>>& scenariosGainsList =
       scenariosGainsList_storage;
+  std::vector<std::pair<std::vector<float>, std::vector<float>>>&
+      listOfGainsSigmaPoints = listOfGainsSigmaPoints_storage;
   int& counterSigmaPoint = counterSigmaPoint_storage;
 
-  std::tuple<VectorXf, MatrixXf> calculation = this->calculateSigmaOnce(
-      this->X0, this->P, firstTimeForPoint, prevGain1, prevGain2,
-      scenariosGainsList, counterSigmaPoint);
-
 #if defined(LOGON) || defined(LOGMETRICS)
-  predictionCounter++;
-
   if (predictnalt == nullptr) {
     predictnalt = fopen((directoryPath + "/predictnalt.txt").c_str(), "a+");
     if (!predictnalt) {
@@ -832,10 +846,24 @@ VectorXf HALO::predictNStates(int n) {
   }
 #endif
 
-  for (int i = 0; i < n; i++) {
+  predictionCounter++;
+
+  // prediction at time step 0. Uses state vector and current covariance matrix.
+  std::tuple<VectorXf, MatrixXf> calculation = this->calculateSigmaOnce(
+      this->X0, this->P, firstTime, firstTimeForPoint, listOfGainsSigmaPoints,
+      prevGain1, prevGain2, scenariosGainsList, counterSigmaPoint);
+
+#if defined(LOGON) || defined(LOGMETRICS)
+  VectorXf Xpred = std::get<0>(calculation);
+  fprintf(predictnalt, "%f,%f,%f,%f,%d\n", this->time, Xpred(0), Xpred(1),
+          Xpred(2), predictionCounter);
+#endif
+
+  for (int i = 1; i < n; i++) {
     calculation = this->calculateSigmaOnce(
-        std::get<0>(calculation), std::get<1>(calculation), firstTimeForPoint,
-        prevGain1, prevGain2, scenariosGainsList, counterSigmaPoint);
+        std::get<0>(calculation), std::get<1>(calculation), firstTime,
+        firstTimeForPoint, listOfGainsSigmaPoints, prevGain1, prevGain2,
+        scenariosGainsList, counterSigmaPoint);
 
 #if defined(LOGON) || defined(LOGMETRICS)
     VectorXf Xpred = std::get<0>(calculation);

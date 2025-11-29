@@ -17,7 +17,7 @@
 #include "gpsData.cpp"
 
 // #define LOGON
-#define LOGMETRICS
+// #define LOGMETRICS
 
 #define TIMERON
 #define printf(...) ;

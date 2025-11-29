@@ -4,7 +4,7 @@
 #include <map>
 
 // #define LOGON
-#define LOGMETRICS
+// #define LOGMETRICS
 #define TIMERON
 
 // home
@@ -635,9 +635,31 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
     const VectorXf& X_in, const MatrixXf& P_in, int firstTimeForPoint,
     std::vector<float>& prevGain1, std::vector<float>& prevGain2,
     std::vector<std::vector<int>>& scenariosGainsList, int& counterSigmaPoint) {
+  std::chrono::high_resolution_clock::time_point tTime;
   float multiplier = 3.0f;
 
-  MatrixXf L(((multiplier)*P_in).llt().matrixL());
+#ifdef TIMERON
+
+  tTime = std::chrono::high_resolution_clock::now();
+
+#endif
+
+  MatrixXf L(((multiplier)*P).llt().matrixL());
+
+#ifdef TIMERON
+
+  this->triangulationTime +=
+      std::chrono::duration_cast<std::chrono::duration<float>>(
+          std::chrono::high_resolution_clock::now() - tTime);
+
+#endif
+
+#ifdef TIMERON
+
+  std::chrono::high_resolution_clock::time_point startSPoint =
+      std::chrono::high_resolution_clock::now();
+
+#endif
 
   MatrixXf sigmaPoints(3, 7);
   sigmaPoints.setZero();
@@ -650,7 +672,21 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
     sigmaPoints.col(j) = X_in - L.col(j - N1 - 1);
   }
 
+#ifdef TIMERON
+
+  this->sPointTime += std::chrono::duration_cast<std::chrono::duration<float>>(
+      std::chrono::high_resolution_clock::now() - startSPoint);
+
+#endif
+
   for (int i = 0; i < (2 * N1) + 1; i++) {
+#ifdef TIMERON
+
+    std::chrono::high_resolution_clock::time_point startPredictLoop =
+        std::chrono::high_resolution_clock::now();
+
+#endif
+
     VectorXf column = sigmaPoints.col(i);
     firstTimeForPoint = firstTime[i];
     prevGain1 = this->listOfGainsSigmaPoints[i].first;
@@ -659,7 +695,53 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
     sigmaPoints.col(i) =
         dynamicModelOnce(column, firstTimeForPoint, prevGain1, prevGain2,
                          scenariosGainsList, counterSigmaPoint);
+
+#ifdef TIMERON
+
+    this->predictLoopTime +=
+        std::chrono::duration_cast<std::chrono::duration<float>>(
+            std::chrono::high_resolution_clock::now() - startPredictLoop);
+
+#endif
+
+    std::chrono::high_resolution_clock::time_point dynamicTime;
+
+#ifdef TIMERON
+
+    dynamicTime = std::chrono::high_resolution_clock::now();
+
+#endif
+
+    sigmaPoints.col(i) = dynamicModel(column);
+
+#ifdef TIMERON
+
+    this->dynamicModelTime +=
+        std::chrono::duration_cast<std::chrono::duration<float>>(
+            std::chrono::high_resolution_clock::now() - dynamicTime);
+
+#endif
+
+#ifdef TIMERON
+
+    std::chrono::high_resolution_clock::time_point endPredictLoop =
+        std::chrono::high_resolution_clock::now();
+
+#endif
+
+#ifdef TIMERON
+    this->endPredictLoopTime +=
+        std::chrono::duration_cast<std::chrono::duration<float>>(
+            std::chrono::high_resolution_clock::now() - endPredictLoop);
+#endif
   }
+
+#ifdef TIMERON
+
+  std::chrono::high_resolution_clock::time_point preMeanStart =
+      std::chrono::high_resolution_clock::now();
+
+#endif
 
   VectorXf Xprediction(3);
   for (int row = 0; row < N1; row++) {
@@ -670,14 +752,50 @@ std::tuple<VectorXf, MatrixXf> HALO::calculateSigmaOnce(
     Xprediction(row) = sum;
   }
 
+#ifdef TIMERON
+
+  this->preMeanTime += std::chrono::duration_cast<std::chrono::duration<float>>(
+      std::chrono::high_resolution_clock::now() - preMeanStart);
+
+#endif
+
+#ifdef TIMERON
+
+  std::chrono::high_resolution_clock::time_point projErrorStart =
+      std::chrono::high_resolution_clock::now();
+
+#endif
+
   MatrixXf projError(3, 7);
   for (int i = 0; i < N1; i++) {
     projError.row(i) = (sigmaPoints.row(i).array() - Xprediction(i)).matrix();
   }
 
+#ifdef TIMERON
+
+  this->projErrorTime +=
+      std::chrono::duration_cast<std::chrono::duration<float>>(
+          std::chrono::high_resolution_clock::now() - projErrorStart);
+#endif
+
+#ifdef TIMERON
+
+  std::chrono::high_resolution_clock::time_point pPredictionStart =
+      std::chrono::high_resolution_clock::now();
+
+#endif
+
   MatrixXf Pprediction =
       projError * WeightsForSigmaPoints.asDiagonal() * projError.transpose() +
       Q;
+
+#ifdef TIMERON
+
+  this->PpredictionTime +=
+      std::chrono::duration_cast<std::chrono::duration<float>>(
+          std::chrono::high_resolution_clock::now() - pPredictionStart);
+
+#endif
 
   return {Xprediction, Pprediction};
 }

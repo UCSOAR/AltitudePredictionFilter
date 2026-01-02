@@ -61,6 +61,18 @@ struct Scenario {
   std::vector<float> measurement;
   bool isBeforeApogeeBool = true;
 
+  
+  // conversions between vector and array.
+  inline std::array<float, 3> vec2arr(const std::vector<float>& v) {
+      assert(v.size() == 3);
+      return {v[0], v[1], v[2]};
+  }
+
+  inline std::vector<float> arr2vec(const std::array<float, 3>& a) {
+      return {a[0], a[1], a[2]};
+  }
+
+
   Scenario(std::vector<std::vector<float>> beforeList,
            std::vector<std::vector<float>> afterList, int Name)
       : BeforeList(beforeList), AfterList(afterList), name(Name) {}
@@ -102,33 +114,33 @@ struct Scenario {
   /**
    * Returns the nearest vector to the measurement vector
    */
-  std::pair<std::vector<float>, size_t> nearestKDTree(
-      std::vector<float> measurement) {
+  std::pair<std::vector<float>, size_t> nearestKDTree(std::vector<float> measurement) {
+    std::array<float, 3> convertedMeasurement = vec2arr(measurement);
+    pointIndex result;
     if (isBeforeApogeeBool) {
-      return treeBefore.nearest_pointIndex(measurement);
+      result = treeBefore.nearest_pointIndex(convertedMeasurement);
     } else {
-      return treeAfter.nearest_pointIndex(measurement);
+      result = treeAfter.nearest_pointIndex(convertedMeasurement);
     }
+
+    return {arr2vec(result.first), result.second};
   }
 
   void createTree() {
-    std::vector<std::vector<float>> beforeVectorofVectors;
-    std::vector<std::vector<float>> afterVectorofVectors;
+    std::vector<std::array<float, 3>> beforeArrayOfArrays;
+    std::vector<std::array<float, 3>> afterArrayOfArrays;
 
-    for (int i = 0; i < BeforeList.size(); i++) {
-      std::vector<float> vect = {BeforeList[i][0], BeforeList[i][1],
-                                 BeforeList[i][2]};
-      beforeVectorofVectors.push_back(vect);
+    for (const auto& pt : BeforeList) {
+        // Assuming BeforeList[i] has at least 3 elements
+        beforeArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
     }
 
-    for (int i = 0; i < AfterList.size(); i++) {
-      std::vector<float> vect = {AfterList[i][0], AfterList[i][1],
-                                 AfterList[i][2]};
-      afterVectorofVectors.push_back(vect);
+    for (const auto& pt : AfterList) {
+        afterArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
     }
 
-    treeBefore = KDTree(beforeVectorofVectors);
-    treeAfter = KDTree(afterVectorofVectors);
+    treeBefore = KDTree(beforeArrayOfArrays);
+    treeAfter = KDTree(afterArrayOfArrays);
   }
 
   /**

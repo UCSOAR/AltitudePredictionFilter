@@ -123,7 +123,7 @@ KDTree::KDTree(std::vector<std::array<float, 3>> point_array)
 void KDTree::node_query_(
     KDNodePtr const& branch, std::array<float, 3> const& pt, size_t const& level,
     size_t const& num_nearest,
-    std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
+    std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
   if (!branch) {
     return;
   }
@@ -148,7 +148,7 @@ void KDTree::node_query_(
 void KDTree::knearest_(
     KDNodePtr const& branch, std::array<float, 3> const& pt, size_t const& level,
     size_t const& num_nearest,
-    std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
+    std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
   if (branch == nullptr || !static_cast<bool>(*branch)) {
     return;
   }
@@ -178,7 +178,7 @@ void KDTree::knearest_(
 // default caller
 KDNodePtr KDTree::nearest_(std::array<float, 3> const& pt) {
   size_t level = 0;
-  std::list<std::pair<KDNodePtr, float>> k_buffer{};
+  std::vector<std::pair<KDNodePtr, float>> k_buffer{};
 
 
   k_buffer.emplace_back(root_, dist2(root_->x, pt));
@@ -211,7 +211,7 @@ pointIndex KDTree::nearest_pointIndex(std::array<float, 3> const& pt) {
 pointIndexArr KDTree::nearest_pointIndices(std::array<float, 3> const& pt,
                                            size_t const& num_nearest) {
   size_t level = 0;
-  std::list<std::pair<KDNodePtr, float>> k_buffer{};
+  std::vector<std::pair<KDNodePtr, float>> k_buffer{};
   k_buffer.emplace_back(root_, dist2(root_->x, pt));
 
   knearest_(root_,        // beginning of tree

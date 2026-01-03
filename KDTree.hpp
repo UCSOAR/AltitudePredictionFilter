@@ -226,11 +226,11 @@ class KDTree {
 
   void knearest_(KDNodePtr const& branch, std::array<float, 3> const& pt,
                  size_t const& level, size_t const& num_nearest,
-                 std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer);
+                 std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer);
 
   void node_query_(KDNodePtr const& branch, std::array<float, 3> const& pt,
                    size_t const& level, size_t const& num_nearest,
-                   std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer);
+                   std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer);
 
   // default caller
   KDNodePtr nearest_(std::array<float, 3> const& pt);

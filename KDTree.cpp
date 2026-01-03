@@ -124,7 +124,7 @@ void KDTree::node_query_(
     KDNodePtr const& branch, std::array<float, 3> const& pt, size_t const& level,
     size_t const& num_nearest,
     std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
-  if (!static_cast<bool>(*branch)) {
+  if (!branch) {
     return;
   }
   knearest_(branch, pt, level, num_nearest, k_nearest_buffer);

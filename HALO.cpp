@@ -21,7 +21,7 @@
 #define HALO_CPP
 #define REFRESH_RATE 3
 
-// #define printf(...) ;
+#define printf(...) ;
 
 /* Constants for the UKF... do we ever use it?
 #define N 6

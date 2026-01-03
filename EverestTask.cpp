@@ -20,7 +20,7 @@
 #define LOGMETRICS
 
 #define TIMERON
-// #define printf(...) ;
+#define printf(...) ;
 
 #ifdef LOGMETRICS
 static FILE* everestGains = NULL;

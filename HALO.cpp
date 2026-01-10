@@ -69,10 +69,12 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
     fprintf(stderr, "Error opening resetGainsFile.txt...exiting\n");
     exit(1);
   }
+#endif
 
+#if defined(LOGON) || defined(LOGMETRICS)
   // deleting P.txt
-  filePath = directoryPath + "/P.txt";
-  if (std::remove(filePath.c_str()) == 0) {
+  std::string filePath2 = directoryPath + "/P.txt";
+  if (std::remove(filePath2.c_str()) == 0) {
   } else {
     std::perror("Error deleting file");
   }
@@ -85,7 +87,7 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
     exit(1);
   }
 
-  fprintf(file, "alt_std,velo_std,acc_std\n");
+  fprintf(file, "time,alt_std,velo_std,acc_std\n");
   fclose(file);
 #endif
 
@@ -274,7 +276,8 @@ void HALO::stateUpdate() {
   }
 
   // check and update before apogee bool
-  // this variable seems misnamed... isBeforeApogeeBoolHALO == 1 means it is AFTER apogee, not before.
+  // this variable seems misnamed... isBeforeApogeeBoolHALO == 1 means it is
+  // AFTER apogee, not before.
   if (isBeforeApogeeBoolHALO == 1) {
     std::vector<Scenario>* scenarios = this->getScenarios();
 
@@ -299,13 +302,14 @@ void HALO::stateUpdate() {
 
   this->P = P1;
 
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGMETRICS)
   // write diagonal of P to file
   FILE* file = fopen((directoryPath + "/P.txt").c_str(), "a+");
   if (!file) {
     fprintf(stderr, "Error opening P.txt...exiting\n");
     exit(1);
   }
+  fprintf(file, "%f,", time);
 
   for (int i = 0; i < 3; i++) {
     // dont write a comma at the end
@@ -667,29 +671,31 @@ VectorXf HALO::predictNStates(int n) {
   predictionCounter++;
 
   // prediction at time step 0. Uses state vector and current covariance matrix.
-  VectorXf calculation = this->dynamicModelOnce(this->X0, firstTimeForPoint, prevGain1, prevGain2, scenariosGainsList, counterSigmaPoint, scenarios);
-
-
+  VectorXf calculation =
+      this->dynamicModelOnce(this->X0, firstTimeForPoint, prevGain1, prevGain2,
+                             scenariosGainsList, counterSigmaPoint, scenarios);
 
 #if defined(LOGON) || defined(LOGMETRICS)
-  fprintf(predictnalt, "%f,%f,%f,%f,%d\n", this->time, calculation(0), calculation(1),
-          calculation(2), predictionCounter);
+  fprintf(predictnalt, "%f,%f,%f,%f,%d\n", this->time, calculation(0),
+          calculation(1), calculation(2), predictionCounter);
 #endif
 
   bool apogee = false;
   for (int i = 1; i < n; i++) {
-
     if (apogee) {
       for (int i = 0; i < scenarios.size(); i++) {
         scenarios.at(i).setIsBeforeApogee(false);
       }
 
     } else {
-      apogee =
-          this->apogeeDetection(Measurement{calculation(0), calculation(1), calculation(2), this->time + (float)i * timeStep});
+      apogee = this->apogeeDetection(
+          Measurement{calculation(0), calculation(1), calculation(2),
+                      this->time + (float)i * timeStep});
     }
 
-    calculation = this->dynamicModelOnce(calculation, firstTimeForPoint, prevGain1, prevGain2, scenariosGainsList, counterSigmaPoint, scenarios);
+    calculation = this->dynamicModelOnce(
+        calculation, firstTimeForPoint, prevGain1, prevGain2,
+        scenariosGainsList, counterSigmaPoint, scenarios);
 
 #if defined(LOGON) || defined(LOGMETRICS)
     fprintf(predictnalt, "%f,%f,%f,%f,%d\n", this->time + (float)i * timeStep,
@@ -1382,7 +1388,8 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 VectorXf HALO::dynamicModelOnce(
     VectorXf& X, int firstTimeForPoint, std::vector<float>& prevGain1,
     std::vector<float>& prevGain2,
-    std::vector<std::vector<int>>& scenariosGainsList, int& counterSigmaPoint, std::vector<Scenario>& scenarios) {
+    std::vector<std::vector<int>>& scenariosGainsList, int& counterSigmaPoint,
+    std::vector<Scenario>& scenarios) {
   VectorXf Xprediction(3, 1);
 
   // for every scenario get lists and find nearest 2 vectors to the current

@@ -23,6 +23,7 @@
 
 using namespace Eigen;
 // #define LOGON
+#define LOGMETRICS
 
 /**
  * @brief Measurement struct to store the time, altitude, velocity and
@@ -61,17 +62,15 @@ struct Scenario {
   std::vector<float> measurement;
   bool isBeforeApogeeBool = true;
 
-  
   // conversions between vector and array.
-  inline std::array<float, 3> vec2arr(const std::vector<float>& v) {
-      assert(v.size() == 3);
-      return {v[0], v[1], v[2]};
+  inline std::array<float, 3> vec2arr(const std::vector<float> &v) {
+    assert(v.size() == 3);
+    return {v[0], v[1], v[2]};
   }
 
-  inline std::vector<float> arr2vec(const std::array<float, 3>& a) {
-      return {a[0], a[1], a[2]};
+  inline std::vector<float> arr2vec(const std::array<float, 3> &a) {
+    return {a[0], a[1], a[2]};
   }
-
 
   Scenario(std::vector<std::vector<float>> beforeList,
            std::vector<std::vector<float>> afterList, int Name)
@@ -114,7 +113,8 @@ struct Scenario {
   /**
    * Returns the nearest vector to the measurement vector
    */
-  std::pair<std::vector<float>, size_t> nearestKDTree(std::vector<float> measurement) {
+  std::pair<std::vector<float>, size_t> nearestKDTree(
+      std::vector<float> measurement) {
     std::array<float, 3> convertedMeasurement = vec2arr(measurement);
     pointIndex result;
     if (isBeforeApogeeBool) {
@@ -130,13 +130,13 @@ struct Scenario {
     std::vector<std::array<float, 3>> beforeArrayOfArrays;
     std::vector<std::array<float, 3>> afterArrayOfArrays;
 
-    for (const auto& pt : BeforeList) {
-        // Assuming BeforeList[i] has at least 3 elements
-        beforeArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
+    for (const auto &pt : BeforeList) {
+      // Assuming BeforeList[i] has at least 3 elements
+      beforeArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
     }
 
-    for (const auto& pt : AfterList) {
-        afterArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
+    for (const auto &pt : AfterList) {
+      afterArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
     }
 
     treeBefore = KDTree(beforeArrayOfArrays);
@@ -267,7 +267,8 @@ class HALO {
                             std::vector<float> &prevGain1,
                             std::vector<float> &prevGain2,
                             std::vector<std::vector<int>> &scenariosGainsList,
-                            int &counterSigmaPoint, std::vector<Scenario>& scenarios);
+                            int &counterSigmaPoint,
+                            std::vector<Scenario> &scenarios);
 
   void setScenarios(std::vector<Scenario> &scenarios) {
     this->scenarios = scenarios;
@@ -476,7 +477,7 @@ class HALO {
         (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
          accelerationConfidence * 0.4);
 
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGMETRICS)
     // write to file confidence values
     FILE *file = fopen("testSuite/results/confidence.txt",
                        "a+");  // Open the file for writing

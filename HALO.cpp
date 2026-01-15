@@ -4,7 +4,7 @@
 #include <map>
 
 // #define LOGON
-#define LOGMETRICS
+// #define LOGMETRICS
 #define TIMERON
 
 // home
@@ -38,6 +38,7 @@ std::string directoryPath = "testSuite/results";
 bool isInitialized = false;
 int counter = 0;
 int isBeforeApogeeBoolHALO = 0;
+int predictionCounter = 0;
 
 using namespace Eigen;
 
@@ -50,7 +51,6 @@ static FILE* predictnalt = NULL;
 static FILE* kalmangains = NULL;
 
 // how many predictions have been made.
-int predictionCounter = 0;
 #endif
 
 void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
@@ -279,7 +279,18 @@ void HALO::stateUpdate() {
   // this variable seems misnamed... isBeforeApogeeBoolHALO == 1 means it is
   // AFTER apogee, not before.
   if (isBeforeApogeeBoolHALO == 1) {
+#ifdef TIMERON
+    std::chrono::high_resolution_clock::time_point getScenario =
+        std::chrono::high_resolution_clock::now();
+#endif
+
     std::vector<Scenario>* scenarios = this->getScenarios();
+
+#ifdef TIMERON
+    this->getScenarioTime +=
+        std::chrono::duration_cast<std::chrono::duration<float>>(
+            std::chrono::high_resolution_clock::now() - getScenario);
+#endif
 
     for (int i = 0; i < scenarios->size(); i++) {
       scenarios->at(i).setIsBeforeApogee(false);
@@ -632,6 +643,11 @@ void HALO::calculateSigmaPoints() {
 }
 
 VectorXf HALO::predictNStates(int n) {
+#ifdef TIMERON
+  std::chrono::high_resolution_clock::time_point predictNStates_start =
+      std::chrono::high_resolution_clock::now();
+#endif
+
   // values to be referenced
   int firstTimeForPoint_storage = 1;
   std::vector<float> prevGain1_storage = {0.5, 0.5, 0.5};
@@ -656,7 +672,19 @@ VectorXf HALO::predictNStates(int n) {
       scenariosGainsList_storage;
   int& counterSigmaPoint = counterSigmaPoint_storage;
 
+#ifdef TIMERON
+  std::chrono::high_resolution_clock::time_point predictNStates_getScenario =
+      std::chrono::high_resolution_clock::now();
+#endif
+
   std::vector<Scenario> scenarios = *this->getScenarios();
+
+#ifdef TIMERON
+  this->predictNStates_getScenarioTime +=
+      std::chrono::duration_cast<std::chrono::duration<float>>(
+          std::chrono::high_resolution_clock::now() -
+          predictNStates_getScenario);
+#endif
 
 #if defined(LOGON) || defined(LOGMETRICS)
   if (predictnalt == nullptr) {
@@ -702,6 +730,12 @@ VectorXf HALO::predictNStates(int n) {
             calculation(0), calculation(1), calculation(2), predictionCounter);
 #endif
   }
+
+#ifdef TIMERON
+  this->predictNStatesTime +=
+      std::chrono::duration_cast<std::chrono::duration<float>>(
+          std::chrono::high_resolution_clock::now() - predictNStates_start);
+#endif
 
   return calculation;
 }
@@ -1418,8 +1452,21 @@ VectorXf HALO::dynamicModelOnce(
     return Xprediction;
   }
 
+#ifdef TIMERON
+  std::chrono::high_resolution_clock::time_point
+      predictNStates_nearestVectorsStart =
+          std::chrono::high_resolution_clock::now();
+#endif
+
   std::pair<std::vector<int>, std::vector<std::vector<float>>>
       nearestVectorsWithIndex = this->findNearestScenarios(&scenarios, X);
+
+#ifdef TIMERON
+  this->predictNStates_nearestScenariosTime +=
+      std::chrono::duration_cast<std::chrono::duration<float>>(
+          std::chrono::high_resolution_clock::now() -
+          predictNStates_nearestVectorsStart);
+#endif
 
   std::vector<std::vector<float>> nearestVectors =
       nearestVectorsWithIndex.second;
@@ -1603,6 +1650,16 @@ std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
 
     std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t"
               << (haloPointer->treeCreationTime).count() << std::endl;
+
+    // profiling for prediction step
+    std::cout << "\t\tpredictNStatesTime:\t\t\t\t\t"
+              << haloPointer->predictNStatesTime.count() << std::endl;
+    std::cout << "\t\t\t->predictNStates_getScenarioTime:\t\t\t\t"
+              << haloPointer->predictNStates_getScenarioTime.count()
+              << std::endl;
+    std::cout << "\t\t\t->predictNStates_nearestScenariosTime:\t\t\t\t"
+              << haloPointer->predictNStates_nearestScenariosTime.count()
+              << std::endl;
 
 #endif
 

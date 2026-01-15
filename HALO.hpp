@@ -23,7 +23,7 @@
 
 using namespace Eigen;
 // #define LOGON
-#define LOGMETRICS
+// #define LOGMETRICS
 
 /**
  * @brief Measurement struct to store the time, altitude, velocity and
@@ -347,6 +347,11 @@ class HALO {
   std::chrono::duration<float> endPredictLoopTime;
   std::chrono::duration<float> getScenarioTime;
   std::chrono::duration<float> treeCreationTime;
+
+  // timers for the forward predict phase
+  std::chrono::duration<float> predictNStatesTime;
+  std::chrono::duration<float> predictNStates_getScenarioTime;
+  std::chrono::duration<float> predictNStates_nearestScenariosTime;
 
   void initializeHALOWithQR(float initialAlt, HALO *halo, MatrixXf &Q,
                             MatrixXf &R0);

@@ -17,7 +17,7 @@
 #include "gpsData.cpp"
 
 // #define LOGON
-#define LOGMETRICS
+// #define LOGMETRICS
 
 #define TIMERON
 #define printf(...) ;
@@ -153,12 +153,11 @@ int openFiles() {
     exit(1);
   }
 
-  fprintf(
-      everestFile,
-      "timestamp, roll, pitch, yaw,accelerationError, accelerometerIgnored, "
-      "accelerationRecoveryTrigger,magneticError, magnetometerIgnored, "
-      "magneticRecoveryTrigger, initialising, angularRateRecovery, "
-      "accelerationRecovery, magneticRecovery, earth.axis.z\n");
+  fprintf(everestFile,
+          "timestamp,roll,pitch,yaw,accelerationError,accelerometerIgnored,"
+          "accelerationRecoveryTrigger,magneticError,magnetometerIgnored,"
+          "magneticRecoveryTrigger,initialising,angularRateRecovery,"
+          "accelerationRecovery,magneticRecovery,earth.axis.z\n");
 
   // delete confidence.txt
   filePath = directoryPath + "/confidence.txt";
@@ -196,7 +195,7 @@ enum debug_level {
   Calibration = 7  // Calibration
 };
 bool isTared = false;
-debug_level debug = ALL;
+debug_level debug = Calibration;
 bool firstSampleAfterCalibration = true;
 bool useSTD = false;
 
@@ -286,11 +285,6 @@ void EverestTask::MadgwickSetup() {
   };
 
   infusion->madAhrsSetSettings(ahrs, &settings);
-
-// open files
-#if defined(LOGON) || defined(LOGMETRICS)
-  openFiles();
-#endif
 }
 
 /**
@@ -336,7 +330,7 @@ void EverestTask::MadgwickWrapper(IMUData data) {
   internalStates = infusion->madAhrsGetInternalStates(infusion->getMadAhrs());
   flags = infusion->madAhrsGetFlags(infusion->getMadAhrs());
 
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGMETRICS)
   // write to file
   fprintf(everestFile, "%f,", timestamp);
 
@@ -1594,6 +1588,11 @@ float findClosestTime(float time) {
  * Serves to just initialize structs
  */
 int main() {
+  // open files. moved here and out of madgwick setup.
+#if defined(LOGON) || defined(LOGMETRICS)
+  openFiles();
+#endif
+
   // read first line and preset the deltaTime to timestamp
   char line[MAX_LINE_LENGTH];
   std::clock_t start;

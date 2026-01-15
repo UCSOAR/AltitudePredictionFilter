@@ -40,7 +40,6 @@ KDNode::KDNode(pointIndex const& pi, KDNodePtr const& left_,
 KDNode::~KDNode() = default;
 
 float KDNode::coord(size_t const& idx) { return x.at(idx); }
-KDNode::operator bool() { return (!x.empty()); }
 KDNode::operator std::array<float, 3>() { return x; }
 KDNode::operator size_t() { return index; }
 KDNode::operator pointIndex() { return std::make_pair(x, index); }
@@ -131,7 +130,7 @@ void KDTree::node_query_(
 
   // x array in branch is null when called, find out why!!!!
   float const dl = dist2(branch->x, pt);
-  assert(*branch);
+  if (!branch) return;
   auto const node_distance = std::make_pair(branch, dl);
   auto const insert_it =
       std::upper_bound(k_nearest_buffer.begin(), k_nearest_buffer.end(),
@@ -149,9 +148,7 @@ void KDTree::knearest_(
     KDNodePtr const& branch, std::array<float, 3> const& pt, size_t const& level,
     size_t const& num_nearest,
     std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
-  if (branch == nullptr || !static_cast<bool>(*branch)) {
-    return;
-  }
+  if (!branch) return;
 
   std::array<float,3> branch_pt = static_cast<std::array<float,3>>(*branch);
   size_t dim = branch_pt.size();
@@ -181,7 +178,11 @@ KDNodePtr KDTree::nearest_(std::array<float, 3> const& pt) {
   std::vector<std::pair<KDNodePtr, float>> k_buffer{};
 
 
-  k_buffer.emplace_back(root_, dist2(root_->x, pt));
+  if (last_nearest_) {
+    k_buffer.emplace_back(last_nearest_, dist2(last_nearest_->x, pt));
+  } else {
+    k_buffer.emplace_back(root_, dist2(root_->x, pt));
+  }
 
   knearest_(root_,    // beginning of tree
             pt,       // point we are querying
@@ -190,7 +191,8 @@ KDNodePtr KDTree::nearest_(std::array<float, 3> const& pt) {
             k_buffer  // list of k nearest neigbours (to be filled)
   );
   if (k_buffer.size() > 0) {
-    return k_buffer.front().first;
+    last_nearest_ = k_buffer.front().first;
+    return last_nearest_;
   }
   return nullptr;
 };
@@ -248,11 +250,10 @@ indexArr KDTree::nearest_indices(std::array<float, 3> const& pt,
 void KDTree::neighborhood_(KDNodePtr const& branch,
                            std::array<float, 3> const& pt, float const& rad2,
                            size_t const& level, pointIndexArr& nbh) {
-  if (!bool(*branch)) {
+  if (!branch) return;
     // branch has no point, means it is a leaf,
     // no points to add
-    return;
-  }
+
 
   size_t const dim = pt.size();
 

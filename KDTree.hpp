@@ -45,7 +45,7 @@ class KDNode {
   float coord(size_t const&);
 
   // conversions
-  explicit operator bool();
+
   explicit operator std::array<float, 3>();
   explicit operator size_t();
   explicit operator pointIndex();
@@ -241,6 +241,9 @@ class KDTree {
 
   KDNodePtr root_;
   KDNodePtr leaf_;
+
+  // the last node found. Used as a starting point for later searches.
+  KDNodePtr last_nearest_;
 
   // void printTheTree() const {
   //   // Clear tree log file

@@ -141,6 +141,13 @@ class EverestTask {
  public:
   void IMU_Update(const IMUData& imu1, const IMUData& imu2);
 
+  int averageIMU(IMUData& imu1, IMUData& imu2);
+
+  int counterEverest = 0;
+  IMUData avgIMU1Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  IMUData avgIMU2Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  int isAligned = 0;
+
   Infusion* ExternalInitialize();
 
   static EverestTask getEverest();

@@ -288,10 +288,10 @@ void EverestTask::MadgwickSetup() {
  *       data to Madgwick
  *
  *      Internal
- * @param data IMUData struct
+ * @param data IMUData_Everest struct
  *
  */
-void EverestTask::MadgwickWrapper(IMUData data) {
+void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   const float timestamp = data.time;
   madVector gyroscope = {data.gyroX, data.gyroY,
                          data.gyroZ};  // data in degrees/s
@@ -363,7 +363,8 @@ void EverestTask::MadgwickWrapper(IMUData data) {
  *
  *    Internal
  */
-void EverestTask::IMU_Update(const IMUData& imu1, const IMUData& imu2) {
+void EverestTask::IMU_Update(const IMUData_Everest& imu1,
+                             const IMUData_Everest& imu2) {
   int numberOfSamples = 2;
   // Update IMU1
   this->internalIMU_1.time = imu1.time;
@@ -575,8 +576,8 @@ void EverestTask::Baro_Update(const BarosData& Baro1, const BarosData& Baro2) {
  *    External (only function that should be called after instantiation of
  * Everest to pass sensor data to Everest for altitude calculation)
  */
-float EverestTask::ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
-                                  BarosData baro2) {
+float EverestTask::ExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
+                                  BarosData baro1, BarosData baro2) {
   if (!isTared) {
     everest.tare(imu1, imu2, baro1, baro2);
     return 0;
@@ -608,8 +609,9 @@ float EverestTask::ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
  * @brief (Currently does not work, use final wrapper) Wraps External Update
  * with alignment, returns External Update with aligned data
  */
-float EverestTask::AlignedExternalUpdate(IMUData imu1, IMUData imu2,
-                                         BarosData baro1, BarosData baro2,
+float EverestTask::AlignedExternalUpdate(IMUData_Everest imu1,
+                                         IMUData_Everest imu2, BarosData baro1,
+                                         BarosData baro2,
                                          MadAxesAlignment alignment) {
   // align
   madVector alignedIMU1 =
@@ -634,7 +636,7 @@ float EverestTask::AlignedExternalUpdate(IMUData imu1, IMUData imu2,
     printf("Alignment: %d\n", alignment);
   }
 
-  // put aligned data into IMUData struct
+  // put aligned data into IMUData_Everest struct
   imu1.accelX = alignedIMU1.axis.x;
   imu1.accelY = alignedIMU1.axis.y;
   imu1.accelZ = alignedIMU1.axis.z;
@@ -674,7 +676,7 @@ float EverestTask::AlignedExternalUpdate(IMUData imu1, IMUData imu2,
  *
  * @return calculated altitude
  */
-float EverestTask::deriveForAltitudeIMU(IMUData avgIMU) {
+float EverestTask::deriveForAltitudeIMU(IMUData_Everest avgIMU) {
   float accelerationZ = everest.state.earthAcceleration * -9.81;
   float initialVelocity = this->getKinematics()->initialVelo;
   float initialAltitude = this->Kinematics.initialAlt;
@@ -1014,7 +1016,7 @@ float getFinalAltitude() { return Kinematics->finalAltitude; }
 /**
  * @brief Average IMUs to feed into alignment function
  */
-int EverestTask::averageIMU(IMUData& imu1, IMUData& imu2) {
+int EverestTask::averageIMU(IMUData_Everest& imu1, IMUData_Everest& imu2) {
   // average IMU data
   this->counterEverest += 1;
 
@@ -1077,7 +1079,7 @@ int EverestTask::averageIMU(IMUData& imu1, IMUData& imu2) {
   return 0;
 }
 
-int EverestTask::findAlignment(IMUData& imu1, IMUData& imu2) {
+int EverestTask::findAlignment(IMUData_Everest& imu1, IMUData_Everest& imu2) {
   // check if averageIMU is ready
   if (averageIMU(imu1, imu2) == 0) {
     return 0;
@@ -1132,8 +1134,8 @@ int EverestTask::findAlignment(IMUData& imu1, IMUData& imu2) {
  * altitude
  *
  */
-void EverestTask::tare(IMUData& imu1, IMUData& imu2, BarosData baro1,
-                       BarosData baro2) {
+void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
+                       BarosData baro1, BarosData baro2) {
   // average pressures
   float average = 0;  // have to do since function is weird
   int numberOfSamples = 0;
@@ -1272,7 +1274,7 @@ float EverestTask::finalWrapper(
     float timeIMU1, float timeIMU2, float timeBaro1, float timeBaro2,
     MadAxesAlignment alignment, MadAxesAlignment alignment2) {
   // converts from m/s to gs
-  IMUData sensorData = {
+  IMUData_Everest sensorData = {
       timeIMU1,
       gyroX1,
       gyroY1,
@@ -1285,7 +1287,7 @@ float EverestTask::finalWrapper(
       magZ1,
   };
 
-  IMUData sensorData2 = {
+  IMUData_Everest sensorData2 = {
       timeIMU2,
       gyroX2,
       gyroY2,
@@ -1378,29 +1380,29 @@ bool getIsTared() { return isTared; }
 std::vector<float> EverestTask::EverestToHalo(EverestData everestData,
                                               EverestTask* everest) {
   if (isAligned == 0) {
-    IMUData imu1 = {everestData.timeIMU1,
-                    everestData.accelX1,
-                    everestData.accelY1,
-                    everestData.accelZ1,
-                    everestData.gyroX1,
-                    everestData.gyroY1,
-                    everestData.gyroZ1,
-                    everestData.magX1,
-                    everestData.magY1,
-                    everestData.magZ1,
-                    0.0f};
+    IMUData_Everest imu1 = {everestData.timeIMU1,
+                            everestData.accelX1,
+                            everestData.accelY1,
+                            everestData.accelZ1,
+                            everestData.gyroX1,
+                            everestData.gyroY1,
+                            everestData.gyroZ1,
+                            everestData.magX1,
+                            everestData.magY1,
+                            everestData.magZ1,
+                            0.0f};
 
-    IMUData imu2 = {everestData.timeIMU2,
-                    everestData.accelX2,
-                    everestData.accelY2,
-                    everestData.accelZ2,
-                    everestData.gyroX2,
-                    everestData.gyroY2,
-                    everestData.gyroZ2,
-                    everestData.magX2,
-                    everestData.magY2,
-                    everestData.magZ2,
-                    0.0f};
+    IMUData_Everest imu2 = {everestData.timeIMU2,
+                            everestData.accelX2,
+                            everestData.accelY2,
+                            everestData.accelZ2,
+                            everestData.gyroX2,
+                            everestData.gyroY2,
+                            everestData.gyroZ2,
+                            everestData.magX2,
+                            everestData.magY2,
+                            everestData.magZ2,
+                            0.0f};
 
     isAligned = everest->findAlignment(imu1, imu2);
   }
@@ -1447,7 +1449,8 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData,
 }
 
 // update IMU1
-void EverestTask::IMU1_Measurements(IMUData imu1, EverestTask* everest) {
+void EverestTask::IMU1_Measurements(IMUData_Everest imu1,
+                                    EverestTask* everest) {
   everest->everestData.accelX1 = imu1.accelX;
   everest->everestData.accelY1 = imu1.accelY;
   everest->everestData.accelZ1 = imu1.accelZ;
@@ -1462,7 +1465,8 @@ void EverestTask::IMU1_Measurements(IMUData imu1, EverestTask* everest) {
 }
 
 // update IMU2
-void EverestTask::IMU2_Measurements(IMUData imu2, EverestTask* everest) {
+void EverestTask::IMU2_Measurements(IMUData_Everest imu2,
+                                    EverestTask* everest) {
   everest->everestData.accelX2 = imu2.accelX;
   everest->everestData.accelY2 = imu2.accelY;
   everest->everestData.accelZ2 = imu2.accelZ;
@@ -1615,11 +1619,11 @@ int main() {
     // Parse pressure readings
     float pressure = baroData[i][1];
 
-    IMUData sensorData = {
+    IMUData_Everest sensorData = {
         time, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, magX, magY, magZ,
     };
 
-    IMUData sensorData2 = {
+    IMUData_Everest sensorData2 = {
         time, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, magX, magY, magZ,
     };
 

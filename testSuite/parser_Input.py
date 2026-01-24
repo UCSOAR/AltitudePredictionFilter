@@ -17,7 +17,7 @@ cpp_code = """
 time_increment = 1 / 3
 current_time = 0
 
-# Generate the IMUData and BarosData arrays
+# Generate the IMUData_Everest and BarosData arrays
 cpp_code += "\nstd::vector<std::vector<float>> taberLaunch = {\n"
 for data in input_data:
     if data[4] == "":

@@ -61,7 +61,7 @@ typedef struct {
   float accelX, accelY, accelZ;
   float magX, magY, magZ;
   float altitude;
-} IMUData;
+} IMUData_Everest;
 
 /**
  * @brief Keeps whole system's states, including apogee detection results and
@@ -82,7 +82,7 @@ typedef struct {
   float std_Baro2;
   float std_GPS;
 
-  IMUData avgIMU;
+  IMUData_Everest avgIMU;
   float deltaTimeIMU;
   float earthAcceleration;
 } systemState;
@@ -139,13 +139,13 @@ typedef struct {
 
 class EverestTask {
  public:
-  void IMU_Update(const IMUData& imu1, const IMUData& imu2);
+  void IMU_Update(const IMUData_Everest& imu1, const IMUData_Everest& imu2);
 
-  int averageIMU(IMUData& imu1, IMUData& imu2);
+  int averageIMU(IMUData_Everest& imu1, IMUData_Everest& imu2);
 
   int counterEverest = 0;
-  IMUData avgIMU1Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  IMUData avgIMU2Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  IMUData_Everest avgIMU1Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  IMUData_Everest avgIMU2Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   int isAligned = 0;
 
   Infusion* ExternalInitialize();
@@ -171,17 +171,19 @@ class EverestTask {
 
   float deriveChangeInVelocityToGetAltitude(float estimate);
 
-  void MadgwickWrapper(IMUData data);
+  void MadgwickWrapper(IMUData_Everest data);
 
-  float ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
-                       BarosData baro2);
+  float ExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
+                       BarosData baro1, BarosData baro2);
 
-  float deriveForAltitudeIMU(IMUData avgIMU);
+  float deriveForAltitudeIMU(IMUData_Everest avgIMU);
 
-  float AlignedExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
-                              BarosData baro2, MadAxesAlignment alignment);
+  float AlignedExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
+                              BarosData baro1, BarosData baro2,
+                              MadAxesAlignment alignment);
 
-  void tare(IMUData& imu1, IMUData& imu2, BarosData baro1, BarosData baro2);
+  void tare(IMUData_Everest& imu1, IMUData_Everest& imu2, BarosData baro1,
+            BarosData baro2);
 
   void MadgwickSetup();
 
@@ -214,12 +216,12 @@ class EverestTask {
 
   float timeEverest = 0;
 
-  void IMU1_Measurements(IMUData imu1, EverestTask* everest);
-  void IMU2_Measurements(IMUData imu2, EverestTask* everest);
+  void IMU1_Measurements(IMUData_Everest imu1, EverestTask* everest);
+  void IMU2_Measurements(IMUData_Everest imu2, EverestTask* everest);
   void Baro1_Measurements(BarosData baro1, EverestTask* everest);
   void Baro2_Measurements(BarosData baro2, EverestTask* everest);
 
-  int findAlignment(IMUData& imu1, IMUData& imu2);
+  int findAlignment(IMUData_Everest& imu1, IMUData_Everest& imu2);
 
   MadAxesAlignment alignment1, alignment2;
 
@@ -230,7 +232,7 @@ class EverestTask {
   void updateGainsWithGPS();
 
  protected:
-  IMUData internalIMU_1, internalIMU_2;
+  IMUData_Everest internalIMU_1, internalIMU_2;
 
   std::vector<float> zeroOffsetAccel = {0, 0, 0};
   std::vector<float> zeroOffsetAccel2 = {0, 0, 0};

@@ -12,7 +12,7 @@ cpp_file_path = "gpsData.cpp"
 with open(cpp_file_path, "w") as cpp_file:
     cpp_file.write("// Auto-generated file containing altitude and time data\n")
     cpp_file.write("#include <vector>\n\n")
-    cpp_file.write("std::vector<std::pair<float, float>> gpsData = {\n")
+    cpp_file.write("std::vector<std::vector<float>> gpsData1 = {\n")
 
     # Write the altitude and time data as pairs into the C++ vector
     for i, (time, altitude) in enumerate(zip(times, altitudes)):

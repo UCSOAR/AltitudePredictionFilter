@@ -28,10 +28,6 @@ static FILE* everestGains = NULL;
 
 FILE* haloFile;
 FILE* everestFile;
-int counterEverest = 0;
-IMUData avgIMU1Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-IMUData avgIMU2Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int isAligned = 0;
 
 int openFiles() {
   // Define the directory path
@@ -1018,9 +1014,9 @@ float getFinalAltitude() { return Kinematics->finalAltitude; }
 /**
  * @brief Average IMUs to feed into alignment function
  */
-int averageIMU(IMUData& imu1, IMUData& imu2) {
+int EverestTask::averageIMU(IMUData& imu1, IMUData& imu2) {
   // average IMU data
-  counterEverest += 1;
+  this->counterEverest += 1;
 
   // average IMU1
   if (counterEverest == 7) {

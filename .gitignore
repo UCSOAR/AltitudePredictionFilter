@@ -63,3 +63,8 @@ STM32L152-Discovery.elf.launch
 # VS2022
 .vs/
 .vscode/
+
+
+# Doxygen docs
+docs/html/
+docs/latex/

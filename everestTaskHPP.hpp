@@ -148,7 +148,12 @@ class EverestTask {
   IMUData_Everest avgIMU2Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   int isAligned = 0;
 
+  int madgwickInitialized = 0;
+  int everestInitialized = 0;
+
   Infusion* ExternalInitialize();
+
+  void initEverest(EverestTask* everest);
 
   static EverestTask getEverest();
 

@@ -4,7 +4,7 @@
 #include <map>
 
 // #define LOGON
-// #define LOGMETRICS
+#define LOGMETRICS
 #define TIMERON
 
 // home

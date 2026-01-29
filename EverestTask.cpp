@@ -13,11 +13,12 @@
 #include <sstream>
 
 #include "input_data.cpp"
+#include "pre_flight_data.cpp"
 
 #include "gpsData.cpp"
 
 // #define LOGON
-// #define LOGMETRICS
+#define LOGMETRICS
 
 #define TIMERON
 #define printf(...) ;
@@ -217,7 +218,6 @@ kinematics* Kinematics = everest.getKinematics();  // tare to ground
 
 madAhrsFlags flags;
 madAhrsInternalStates internalStates;
-EverestData everestData;
 
 /**
  * @brief Calls finalWrapper with data and alignment
@@ -281,6 +281,8 @@ void EverestTask::MadgwickSetup() {
   };
 
   infusion->madAhrsSetSettings(ahrs, &settings);
+
+  madgwickInitialized = 1;
 }
 
 /**
@@ -578,11 +580,6 @@ void EverestTask::Baro_Update(const BarosData& Baro1, const BarosData& Baro2) {
  */
 float EverestTask::ExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
                                   BarosData baro1, BarosData baro2) {
-  if (!isTared) {
-    everest.tare(imu1, imu2, baro1, baro2);
-    return 0;
-  }
-
   everest.IMU_Update(imu1, imu2);
 
   if (debug == Third || debug == ALL) {
@@ -1379,48 +1376,6 @@ bool getIsTared() { return isTared; }
  */
 std::vector<float> EverestTask::EverestToHalo(EverestData everestData,
                                               EverestTask* everest) {
-  if (isAligned == 0) {
-    IMUData_Everest imu1 = {everestData.timeIMU1,
-                            everestData.accelX1,
-                            everestData.accelY1,
-                            everestData.accelZ1,
-                            everestData.gyroX1,
-                            everestData.gyroY1,
-                            everestData.gyroZ1,
-                            everestData.magX1,
-                            everestData.magY1,
-                            everestData.magZ1,
-                            0.0f};
-
-    IMUData_Everest imu2 = {everestData.timeIMU2,
-                            everestData.accelX2,
-                            everestData.accelY2,
-                            everestData.accelZ2,
-                            everestData.gyroX2,
-                            everestData.gyroY2,
-                            everestData.gyroZ2,
-                            everestData.magX2,
-                            everestData.magY2,
-                            everestData.magZ2,
-                            0.0f};
-
-    isAligned = everest->findAlignment(imu1, imu2);
-  }
-
-  if (haloInitialized == false) {
-    // Done tareing, initialize once
-    if (isTared) {
-      // Initialize HALO
-      halo = HALO();
-      // Set initial altitude to 1000 if it is zero (no baros in tareing)
-      if (everest->Kinematics.initialAlt == 0) {
-        everest->Kinematics.initialAlt = 1000;
-      }
-      halo.initializeHALO(everest->Kinematics.initialAlt, &halo);
-      haloInitialized = true;
-    }
-  }
-
   float eAltitude =
       everest->TaskWrapper(everestData, this->alignment1, this->alignment2);
   float eVelocity = everest->getKinematics()->initialVelo;
@@ -1507,12 +1462,11 @@ float roundToDecimalPlaces(double value, int decimalPlaces) {
 }
 
 std::vector<float> EverestTask::QueueEverest(EverestTask* everest) {
-  // run timer loop, at constant HALORefreshRate
-  // uncomment for launch (without max time)
-  // while(everest->timeEverest < 180){
-  if (everest->timeEverest == 0) {
-    // Setup Madgwick and attach Madgwick to Everest
-    everest->MadgwickSetup();
+  if (everestInitialized == 0) {
+    initEverest(everest);
+    // size 0 float indicates not ready. I doubt a union return type would be a
+    // good solution here.
+    return std::vector<float>();
   }
 
   if (roundToDecimalPlaces(everest->timeEverest, 4) >=
@@ -1579,6 +1533,89 @@ float findClosestTime(float time) {
     }
   }
   return altitude;
+}
+
+void EverestTask::initEverest(EverestTask* everest) {
+  if (madgwickInitialized == 0) everest->MadgwickSetup();
+
+  if (everest->isAligned == 0) {
+    IMUData_Everest imu1 = {everest->everestData.timeIMU1,
+                            everest->everestData.accelX1,
+                            everest->everestData.accelY1,
+                            everest->everestData.accelZ1,
+                            everest->everestData.gyroX1,
+                            everest->everestData.gyroY1,
+                            everest->everestData.gyroZ1,
+                            everest->everestData.magX1,
+                            everest->everestData.magY1,
+                            everest->everestData.magZ1,
+                            0.0f};
+
+    IMUData_Everest imu2 = {everest->everestData.timeIMU2,
+                            everest->everestData.accelX2,
+                            everest->everestData.accelY2,
+                            everest->everestData.accelZ2,
+                            everest->everestData.gyroX2,
+                            everest->everestData.gyroY2,
+                            everest->everestData.gyroZ2,
+                            everest->everestData.magX2,
+                            everest->everestData.magY2,
+                            everest->everestData.magZ2,
+                            0.0f};
+
+    everest->isAligned = everest->findAlignment(imu1, imu2);
+  }
+
+  if (!isTared) {
+    IMUData_Everest imu1 = {everest->everestData.timeIMU1,
+                            everest->everestData.accelX1,
+                            everest->everestData.accelY1,
+                            everest->everestData.accelZ1,
+                            everest->everestData.gyroX1,
+                            everest->everestData.gyroY1,
+                            everest->everestData.gyroZ1,
+                            everest->everestData.magX1,
+                            everest->everestData.magY1,
+                            everest->everestData.magZ1,
+                            0.0f};
+
+    IMUData_Everest imu2 = {everest->everestData.timeIMU2,
+                            everest->everestData.accelX2,
+                            everest->everestData.accelY2,
+                            everest->everestData.accelZ2,
+                            everest->everestData.gyroX2,
+                            everest->everestData.gyroY2,
+                            everest->everestData.gyroZ2,
+                            everest->everestData.magX2,
+                            everest->everestData.magY2,
+                            everest->everestData.magZ2,
+                            0.0f};
+
+    BarosData baro1 = {everest->everestData.timeBaro1,
+                       everest->everestData.pressure1, 0, 0};
+    BarosData baro2 = {everest->everestData.timeBaro2,
+                       everest->everestData.pressure2, 0, 0};
+
+    everest->tare(imu1, imu2, baro1, baro2);
+  }
+
+  if (haloInitialized == false) {
+    // Done tareing, initialize once
+    if (isTared) {
+      // Initialize HALO
+      halo = HALO();
+      // Set initial altitude to 1000 if it is zero (no baros in tareing)
+      if (everest->Kinematics.initialAlt == 0) {
+        everest->Kinematics.initialAlt = 1000;
+      }
+      halo.initializeHALO(everest->Kinematics.initialAlt, &halo);
+      haloInitialized = true;
+
+      everest->everestInitialized = 1;
+    }
+  }
+
+  return;
 }
 
 // --------------------------------------------------- END OF EVEREST

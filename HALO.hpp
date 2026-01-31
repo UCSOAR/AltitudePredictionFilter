@@ -281,7 +281,8 @@ class HALO {
   bool isBeforeApogee(float acceleration, float velocity, float altitude,
                       float lastAltitude);
 
-  float deltaTime = 1.0 / 3;
+  // baseline rate of change
+  float deltaTime = 1.0 / 3.0f;
 
   void setDeltaTime(float deltaTime) { this->deltaTime = deltaTime; }
 
@@ -318,7 +319,7 @@ class HALO {
 
   std::vector<float> Halo_Input(HALO *haloPointer, bool isInitialized,
                                 float eAccelerationZ, float eVelocity,
-                                float eAltitude, float gpsAltitude, float time);
+                                float eAltitude, float gpsAltitude, float time, float deltaTime);
 
   // for predictNextValues
   int counterSigmaPoint = 0;
@@ -365,6 +366,8 @@ class HALO {
   VectorXf X_in;
   VectorXf X_pred;
 
+
+  // use REFRESH_RATE here somehow
   float timeStep = 1.0f / 3.0f;
 
   // last time that a prediction was made. done to prevent multiple triggers.

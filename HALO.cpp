@@ -967,7 +967,6 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
   Scenario* scenario1 =
       &scenarios->at(distances[lowestDistanceIndex].second.second);
   std::vector<float> currentVector1 = scenario1->evaluateVectorAt(indexFirst);
-  float deltaTime = 1.0 / REFRESH_RATE;
   float nextTimeStep = currentVector1[3] + deltaTime;
   std::vector<float> futureVector1 =
       scenario1->evaluateVectorAtTime(nextTimeStep);
@@ -1378,8 +1377,8 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
     printf("X is nan, defaulting to static integration\n");
 
-    float finalVelocity = X(1) + X(0) * ((float)1.0 / REFRESH_RATE);
-    float altitude = X(2) + (X(1) + finalVelocity) * (1.0 / REFRESH_RATE) / 2.0;
+    float finalVelocity = X(1) + X(0) * getDeltaTime();
+    float altitude = X(2) + (X(1) + finalVelocity) * getDeltaTime() / 2.0;
 
     Xprediction(0) = altitude;
     Xprediction(1) = finalVelocity;
@@ -1442,8 +1441,8 @@ VectorXf HALO::dynamicModelOnce(
 
     printf("X is nan, defaulting to static integration\n");
 
-    float finalVelocity = X(1) + X(0) * ((float)1.0 / REFRESH_RATE);
-    float altitude = X(2) + (X(1) + finalVelocity) * (1.0 / REFRESH_RATE) / 2.0;
+    float finalVelocity = X(1) + X(0) * getDeltaTime();
+    float altitude = X(2) + (X(1) + finalVelocity) * getDeltaTime() / 2.0;
 
     Xprediction(0) = altitude;
     Xprediction(1) = finalVelocity;
@@ -1581,7 +1580,8 @@ void HALO::initializeHALOWithQR(float initialAlt, HALO* halo, MatrixXf& Q,
 std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
                                     float eAccelerationZ, float eVelocity,
                                     float eAltitude, float gpsAltitude,
-                                    float time) {
+                                    float time, float deltaTime) {
+  setDeltaTime(deltaTime);
   std::vector<float> unitedStates = {0, 0, 0};
 
   if (isInitialized) {
@@ -1601,7 +1601,7 @@ std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
     }
   }
 
-  if (counter == 525) {
+  if (counter == 524) {
 #ifdef TIMERON
     std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t"
               << haloPointer->updateTime.count() << std::endl;

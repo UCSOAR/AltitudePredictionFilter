@@ -267,7 +267,7 @@ void EverestTask::MadgwickSetup() {
   // Initialise algorithms
   madOffset offset = infusion->getOffset();
 
-  infusion->madOffsetInitialise(&offset, SAMPLE_RATE);
+  infusion->madOffsetInitialise(&offset, REFRESH_RATE);
   infusion->madAhrsInitialise(ahrs);
 
   // Set AHRS algorithm settings
@@ -277,7 +277,7 @@ void EverestTask::MadgwickSetup() {
       2000.0f, /* replace this with actual gyroscope range in degrees/s */
       10.0f,
       10.0f,
-      5 * SAMPLE_RATE, /* 5 seconds */
+      5 * REFRESH_RATE, /* 5 seconds, we ought to use adaptive deltatime here. */
   };
 
   infusion->madAhrsSetSettings(ahrs, &settings);
@@ -1389,10 +1389,11 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData,
             eVelocity, eAccelerationZ);
 #endif
 
+    // TODO: Shouldn't everestTime be the source of truth?  At some point we should decide.
     // Update HALO
     haloData = halo.Halo_Input(&halo, haloInitialized, eAccelerationZ,
                                eVelocity, eAltitude, everestData.altitudeGPS,
-                               everestData.timeIMU1);
+                               everestData.timeIMU1, deltaTime);
 
 #if defined(LOGON) || defined(LOGMETRICS)
     fprintf(haloFile, "%f,%f,%f\n", haloData[0], haloData[1], haloData[2]);
@@ -1461,7 +1462,7 @@ float roundToDecimalPlaces(double value, int decimalPlaces) {
   return std::round(value * scale) / scale;
 }
 
-std::vector<float> EverestTask::QueueEverest(EverestTask* everest) {
+std::vector<float> EverestTask::QueueEverest(EverestTask* everest, float currentTime) {
   if (everestInitialized == 0) {
     initEverest(everest);
     // size 0 float indicates not ready. I doubt a union return type would be a
@@ -1469,8 +1470,12 @@ std::vector<float> EverestTask::QueueEverest(EverestTask* everest) {
     return std::vector<float>();
   }
 
-  if (roundToDecimalPlaces(everest->timeEverest, 4) >=
-      roundToDecimalPlaces((oldTime + 1.0 / SAMPLE_RATE), 4)) {
+  updateDeltaTime(currentTime);
+
+  // this code doesn't make sense since deltaTime is defined using timeEverest. deltaTime will always be equal.
+  // TODO: 0 here will be a threshold value for updates. If the filter is updating too fast (doubtful) then we can limit it here.
+  if (deltaTime >=
+      0) {
     if (everest->availableMeasurements[0] == 1 &&
         everest->availableMeasurements[1] == 1 &&
         everest->availableMeasurements[2] == 1 &&
@@ -1513,11 +1518,13 @@ std::vector<float> EverestTask::QueueEverest(EverestTask* everest) {
       everest->availableMeasurements[3] = 0;
     }
   }
-
-  oldTime = everest->timeEverest;
-  everest->timeEverest += 1.0 / SAMPLE_RATE;
-
   // }
+}
+
+void EverestTask::updateDeltaTime( float currentTime) {
+  oldTime = timeEverest;
+  deltaTime = oldTime - currentTime;
+  timeEverest = currentTime;
 }
 
 float findClosestTime(float time) {
@@ -1691,7 +1698,7 @@ int main() {
     start = std::clock();
 
     // calls the entirety of the power of HALO, peak modularization
-    std::vector<float> haloData = everest.QueueEverest(&everest);
+    std::vector<float> haloData = everest.QueueEverest(&everest, time);
 
     clock_t endTime = std::clock();
 

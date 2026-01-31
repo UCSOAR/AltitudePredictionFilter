@@ -31,8 +31,7 @@
 
 // Definitions
 // CHANGE
-#define SAMPLE_RATE (3)  // replace this with actual sample rate
-#define DELTA_TIME (1.0f / 3.0f)
+#define REFRESH_RATE (3)  // replace this with actual sample rate
 #define RATE_BARO (3)
 #define CALIBRATION_TIME (2)
 
@@ -213,13 +212,20 @@ class EverestTask {
   std::vector<float> EverestToHalo(EverestData everestData,
                                    EverestTask* everest);
 
-  std::vector<float> QueueEverest(EverestTask* everest);
+  std::vector<float> QueueEverest(EverestTask* everest, float currentTime);
+
+  // calculate deltaTime and adjust everestTime and oldTime
+  void updateDeltaTime(float currentTime);
+
 
   std::vector<int> availableMeasurements = {0, 0, 0, 0, 0};
 
   EverestData everestData;
 
   float timeEverest = 0;
+
+  // the change between oldTime and timeEverest. 
+  float deltaTime = 0;
 
   void IMU1_Measurements(IMUData_Everest imu1, EverestTask* everest);
   void IMU2_Measurements(IMUData_Everest imu2, EverestTask* everest);

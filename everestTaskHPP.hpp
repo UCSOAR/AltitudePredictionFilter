@@ -150,9 +150,34 @@ class EverestTask {
   int madgwickInitialized = 0;
   int everestInitialized = 0;
 
+  bool isTared = false;
+  bool firstSampleAfterCalibration = true;
+  bool useSTD = false;
+
+  // INTERNAL VARIABLES
+  double theTime = CALIBRATION_TIME * RATE_BARO;
+  float sum = 0;
+  float pressureSum = 0;
+  float previousTimestamp = 0;
+  bool haloInitialized = false;
+  std::vector<float> sumZeroOffsetAccel;
+  std::vector<float> sumZeroOffsetAccel2;
+  std::vector<float> sumZeroOffsetGyro;
+  std::vector<float> sumZeroOffsetGyro2;
+
+  // Instantiate Everest
+  madAhrs* ahrs;
+  Infusion* infusion;
+
+  float oldTime = 0;
+  HALO halo;
+
+  madAhrsFlags flags;
+  madAhrsInternalStates internalStates;
+
   Infusion* ExternalInitialize();
 
-  void initEverest(EverestTask* everest);
+  void initEverest();
 
   static EverestTask getEverest();
 
@@ -164,8 +189,6 @@ class EverestTask {
   float dynamite();
 
   kinematics Kinematics;
-
-  kinematics* getKinematics();
 
   Infusion madgwick;
 
@@ -209,14 +232,14 @@ class EverestTask {
 
   bool getIsTared();
 
-  std::vector<float> EverestToHalo(EverestData everestData,
-                                   EverestTask* everest);
+  void setIsTare(bool isTare);
 
-  std::vector<float> QueueEverest(EverestTask* everest, float currentTime);
+  std::vector<float> EverestToHalo(EverestData everestData);
+
+  std::vector<float> QueueEverest(float currentTime);
 
   // calculate deltaTime and adjust everestTime and oldTime
   void updateDeltaTime(float currentTime);
-
 
   std::vector<int> availableMeasurements = {0, 0, 0, 0, 0};
 
@@ -224,23 +247,25 @@ class EverestTask {
 
   float timeEverest = 0;
 
-  // the change between oldTime and timeEverest. 
+  // the change between oldTime and timeEverest.
   float deltaTime = 0;
 
-  void IMU1_Measurements(IMUData_Everest imu1, EverestTask* everest);
-  void IMU2_Measurements(IMUData_Everest imu2, EverestTask* everest);
-  void Baro1_Measurements(BarosData baro1, EverestTask* everest);
-  void Baro2_Measurements(BarosData baro2, EverestTask* everest);
+  void IMU1_Measurements(IMUData_Everest imu1);
+  void IMU2_Measurements(IMUData_Everest imu2);
+  void Baro1_Measurements(BarosData baro1);
+  void Baro2_Measurements(BarosData baro2);
 
   int findAlignment(IMUData_Everest& imu1, IMUData_Everest& imu2);
 
   MadAxesAlignment alignment1, alignment2;
 
-  void GPS_Measurements(float altitude, EverestTask* everest);
+  void GPS_Measurements(float altitude);
 
   BarosData baro1, baro2;
 
   void updateGainsWithGPS();
+
+  float getFinalAltitude();
 
  protected:
   IMUData_Everest internalIMU_1, internalIMU_2;
@@ -272,7 +297,5 @@ EverestTask EverestTask::getEverest() {
   EverestTask everest = EverestTask();
   return everest;
 }
-
-kinematics* EverestTask::getKinematics() { return &Kinematics; }
 
 #endif

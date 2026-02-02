@@ -191,33 +191,8 @@ enum debug_level {
   HAL0 = 6,        // HALO
   Calibration = 7  // Calibration
 };
-bool isTared = false;
+
 debug_level debug = Calibration;
-bool firstSampleAfterCalibration = true;
-bool useSTD = false;
-
-// INTERNAL VARIABLES
-double theTime = CALIBRATION_TIME * RATE_BARO;
-float sum = 0;
-float pressureSum = 0;
-static float previousTimestamp = 0;
-bool haloInitialized = false;
-std::vector<float> sumZeroOffsetAccel;
-std::vector<float> sumZeroOffsetAccel2;
-std::vector<float> sumZeroOffsetGyro;
-std::vector<float> sumZeroOffsetGyro2;
-
-// Instantiate Everest
-madAhrs* ahrs;
-Infusion* infusion;
-
-EverestTask everest = EverestTask::getEverest();
-float oldTime = everest.timeEverest;
-HALO halo;
-kinematics* Kinematics = everest.getKinematics();  // tare to ground
-
-madAhrsFlags flags;
-madAhrsInternalStates internalStates;
 
 /**
  * @brief Calls finalWrapper with data and alignment
@@ -244,7 +219,7 @@ float EverestTask::TaskWrapper(EverestData everestData,
  */
 void EverestTask::MadgwickSetup() {
   // Attaches Madgwick to Everest
-  infusion = everest.ExternalInitialize();
+  infusion = this->ExternalInitialize();
   ahrs = infusion->getMadAhrs();
 
   // Define calibration (replace with actual calibration data if available)
@@ -277,7 +252,8 @@ void EverestTask::MadgwickSetup() {
       2000.0f, /* replace this with actual gyroscope range in degrees/s */
       10.0f,
       10.0f,
-      5 * REFRESH_RATE, /* 5 seconds, we ought to use adaptive deltatime here. */
+      5 * REFRESH_RATE, /* 5 seconds, we ought to use adaptive deltatime here.
+                         */
   };
 
   infusion->madAhrsSetSettings(ahrs, &settings);
@@ -306,6 +282,8 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   gyroscope = infusion->madOffsetUpdate(&offset, gyroscope);
 
   // Calculate delta time (in seconds)
+  // TODO: This code is technically identical to the new updateDeltaTime.
+  // However, we can leave it here, though it may cause issues.
   float deltaTime = (float)(timestamp - previousTimestamp);
   previousTimestamp = timestamp;
   this->state.deltaTimeIMU = deltaTime;
@@ -345,7 +323,7 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   fprintf(everestFile, "\n");
 #endif
 
-  everest.state.earthAcceleration = earth.axis.z;
+  this->state.earthAcceleration = earth.axis.z;
 
   if (debug == Secondary || debug == ALL) {
     printf("%f,%d,%.0f,%.0f,%d,%.0f,%d,%d,%d,%d\n",
@@ -580,16 +558,15 @@ void EverestTask::Baro_Update(const BarosData& Baro1, const BarosData& Baro2) {
  */
 float EverestTask::ExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
                                   BarosData baro1, BarosData baro2) {
-  everest.IMU_Update(imu1, imu2);
+  this->IMU_Update(imu1, imu2);
 
   if (debug == Third || debug == ALL) {
-    printf("After IMU Update IMU Altitude: %f\n",
-           everest.state.avgIMU.altitude);
+    printf("After IMU Update IMU Altitude: %f\n", this->state.avgIMU.altitude);
   }
 
-  everest.Baro_Update(baro1, baro2);
+  this->Baro_Update(baro1, baro2);
 
-  float finalAlt = everest.dynamite();
+  float finalAlt = this->dynamite();
 
   if (debug == Dynamite || debug == ALL) {
     printf("After Dynamite: %f\n", finalAlt);
@@ -674,8 +651,8 @@ float EverestTask::AlignedExternalUpdate(IMUData_Everest imu1,
  * @return calculated altitude
  */
 float EverestTask::deriveForAltitudeIMU(IMUData_Everest avgIMU) {
-  float accelerationZ = everest.state.earthAcceleration * -9.81;
-  float initialVelocity = this->getKinematics()->initialVelo;
+  float accelerationZ = this->state.earthAcceleration * -9.81;
+  float initialVelocity = this->Kinematics.initialVelo;
   float initialAltitude = this->Kinematics.initialAlt;
   double deltaTime = this->state.deltaTimeIMU;
 
@@ -733,16 +710,16 @@ float convertToAltitude(float pressure) {
  * @category Internal | Asynchronous
  */
 float EverestTask::dynamite() {
-  float IMUAltitude = deriveForAltitudeIMU(everest.state.avgIMU);
+  float IMUAltitude = deriveForAltitudeIMU(this->state.avgIMU);
   this->state.avgIMU.altitude = IMUAltitude;
 
   float BaroAltitude1 = convertToAltitude(this->baro1.pressure);
   this->baro1.altitude = BaroAltitude1;
 
-  float BaroAltitude2 = convertToAltitude(everest.baro2.pressure);
+  float BaroAltitude2 = convertToAltitude(this->baro2.pressure);
   this->baro2.altitude = BaroAltitude2;
 
-  float GPSAltitude = everest.everestData.altitudeGPS;
+  float GPSAltitude = this->everestData.altitudeGPS;
 
   if (debug == Dynamite || debug == ALL) {
     printf("\nDynamite\n");
@@ -755,25 +732,25 @@ float EverestTask::dynamite() {
   }
 
   // if pressure is zero, set gain to zero
-  if (everest.baro1.pressure == 0) {
-    everest.state.gain_Baro1 = 0;
-  } else if (everest.state.gain_Baro1 == 0) {
+  if (this->baro1.pressure == 0) {
+    this->state.gain_Baro1 = 0;
+  } else if (this->state.gain_Baro1 == 0) {
     // if not zero, set gain to previous gain
-    everest.state.gain_Baro1 = everest.state.prev_gain_Baro1;
+    this->state.gain_Baro1 = this->state.prev_gain_Baro1;
   }
 
   // if not zero, set gain to zero
-  if (everest.baro2.pressure == 0) {
-    everest.state.gain_Baro2 = 0;
-  } else if (everest.state.gain_Baro2 == 0) {
+  if (this->baro2.pressure == 0) {
+    this->state.gain_Baro2 = 0;
+  } else if (this->state.gain_Baro2 == 0) {
     // if not zero, set gain to previous gain
-    everest.state.gain_Baro2 = everest.state.prev_gain_Baro2;
+    this->state.gain_Baro2 = this->state.prev_gain_Baro2;
   }
 
   // distribute measurements based on gain
-  float distributed_IMU_Altitude = IMUAltitude * everest.state.gain_IMU;
-  float distributed_Baro_Altitude1 = (BaroAltitude1 * everest.state.gain_Baro1);
-  float distributed_Baro_Altitude2 = (BaroAltitude2 * everest.state.gain_Baro2);
+  float distributed_IMU_Altitude = IMUAltitude * this->state.gain_IMU;
+  float distributed_Baro_Altitude1 = (BaroAltitude1 * this->state.gain_Baro1);
+  float distributed_Baro_Altitude2 = (BaroAltitude2 * this->state.gain_Baro2);
 
   // summation of distributed measurements
   float distributed_Sum = distributed_IMU_Altitude +
@@ -785,8 +762,8 @@ float EverestTask::dynamite() {
   }
 
   // summation of gains
-  float sumGain = everest.state.gain_IMU + everest.state.gain_Baro1 +
-                  everest.state.gain_Baro2;
+  float sumGain =
+      this->state.gain_IMU + this->state.gain_Baro1 + this->state.gain_Baro2;
 
   if (debug == Dynamite || debug == ALL) {
     printf("Sum Gain: %f\n\n", sumGain);
@@ -800,12 +777,12 @@ float EverestTask::dynamite() {
   }
 
   // overrides normalised altitude with GPS altitude if available, Don't!!
-  /*if (everest.availableMeasurements[4] == 1) {
-    std::cout << "GPS Altitude: " << everest.everestData.altitudeGPS
+  /*if (this->availableMeasurements[4] == 1) {
+    std::cout << "GPS Altitude: " << this->everestData.altitudeGPS
               << std::endl;
     std::cout << "Normalised Altitude before: " << normalised_Altitude
               << std::endl;
-    normalised_Altitude = everest.everestData.altitudeGPS;
+    normalised_Altitude = this->everestData.altitudeGPS;
     std::cout << "Normalised Altitude after: " << normalised_Altitude
               << std::endl;
   }*/
@@ -831,28 +808,28 @@ float EverestTask::dynamite() {
   recalculateGain(normalised_Altitude);
 
   /*
-  if (everest.availableMeasurements[4] == 1) {
+  if (this->availableMeasurements[4] == 1) {
     updateGainsWithGPS();
   }*/
 
   // Save the gains that are not zero as previous gains
   // so once we have recovery phase these old gains are used
-  if (everest.state.gain_IMU != 0) {
-    everest.state.prev_gain_IMU = everest.state.gain_IMU;
+  if (this->state.gain_IMU != 0) {
+    this->state.prev_gain_IMU = this->state.gain_IMU;
   }
-  if (everest.state.gain_Baro1 != 0) {
-    everest.state.prev_gain_Baro1 = everest.state.gain_Baro1;
+  if (this->state.gain_Baro1 != 0) {
+    this->state.prev_gain_Baro1 = this->state.gain_Baro1;
   }
-  if (everest.state.gain_Baro2 != 0) {
-    everest.state.prev_gain_Baro2 = everest.state.gain_Baro2;
+  if (this->state.gain_Baro2 != 0) {
+    this->state.prev_gain_Baro2 = this->state.gain_Baro2;
   }
   if (debug == Dynamite || debug == ALL) {
     printf("Previous Gains\n");
-    printf("Prev Gain IMU: %f\n", everest.state.prev_gain_IMU);
-    printf("Prev Gain Baro1: %f\n", everest.state.prev_gain_Baro1);
-    printf("Prev Gain Baro2: %f\n", everest.state.prev_gain_Baro2);
-    // printf("Prev Gain Baro3: %f\n", everest.state.prev_gain_Baro3);
-    // printf("Prev Gain Real Baro: %f\n\n", everest.state.prev_gain_Real_Baro);
+    printf("Prev Gain IMU: %f\n", this->state.prev_gain_IMU);
+    printf("Prev Gain Baro1: %f\n", this->state.prev_gain_Baro1);
+    printf("Prev Gain Baro2: %f\n", this->state.prev_gain_Baro2);
+    // printf("Prev Gain Baro3: %f\n", this->state.prev_gain_Baro3);
+    // printf("Prev Gain Real Baro: %f\n\n", this->state.prev_gain_Real_Baro);
   }
 
   return normalised_Altitude;
@@ -863,16 +840,16 @@ float EverestTask::dynamite() {
  *
  */
 void EverestTask::updateGainsWithGPS() {
-  float gpsAltitude = everest.everestData.altitudeGPS;
-  float imuGPSDiff = fabsf(everest.state.avgIMU.altitude - gpsAltitude);
-  float baro1GPSDiff = fabsf(everest.baro1.altitude - gpsAltitude);
-  float baro2GPSDiff = fabsf(everest.baro2.altitude - gpsAltitude);
+  float gpsAltitude = this->everestData.altitudeGPS;
+  float imuGPSDiff = fabsf(this->state.avgIMU.altitude - gpsAltitude);
+  float baro1GPSDiff = fabsf(this->baro1.altitude - gpsAltitude);
+  float baro2GPSDiff = fabsf(this->baro2.altitude - gpsAltitude);
 
   float totalDiff = imuGPSDiff + baro1GPSDiff + baro2GPSDiff;
 
-  float gain_IMU = everest.state.gain_IMU * (1 - imuGPSDiff / totalDiff);
-  float gain_Baro1 = everest.state.gain_Baro1 * (1 - baro1GPSDiff / totalDiff);
-  float gain_Baro2 = everest.state.gain_Baro2 * (1 - baro2GPSDiff / totalDiff);
+  float gain_IMU = this->state.gain_IMU * (1 - imuGPSDiff / totalDiff);
+  float gain_Baro1 = this->state.gain_Baro1 * (1 - baro1GPSDiff / totalDiff);
+  float gain_Baro2 = this->state.gain_Baro2 * (1 - baro2GPSDiff / totalDiff);
 
   if (debug == Dynamite || debug == ALL) {
     printf("\nUpdate Gains with GPS\n");
@@ -885,9 +862,9 @@ void EverestTask::updateGainsWithGPS() {
     printf("New Gain Baro2: %f\n", gain_Baro2);
   }
 
-  everest.state.gain_IMU = gain_IMU;
-  everest.state.gain_Baro1 = gain_Baro1;
-  everest.state.gain_Baro2 = gain_Baro2;
+  this->state.gain_IMU = gain_IMU;
+  this->state.gain_Baro1 = gain_Baro1;
+  this->state.gain_Baro2 = gain_Baro2;
 }
 
 /**
@@ -954,9 +931,9 @@ void EverestTask::calculateSTDCoefficients() {
   float std_Baro1 = this->state.gain_Baro1;
   float std_Baro2 = this->state.gain_Baro2;
 
-  float sumSTD1 = pow(everest.state.gain_IMU, 2) +
-                  pow(everest.state.gain_Baro1, 2) +
-                  pow(everest.state.gain_Baro2, 2);
+  float sumSTD1 = pow(this->state.gain_IMU, 2) +
+                  pow(this->state.gain_Baro1, 2) +
+                  pow(this->state.gain_Baro2, 2);
 
   // normalise
   this->state.std_IMU = pow(std_IMU, 2) / sumSTD1;
@@ -1008,7 +985,7 @@ float EverestTask::deriveChangeInVelocityToGetAltitude(float estimate) {
  * @return kinematics struct
  *
  */
-float getFinalAltitude() { return Kinematics->finalAltitude; }
+float EverestTask::getFinalAltitude() { return Kinematics.finalAltitude; }
 
 /**
  * @brief Average IMUs to feed into alignment function
@@ -1355,8 +1332,7 @@ float EverestTask::finalWrapper(
   sensorData2.magY = imu2MagAligned.axis.y;
   sensorData2.magZ = imu2MagAligned.axis.z;
 
-  float eAltitude =
-      everest.ExternalUpdate(sensorData, sensorData2, baro1, baro2);
+  float eAltitude = this->ExternalUpdate(sensorData, sensorData2, baro1, baro2);
 
   return eAltitude;
 }
@@ -1364,22 +1340,21 @@ float EverestTask::finalWrapper(
 /**
  * @brief Resets isTared flag to re-initialize the tare
  */
-void setIsTare(bool isTare) { isTared = isTare; }
+void EverestTask::setIsTare(bool isTare) { isTared = isTare; }
 
 /**
  * @brief Returns the isTared flag
  */
-bool getIsTared() { return isTared; }
+bool EverestTask::getIsTared() { return isTared; }
 
 /**
  * @brief initialized Halo, and passes Everest filtered values to HALO
  */
-std::vector<float> EverestTask::EverestToHalo(EverestData everestData,
-                                              EverestTask* everest) {
+std::vector<float> EverestTask::EverestToHalo(EverestData everestData) {
   float eAltitude =
-      everest->TaskWrapper(everestData, this->alignment1, this->alignment2);
-  float eVelocity = everest->getKinematics()->initialVelo;
-  float eAccelerationZ = (everest->state.earthAcceleration - 1) * -9.81;
+      this->TaskWrapper(everestData, this->alignment1, this->alignment2);
+  float eVelocity = this->Kinematics.initialVelo;
+  float eAccelerationZ = (this->state.earthAcceleration - 1) * -9.81;
 
   std::vector<float> haloData = {0, 0, 0};
 
@@ -1389,8 +1364,8 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData,
             eVelocity, eAccelerationZ);
 #endif
 
-    // TODO: Shouldn't everestTime be the source of truth?  At some point we should decide.
-    // Update HALO
+    // TODO: Shouldn't everestTime be the source of truth?  At some point we
+    // should decide. Update HALO
     haloData = halo.Halo_Input(&halo, haloInitialized, eAccelerationZ,
                                eVelocity, eAltitude, everestData.altitudeGPS,
                                everestData.timeIMU1, deltaTime);
@@ -1405,55 +1380,53 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData,
 }
 
 // update IMU1
-void EverestTask::IMU1_Measurements(IMUData_Everest imu1,
-                                    EverestTask* everest) {
-  everest->everestData.accelX1 = imu1.accelX;
-  everest->everestData.accelY1 = imu1.accelY;
-  everest->everestData.accelZ1 = imu1.accelZ;
-  everest->everestData.gyroX1 = imu1.gyroX;
-  everest->everestData.gyroY1 = imu1.gyroY;
-  everest->everestData.gyroZ1 = imu1.gyroZ;
-  everest->everestData.magX1 = imu1.magX;
-  everest->everestData.magY1 = imu1.magY;
-  everest->everestData.magZ1 = imu1.magZ;
-  everest->everestData.timeIMU1 = imu1.time;
-  everest->availableMeasurements[0] = 1;
+void EverestTask::IMU1_Measurements(IMUData_Everest imu1) {
+  this->everestData.accelX1 = imu1.accelX;
+  this->everestData.accelY1 = imu1.accelY;
+  this->everestData.accelZ1 = imu1.accelZ;
+  this->everestData.gyroX1 = imu1.gyroX;
+  this->everestData.gyroY1 = imu1.gyroY;
+  this->everestData.gyroZ1 = imu1.gyroZ;
+  this->everestData.magX1 = imu1.magX;
+  this->everestData.magY1 = imu1.magY;
+  this->everestData.magZ1 = imu1.magZ;
+  this->everestData.timeIMU1 = imu1.time;
+  this->availableMeasurements[0] = 1;
 }
 
 // update IMU2
-void EverestTask::IMU2_Measurements(IMUData_Everest imu2,
-                                    EverestTask* everest) {
-  everest->everestData.accelX2 = imu2.accelX;
-  everest->everestData.accelY2 = imu2.accelY;
-  everest->everestData.accelZ2 = imu2.accelZ;
-  everest->everestData.gyroX2 = imu2.gyroX;
-  everest->everestData.gyroY2 = imu2.gyroY;
-  everest->everestData.gyroZ2 = imu2.gyroZ;
-  everest->everestData.magX2 = imu2.magX;
-  everest->everestData.magY2 = imu2.magY;
-  everest->everestData.magZ2 = imu2.magZ;
-  everest->everestData.timeIMU2 = imu2.time;
-  everest->availableMeasurements[1] = 1;
+void EverestTask::IMU2_Measurements(IMUData_Everest imu2) {
+  this->everestData.accelX2 = imu2.accelX;
+  this->everestData.accelY2 = imu2.accelY;
+  this->everestData.accelZ2 = imu2.accelZ;
+  this->everestData.gyroX2 = imu2.gyroX;
+  this->everestData.gyroY2 = imu2.gyroY;
+  this->everestData.gyroZ2 = imu2.gyroZ;
+  this->everestData.magX2 = imu2.magX;
+  this->everestData.magY2 = imu2.magY;
+  this->everestData.magZ2 = imu2.magZ;
+  this->everestData.timeIMU2 = imu2.time;
+  this->availableMeasurements[1] = 1;
 }
 
 // update Baro1
-void EverestTask::Baro1_Measurements(BarosData baro1, EverestTask* everest) {
-  everest->everestData.pressure1 = baro1.pressure;
-  everest->everestData.timeBaro1 = baro1.time;
-  everest->availableMeasurements[2] = 1;
+void EverestTask::Baro1_Measurements(BarosData baro1) {
+  this->everestData.pressure1 = baro1.pressure;
+  this->everestData.timeBaro1 = baro1.time;
+  this->availableMeasurements[2] = 1;
 }
 
 // update Baro2
-void EverestTask::Baro2_Measurements(BarosData baro2, EverestTask* everest) {
-  everest->everestData.pressure2 = baro2.pressure;
-  everest->everestData.timeBaro2 = baro2.time;
-  everest->availableMeasurements[3] = 1;
+void EverestTask::Baro2_Measurements(BarosData baro2) {
+  this->everestData.pressure2 = baro2.pressure;
+  this->everestData.timeBaro2 = baro2.time;
+  this->availableMeasurements[3] = 1;
 }
 
 // update GPS
-void EverestTask::GPS_Measurements(float altitude, EverestTask* everest) {
-  everest->everestData.altitudeGPS = altitude;
-  everest->availableMeasurements[4] = 1;
+void EverestTask::GPS_Measurements(float altitude) {
+  this->everestData.altitudeGPS = altitude;
+  this->availableMeasurements[4] = 1;
 }
 
 // Custom rounding function
@@ -1462,9 +1435,9 @@ float roundToDecimalPlaces(double value, int decimalPlaces) {
   return std::round(value * scale) / scale;
 }
 
-std::vector<float> EverestTask::QueueEverest(EverestTask* everest, float currentTime) {
+std::vector<float> EverestTask::QueueEverest(float currentTime) {
   if (everestInitialized == 0) {
-    initEverest(everest);
+    initEverest();
     // size 0 float indicates not ready. I doubt a union return type would be a
     // good solution here.
     return std::vector<float>();
@@ -1472,56 +1445,55 @@ std::vector<float> EverestTask::QueueEverest(EverestTask* everest, float current
 
   updateDeltaTime(currentTime);
 
-  // this code doesn't make sense since deltaTime is defined using timeEverest. deltaTime will always be equal.
-  // TODO: 0 here will be a threshold value for updates. If the filter is updating too fast (doubtful) then we can limit it here.
-  if (deltaTime >=
-      0) {
-    if (everest->availableMeasurements[0] == 1 &&
-        everest->availableMeasurements[1] == 1 &&
-        everest->availableMeasurements[2] == 1 &&
-        everest->availableMeasurements[3] == 1) {
-      std::vector<float> haloData =
-          everest->EverestToHalo(everest->everestData, everest);
+  // this code doesn't make sense since deltaTime is defined using timethis->
+  // deltaTime will always be equal.
+  // TODO: 0 here will be a threshold value for updates. If the filter is
+  // updating too fast (doubtful) then we can limit it here.
+  if (deltaTime >= 0) {
+    if (this->availableMeasurements[0] == 1 &&
+        this->availableMeasurements[1] == 1 &&
+        this->availableMeasurements[2] == 1 &&
+        this->availableMeasurements[3] == 1) {
+      std::vector<float> haloData = this->EverestToHalo(this->everestData);
       // reset available measurements
-      everest->availableMeasurements[0] = 0;
-      everest->availableMeasurements[1] = 0;
-      everest->availableMeasurements[2] = 0;
-      everest->availableMeasurements[3] = 0;
+      this->availableMeasurements[0] = 0;
+      this->availableMeasurements[1] = 0;
+      this->availableMeasurements[2] = 0;
+      this->availableMeasurements[3] = 0;
     } else {
       // available[0] = IMU1, available[1] = IMU2, available[2] = Baro1,
       // available[3] = Baro2
-      if (everest->availableMeasurements[0] == 0) {
+      if (this->availableMeasurements[0] == 0) {
         // set to infinity
-        everest->everestData.accelX1 = std::numeric_limits<float>::infinity();
+        this->everestData.accelX1 = std::numeric_limits<float>::infinity();
       }
 
-      if (everest->availableMeasurements[1] == 0) {
+      if (this->availableMeasurements[1] == 0) {
         // set to infinity
-        everest->everestData.accelX2 = std::numeric_limits<float>::infinity();
+        this->everestData.accelX2 = std::numeric_limits<float>::infinity();
       }
 
-      if (everest->availableMeasurements[2] == 0) {
-        everest->everestData.pressure1 = 0;
+      if (this->availableMeasurements[2] == 0) {
+        this->everestData.pressure1 = 0;
       }
 
-      if (everest->availableMeasurements[3] == 0) {
-        everest->everestData.pressure2 = 0;
+      if (this->availableMeasurements[3] == 0) {
+        this->everestData.pressure2 = 0;
       }
 
-      std::vector<float> haloData =
-          everest->EverestToHalo(everest->everestData, everest);
+      std::vector<float> haloData = this->EverestToHalo(this->everestData);
 
       // reset available measurements
-      everest->availableMeasurements[0] = 0;
-      everest->availableMeasurements[1] = 0;
-      everest->availableMeasurements[2] = 0;
-      everest->availableMeasurements[3] = 0;
+      this->availableMeasurements[0] = 0;
+      this->availableMeasurements[1] = 0;
+      this->availableMeasurements[2] = 0;
+      this->availableMeasurements[3] = 0;
     }
   }
   // }
 }
 
-void EverestTask::updateDeltaTime( float currentTime) {
+void EverestTask::updateDeltaTime(float currentTime) {
   oldTime = timeEverest;
   deltaTime = oldTime - currentTime;
   timeEverest = currentTime;
@@ -1542,68 +1514,68 @@ float findClosestTime(float time) {
   return altitude;
 }
 
-void EverestTask::initEverest(EverestTask* everest) {
-  if (madgwickInitialized == 0) everest->MadgwickSetup();
+void EverestTask::initEverest() {
+  if (madgwickInitialized == 0) this->MadgwickSetup();
 
-  if (everest->isAligned == 0) {
-    IMUData_Everest imu1 = {everest->everestData.timeIMU1,
-                            everest->everestData.accelX1,
-                            everest->everestData.accelY1,
-                            everest->everestData.accelZ1,
-                            everest->everestData.gyroX1,
-                            everest->everestData.gyroY1,
-                            everest->everestData.gyroZ1,
-                            everest->everestData.magX1,
-                            everest->everestData.magY1,
-                            everest->everestData.magZ1,
+  if (this->isAligned == 0) {
+    IMUData_Everest imu1 = {this->everestData.timeIMU1,
+                            this->everestData.accelX1,
+                            this->everestData.accelY1,
+                            this->everestData.accelZ1,
+                            this->everestData.gyroX1,
+                            this->everestData.gyroY1,
+                            this->everestData.gyroZ1,
+                            this->everestData.magX1,
+                            this->everestData.magY1,
+                            this->everestData.magZ1,
                             0.0f};
 
-    IMUData_Everest imu2 = {everest->everestData.timeIMU2,
-                            everest->everestData.accelX2,
-                            everest->everestData.accelY2,
-                            everest->everestData.accelZ2,
-                            everest->everestData.gyroX2,
-                            everest->everestData.gyroY2,
-                            everest->everestData.gyroZ2,
-                            everest->everestData.magX2,
-                            everest->everestData.magY2,
-                            everest->everestData.magZ2,
+    IMUData_Everest imu2 = {this->everestData.timeIMU2,
+                            this->everestData.accelX2,
+                            this->everestData.accelY2,
+                            this->everestData.accelZ2,
+                            this->everestData.gyroX2,
+                            this->everestData.gyroY2,
+                            this->everestData.gyroZ2,
+                            this->everestData.magX2,
+                            this->everestData.magY2,
+                            this->everestData.magZ2,
                             0.0f};
 
-    everest->isAligned = everest->findAlignment(imu1, imu2);
+    this->isAligned = this->findAlignment(imu1, imu2);
   }
 
   if (!isTared) {
-    IMUData_Everest imu1 = {everest->everestData.timeIMU1,
-                            everest->everestData.accelX1,
-                            everest->everestData.accelY1,
-                            everest->everestData.accelZ1,
-                            everest->everestData.gyroX1,
-                            everest->everestData.gyroY1,
-                            everest->everestData.gyroZ1,
-                            everest->everestData.magX1,
-                            everest->everestData.magY1,
-                            everest->everestData.magZ1,
+    IMUData_Everest imu1 = {this->everestData.timeIMU1,
+                            this->everestData.accelX1,
+                            this->everestData.accelY1,
+                            this->everestData.accelZ1,
+                            this->everestData.gyroX1,
+                            this->everestData.gyroY1,
+                            this->everestData.gyroZ1,
+                            this->everestData.magX1,
+                            this->everestData.magY1,
+                            this->everestData.magZ1,
                             0.0f};
 
-    IMUData_Everest imu2 = {everest->everestData.timeIMU2,
-                            everest->everestData.accelX2,
-                            everest->everestData.accelY2,
-                            everest->everestData.accelZ2,
-                            everest->everestData.gyroX2,
-                            everest->everestData.gyroY2,
-                            everest->everestData.gyroZ2,
-                            everest->everestData.magX2,
-                            everest->everestData.magY2,
-                            everest->everestData.magZ2,
+    IMUData_Everest imu2 = {this->everestData.timeIMU2,
+                            this->everestData.accelX2,
+                            this->everestData.accelY2,
+                            this->everestData.accelZ2,
+                            this->everestData.gyroX2,
+                            this->everestData.gyroY2,
+                            this->everestData.gyroZ2,
+                            this->everestData.magX2,
+                            this->everestData.magY2,
+                            this->everestData.magZ2,
                             0.0f};
 
-    BarosData baro1 = {everest->everestData.timeBaro1,
-                       everest->everestData.pressure1, 0, 0};
-    BarosData baro2 = {everest->everestData.timeBaro2,
-                       everest->everestData.pressure2, 0, 0};
+    BarosData baro1 = {this->everestData.timeBaro1, this->everestData.pressure1,
+                       0, 0};
+    BarosData baro2 = {this->everestData.timeBaro2, this->everestData.pressure2,
+                       0, 0};
 
-    everest->tare(imu1, imu2, baro1, baro2);
+    this->tare(imu1, imu2, baro1, baro2);
   }
 
   if (haloInitialized == false) {
@@ -1612,13 +1584,13 @@ void EverestTask::initEverest(EverestTask* everest) {
       // Initialize HALO
       halo = HALO();
       // Set initial altitude to 1000 if it is zero (no baros in tareing)
-      if (everest->Kinematics.initialAlt == 0) {
-        everest->Kinematics.initialAlt = 1000;
+      if (this->Kinematics.initialAlt == 0) {
+        this->Kinematics.initialAlt = 1000;
       }
-      halo.initializeHALO(everest->Kinematics.initialAlt, &halo);
+      halo.initializeHALO(this->Kinematics.initialAlt, &halo);
       haloInitialized = true;
 
-      everest->everestInitialized = 1;
+      this->everestInitialized = 1;
     }
   }
 
@@ -1637,6 +1609,7 @@ int main() {
   openFiles();
 #endif
 
+  EverestTask everest = EverestTask();
   // read first line and preset the deltaTime to timestamp
   char line[MAX_LINE_LENGTH];
   std::clock_t start;
@@ -1688,17 +1661,17 @@ int main() {
     }
 
     // get measurements (this will be done from subscribing to the sensors)
-    everest.IMU1_Measurements(sensorData, &everest);
-    everest.IMU2_Measurements(sensorData2, &everest);
-    everest.Baro1_Measurements(baro1, &everest);
-    everest.Baro2_Measurements(baro2, &everest);
-    everest.GPS_Measurements(findClosestTime(time), &everest);
+    everest.IMU1_Measurements(sensorData);
+    everest.IMU2_Measurements(sensorData2);
+    everest.Baro1_Measurements(baro1);
+    everest.Baro2_Measurements(baro2);
+    everest.GPS_Measurements(findClosestTime(time));
 
     // start timer for iteration
     start = std::clock();
 
     // calls the entirety of the power of HALO, peak modularization
-    std::vector<float> haloData = everest.QueueEverest(&everest, time);
+    std::vector<float> haloData = everest.QueueEverest(time);
 
     clock_t endTime = std::clock();
 

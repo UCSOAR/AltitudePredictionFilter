@@ -1495,7 +1495,7 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
 
 void EverestTask::updateDeltaTime(float currentTime) {
   oldTime = timeEverest;
-  deltaTime = oldTime - currentTime;
+  deltaTime = currentTime - oldTime;
   timeEverest = currentTime;
 }
 

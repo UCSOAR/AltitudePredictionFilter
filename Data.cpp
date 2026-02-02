@@ -1,6 +1,8 @@
 
 #include <vector>
 
+#include "Data.hpp"
+
 const int num_scenarios_parsed = 2;
 
 std::vector<std::vector<float>> beforeApogeeSim1 = {

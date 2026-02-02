@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <ctime>
 #include <string.h>
-#include <direct.h>
+
 #include <cstdio>
 #include <cerrno>
 
@@ -12,10 +12,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "input_data.cpp"
-#include "pre_flight_data.cpp"
 
-#include "gpsData.cpp"
 
 // #define LOGON
 // #define LOGMETRICS
@@ -25,6 +22,14 @@
 
 #ifdef LOGMETRICS
 static FILE* everestGains = NULL;
+#endif
+
+
+#ifdef TEST_BUILD
+#include <direct.h>
+#include "input_data.cpp"
+#include "pre_flight_data.cpp"
+#include "gpsData.cpp"
 #endif
 
 FILE* haloFile;
@@ -45,6 +50,7 @@ Infusion* EverestTask::ExternalInitialize() {
   return &madgwick;
 }
 
+#ifdef TEST_BUILD
 int openFiles() {
   // Define the directory path
   std::string directoryPath = "testSuite/results";
@@ -189,10 +195,14 @@ int openFiles() {
   return 0;
 }
 
+#endif
+
 /**
  * To run:  g++ Infusion.cpp EverestTask.cpp -o Everest
  *          ./Everest
  */
+
+
 using namespace std;
 
 // SETTINGS (mostly for debugging, keep default for run)
@@ -1514,6 +1524,7 @@ void EverestTask::updateDeltaTime(float currentTime) {
   timeEverest = currentTime;
 }
 
+#ifdef TEST_BUILD
 float findClosestTime(float time) {
   // cycle through the times until you find one bigger and return one or after
   // before it
@@ -1528,6 +1539,7 @@ float findClosestTime(float time) {
   }
   return altitude;
 }
+#endif
 
 void EverestTask::initEverest() {
   if (madgwickInitialized == 0) this->MadgwickSetup();
@@ -1615,6 +1627,7 @@ void EverestTask::initEverest() {
 // --------------------------------------------------- END OF EVEREST
 #define MAX_LINE_LENGTH 1024
 
+#ifdef TEST_BUILD
 /**
  * Serves to just initialize structs
  */
@@ -1706,3 +1719,4 @@ int main() {
 
   return 0;
 }
+#endif

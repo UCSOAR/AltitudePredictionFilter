@@ -1,6 +1,6 @@
 #include "HALO.hpp"
 #include <fstream>
-#include "Data.cpp"
+#include "Data.hpp"
 #include <map>
 
 // #define LOGON

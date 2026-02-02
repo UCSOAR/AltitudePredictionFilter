@@ -16,15 +16,6 @@
 #include <iostream>
 #include <sstream>
 
-#ifdef HOME
-<<<<<<< Updated upstream
-#include "C:\Users\Harry\Desktop\SOAR\extra\HALO.hpp"
-    == == ==
-    =
-#include "C:\Users\harry\Desktop\soar\extra\HALO.hpp"
-        >>>>>>> Stashed changes
-#endif
-
 #ifndef HOME
 #include "C:\Users\harry\Desktop\soar\extra\HALO.hpp"
 #endif
@@ -35,14 +26,9 @@
 #define RATE_BARO (3)
 #define CALIBRATION_TIME (2)
 
-        /* Macros/Enums
-           ------------------------------------------------------------*/
-        enum EVEREST_TASK_COMMANDS {
-          EVEREST_NONE = 0,
-          UPDATE,
-          TEST,
-          RETARE
-        };
+/* Macros/Enums
+   ------------------------------------------------------------*/
+enum EVEREST_TASK_COMMANDS { EVEREST_NONE = 0, UPDATE, TEST, RETARE };
 
 /*Defines------------------------------------------------------------------*/
 typedef struct {

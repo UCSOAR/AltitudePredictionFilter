@@ -278,24 +278,4 @@ class EverestTask {
  private:
 };
 
-void EverestTask::initialize1(systemState& state) {
-  this->state.gain_IMU = 4 / 10.0;  // change to actual initial trusts
-  this->state.gain_Baro1 = 3 / 10.0;
-  state.gain_Baro2 = 3 / 10.0;
-
-  Kinematics.initialVelo = 0;
-  Kinematics.initialAlt = 0;
-  Kinematics.finalAltitude = 0;
-}
-
-Infusion* EverestTask::ExternalInitialize() {
-  initialize1(state);
-  return &madgwick;
-}
-
-EverestTask EverestTask::getEverest() {
-  EverestTask everest = EverestTask();
-  return everest;
-}
-
 #endif

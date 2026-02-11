@@ -1722,6 +1722,3 @@ int main() {
 
 
 #endif
-int main () {
-  return 0; 
-}

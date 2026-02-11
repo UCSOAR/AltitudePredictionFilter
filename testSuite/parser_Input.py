@@ -2,41 +2,113 @@ import csv
 
 # Read the IMU data from a CSV file
 input_data = []
-with open("Imu_Baro.csv", "r") as file:
+with open("testSuite/data/Imu_Baro.csv", "r") as file:
     reader = csv.reader(file)
-    next(reader)  # Skip the header row
+    next(reader)  # Skip header
     for row in reader:
         input_data.append(row)
 
-# Generate the C++ code
-cpp_code = """
-#include <vector>
-"""
-
-# Initialize time variables
+# Time variables
 time_increment = 1 / 3
 current_time = 0
 
-# Generate the IMUData_Everest and BarosData arrays
-cpp_code += "\nstd::vector<std::vector<float>> taberLaunch = {\n"
+# Count valid IMU rows
+imu_count = 0
 for data in input_data:
     if data[4] == "":
         break
-    cpp_code += f"    {{{current_time}, {float(data[3])/1000}, {float(data[4])/1000}, {float(data[5])/1000}, {float(data[0])/1000}, {float(data[1])/1000}, {float(data[2])/1000}, {float(data[6])/1000}, {float(data[7])/1000}, {float(data[8])/1000}}},\n"
-    current_time += time_increment
-cpp_code += "};\n"
+    imu_count += 1
 
-current_time = 0
-cpp_code += "\nstd::vector<std::vector<float>> baroData = {\n"
+# Count valid baro rows
+baro_count = 0
 for data in input_data:
     if data[10] == "":
         break
-    cpp_code += f"    {{{current_time}, {data[10]}, 0, 0}},\n"
+    baro_count += 1
+
+
+# C++ source
+cpp_code = f"""
+#include <array>
+#include "input_data.hpp"
+
+const std::array<std::array<float, 10>, {imu_count}> taberLaunch = {{
+"""
+
+# Generate IMU data
+current_time = 0
+
+for i, data in enumerate(input_data[:imu_count]):
+
+    comma = "," if i < imu_count - 1 else ""
+
+    cpp_code += (
+        f"    std::array<float, 10>{{"
+        f"{current_time}, "
+        f"{float(data[3])/1000}, "
+        f"{float(data[4])/1000}, "
+        f"{float(data[5])/1000}, "
+        f"{float(data[0])/1000}, "
+        f"{float(data[1])/1000}, "
+        f"{float(data[2])/1000}, "
+        f"{float(data[6])/1000}, "
+        f"{float(data[7])/1000}, "
+        f"{float(data[8])/1000}"
+        f"}}{comma}\n"
+    )
+
     current_time += time_increment
+
+
+cpp_code += f"""}};
+
+const std::array<std::array<float, 4>, {baro_count}> baroData = {{
+"""
+
+
+# Generate Baro data
+current_time = 0
+
+for i, data in enumerate(input_data[:baro_count]):
+
+    comma = "," if i < baro_count - 1 else ""
+
+    cpp_code += (
+        f"    std::array<float, 4>{{"
+        f"{current_time}, "
+        f"{data[10]}, "
+        f"0, 0"
+        f"}}{comma}\n"
+    )
+
+    current_time += time_increment
+
+
 cpp_code += "};\n"
 
-# Write the generated C++ code to a file
+
+# Write cpp
 with open("input_data.cpp", "w") as file:
     file.write(cpp_code)
 
-print("input_data.cpp file has been generated.")
+
+# Header file
+hpp_code = f"""
+#ifndef INPUT_DATA_HPP_
+#define INPUT_DATA_HPP_
+
+#include <array>
+
+extern const std::array<std::array<float, 10>, {imu_count}> taberLaunch;
+
+extern const std::array<std::array<float, 4>, {baro_count}> baroData;
+
+#endif
+"""
+
+
+with open("input_data.hpp", "w") as file:
+    file.write(hpp_code)
+
+
+print("input_data.cpp and input_data.hpp generated.")

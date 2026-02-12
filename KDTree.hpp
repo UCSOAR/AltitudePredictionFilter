@@ -59,7 +59,6 @@ KDNodePtr NewKDNodePtr();
 inline float dist2(std::array<float, 3> const&, std::array<float, 3> const&);
 inline float dist2(KDNodePtr const&, KDNodePtr const&);
 
-
 // Need for sorting
 class comparer {
  public:
@@ -83,7 +82,7 @@ class KDTree {
   KDTree() = default;
 
   /// Build a KDtree
-  explicit KDTree(std::vector<std::array<float, 3>> point_array);
+  explicit KDTree(std::vector<std::array<float, 3>>& point_array);
 
   /// Get the point which lies closest to the input point.
   /// @param pt input point.
@@ -117,8 +116,8 @@ class KDTree {
   ///
   /// @returns a vector containing the points which are at a distance smaller
   /// than rad to the input point.
-  std::vector<std::array<float, 3>> nearest_points(std::array<float, 3> const& pt,
-                                                 size_t const& num_nearest);
+  std::vector<std::array<float, 3>> nearest_points(
+      std::array<float, 3> const& pt, size_t const& num_nearest);
 
   /// Get the indices of points closest to the input point.
   ///
@@ -218,7 +217,8 @@ class KDTree {
   ///
   /// @returns a vector containing the indices of the points which are at a
   /// distance smaller than rad to the input point.
-  indexArr neighborhood_indices(std::array<float, 3> const& pt, float const& rad);
+  indexArr neighborhood_indices(std::array<float, 3> const& pt,
+                                float const& rad);
 
  private:
   KDNodePtr make_tree(pointIndexArr::iterator const& begin,

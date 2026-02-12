@@ -10,15 +10,10 @@
 #include "KDTree.hpp"
 #include <deque>
 
-#ifdef HOME
-#include "C:\Users\harry\Desktop\soar\eigen-3.4.0\eigen-3.4.0\Eigen\Cholesky"
-#include "C:\Users\harry\Desktop\soar\eigen-3.4.0\eigen-3.4.0\Eigen\Dense"
-#endif
-
 // away
 #ifndef HOME
-#include "C:\Users\harry\Desktop\soar\eigen-3.4.0\eigen-3.4.0\Eigen\Cholesky"
-#include "C:\Users\harry\Desktop\soar\eigen-3.4.0\eigen-3.4.0\Eigen\Dense"
+#include "Eigen\Cholesky"
+#include "Eigen\Dense"
 #endif
 
 using namespace Eigen;
@@ -72,8 +67,8 @@ struct Scenario {
     return {a[0], a[1], a[2]};
   }
 
-  Scenario(std::vector<std::vector<float>> beforeList,
-           std::vector<std::vector<float>> afterList, int Name)
+  Scenario(std::vector<std::vector<float>> &beforeList,
+           std::vector<std::vector<float>> &afterList, int Name)
       : BeforeList(beforeList), AfterList(afterList), name(Name) {}
 
   // Function to find the vector and split the list
@@ -319,7 +314,8 @@ class HALO {
 
   std::vector<float> Halo_Input(HALO *haloPointer, bool isInitialized,
                                 float eAccelerationZ, float eVelocity,
-                                float eAltitude, float gpsAltitude, float time, float deltaTime);
+                                float eAltitude, float gpsAltitude, float time,
+                                float deltaTime);
 
   // for predictNextValues
   int counterSigmaPoint = 0;
@@ -365,7 +361,6 @@ class HALO {
 
   VectorXf X_in;
   VectorXf X_pred;
-
 
   // use REFRESH_RATE here somehow
   float timeStep = 1.0f / 3.0f;

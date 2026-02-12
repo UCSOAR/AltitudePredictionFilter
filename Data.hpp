@@ -2,9 +2,7 @@
 #ifndef DATA_HPP_
 #define DATA_HPP_
 
-#include <vector>
-
-extern const int num_scenarios_parsed;
+const int num_scenarios_parsed = 2;
 
 extern std::vector<std::vector<float>> beforeApogeeSim1;
 

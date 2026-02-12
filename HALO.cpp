@@ -9,12 +9,12 @@
 
 // home
 #ifdef HOME
-#include "C:\Users\harry\Desktop\soar\eigen-3.4.0\eigen-3.4.0\Eigen\Dense"
+#include "Eigen\Dense"
 #endif
 
 // away
 #ifndef HOME
-#include "C:\Users\harry\Desktop\soar\eigen-3.4.0\eigen-3.4.0\Eigen\Dense"
+#include "Eigen\Dense"
 #endif
 
 #ifndef HALO_CPP

@@ -49,7 +49,8 @@ KDNodePtr NewKDNodePtr() {
   return mynode;
 }
 
-inline float dist2(std::array<float, 3> const& a, std::array<float, 3> const& b) {
+inline float dist2(std::array<float, 3> const& a,
+                   std::array<float, 3> const& b) {
   float distc = 0.0f;
   for (size_t i = 0; i < 3; ++i) {
     float di = a[i] - b[i];
@@ -110,7 +111,7 @@ KDNodePtr KDTree::make_tree(pointIndexArr::iterator const& begin,
   return std::make_shared<KDNode>(*middle, left, right);
 }
 
-KDTree::KDTree(std::vector<std::array<float, 3>> point_array)
+KDTree::KDTree(std::vector<std::array<float, 3>>& point_array)
     : leaf_{std::make_shared<KDNode>()} {
   pointIndexArr arr;
   for (size_t i = 0; i < point_array.size(); i++) {
@@ -120,8 +121,8 @@ KDTree::KDTree(std::vector<std::array<float, 3>> point_array)
 }
 
 void KDTree::node_query_(
-    KDNodePtr const& branch, std::array<float, 3> const& pt, size_t const& level,
-    size_t const& num_nearest,
+    KDNodePtr const& branch, std::array<float, 3> const& pt,
+    size_t const& level, size_t const& num_nearest,
     std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
   if (!branch) {
     return;
@@ -145,12 +146,12 @@ void KDTree::node_query_(
 }
 
 void KDTree::knearest_(
-    KDNodePtr const& branch, std::array<float, 3> const& pt, size_t const& level,
-    size_t const& num_nearest,
+    KDNodePtr const& branch, std::array<float, 3> const& pt,
+    size_t const& level, size_t const& num_nearest,
     std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
   if (!branch) return;
 
-  std::array<float,3> branch_pt = static_cast<std::array<float,3>>(*branch);
+  std::array<float, 3> branch_pt = static_cast<std::array<float, 3>>(*branch);
   size_t dim = branch_pt.size();
   assert(dim != 0);
   assert(dim == pt.size());
@@ -176,7 +177,6 @@ void KDTree::knearest_(
 KDNodePtr KDTree::nearest_(std::array<float, 3> const& pt) {
   size_t level = 0;
   std::vector<std::pair<KDNodePtr, float>> k_buffer{};
-
 
   if (last_nearest_) {
     k_buffer.emplace_back(last_nearest_, dist2(last_nearest_->x, pt));
@@ -251,9 +251,8 @@ void KDTree::neighborhood_(KDNodePtr const& branch,
                            std::array<float, 3> const& pt, float const& rad2,
                            size_t const& level, pointIndexArr& nbh) {
   if (!branch) return;
-    // branch has no point, means it is a leaf,
-    // no points to add
-
+  // branch has no point, means it is a leaf,
+  // no points to add
 
   size_t const dim = pt.size();
 

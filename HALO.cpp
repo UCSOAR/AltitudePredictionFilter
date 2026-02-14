@@ -5,7 +5,8 @@
 
 // #define LOGON
 // #define LOGMETRICS
-#define TIMERON
+// #define TIMERON
+// #define TESTING_BUILD
 
 // home
 #ifdef HOME
@@ -211,9 +212,12 @@ void HALO::stateUpdate() {
   for (int row = 0; row < 3; row++) {
     for (int col = 0; col < OBSERVATION_DIMENSIONS; col++) {
       if (std::isnan(K(row, col))) {
+        kZero = true;
+        K(row, col) = 0;
+
+#ifdef TESTING_BUILD
         FILE* log = fopen("log.txt", "a+");  // Open the file for appending or
                                              // create it if it doesn't exist
-        kZero = true;
 
         if (!log) {
           fprintf(stderr, "Error opening log.txt...exiting\n");
@@ -224,25 +228,26 @@ void HALO::stateUpdate() {
                 this->time);
 
         fclose(log);
-
-        K(row, col) = 0;
       }
+#endif
     }
   }
+}
 
-  if (kZero) {
-    FILE* log = fopen(
-        "log.txt",
-        "a+");  // Open the file for appending or create it if it doesn't exist
+#ifdef TESTING_BUILD
+if (kZero) {
+  FILE* log = fopen(
+      "log.txt",
+      "a+");  // Open the file for appending or create it if it doesn't exist
 
-    if (!log) {
-      fprintf(stderr, "Error opening log.txt...exiting\n");
-      exit(1);
-    }
-
-    fprintf(log, "\n");
-    fclose(log);
+  if (!log) {
+    fprintf(stderr, "Error opening log.txt...exiting\n");
+    exit(1);
   }
+
+  fprintf(log, "\n");
+  fclose(log);
+#endif
 
   VectorXf difference(OBSERVATION_DIMENSIONS, 1);
   difference.setZero();
@@ -255,6 +260,7 @@ void HALO::stateUpdate() {
   X0 = this->Xprediction + K * difference;
 
   if (std::isnan(X0(0)) || std::isnan(X0(1)) || std::isnan(X0(2))) {
+#ifdef TESTING_BUILD
     FILE* log = fopen(
         "log.txt",
         "a+");  // Open the file for appending or create it if it doesn't exist
@@ -269,10 +275,10 @@ void HALO::stateUpdate() {
             "Prediction as Estimation\n",
             this->time);
 
+    fclose(log);
+#endif
     // default to prediction
     X0 = this->Xprediction;
-
-    fclose(log);
   }
 
   // check and update before apogee bool
@@ -1366,6 +1372,7 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
   // check if X is nan, if so default to static integration
   if (std::isnan(X(0)) || std::isnan(X(1)) || std::isnan(X(2))) {
+#ifdef TESTING_BUILD
     FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
     if (!file) {
       fprintf(stderr, "Error opening log.txt...exiting\n");
@@ -1374,6 +1381,7 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
     fprintf(file, "At %f X is nan, defaulting to static integration\n",
             this->time);
     fclose(file);
+#endif
 
     printf("X is nan, defaulting to static integration\n");
 

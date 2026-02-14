@@ -12,8 +12,6 @@
 #include <iostream>
 #include <sstream>
 
-
-
 // #define LOGON
 // #define LOGMETRICS
 
@@ -23,7 +21,6 @@
 #ifdef LOGMETRICS
 static FILE* everestGains = NULL;
 #endif
-
 
 #ifdef TEST_BUILD
 #include <direct.h>
@@ -201,7 +198,6 @@ int openFiles() {
  * To run:  g++ Infusion.cpp EverestTask.cpp -o Everest
  *          ./Everest
  */
-
 
 using namespace std;
 
@@ -1513,6 +1509,8 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
       this->availableMeasurements[1] = 0;
       this->availableMeasurements[2] = 0;
       this->availableMeasurements[3] = 0;
+
+      return haloData;
     }
   }
   // }
@@ -1719,6 +1717,5 @@ int main() {
 
   return 0;
 }
-
 
 #endif

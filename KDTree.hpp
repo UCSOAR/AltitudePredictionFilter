@@ -79,6 +79,7 @@ inline void sort_on_idx(pointIndexArr::iterator const&,  //
 
 class KDTree {
  public:
+  void reset_last_nearest() { last_nearest_ = nullptr; }
   KDTree() = default;
 
   /// Build a KDtree

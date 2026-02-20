@@ -10,6 +10,9 @@
 #include "KDTree.hpp"
 #include <deque>
 
+#include "SystemDefines.hpp"
+#include "UARTDriver.hpp"
+
 // away
 #ifndef HOME
 #include "Eigen\Cholesky"
@@ -113,8 +116,10 @@ struct Scenario {
     std::array<float, 3> convertedMeasurement = vec2arr(measurement);
     pointIndex result;
     if (isBeforeApogeeBool) {
+      treeBefore.reset_last_nearest();
       result = treeBefore.nearest_pointIndex(convertedMeasurement);
     } else {
+      treeAfter.reset_last_nearest();
       result = treeAfter.nearest_pointIndex(convertedMeasurement);
     }
 
@@ -124,6 +129,9 @@ struct Scenario {
   void createTree() {
     std::vector<std::array<float, 3>> beforeArrayOfArrays;
     std::vector<std::array<float, 3>> afterArrayOfArrays;
+
+    beforeArrayOfArrays.reserve(BeforeList.size());
+    afterArrayOfArrays.reserve(AfterList.size());
 
     for (const auto &pt : BeforeList) {
       // Assuming BeforeList[i] has at least 3 elements
@@ -173,7 +181,9 @@ struct Scenario {
 
   /** finds vector at specified index **/
   std::vector<float> evaluateVectorAt(int index) {
-    return (*getLists())[index];
+    auto *lists = getLists();
+
+    return lists->at(index);
   }
 
   /** finds vector at specified time **/

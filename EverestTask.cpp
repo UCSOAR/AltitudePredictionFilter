@@ -213,7 +213,7 @@ enum debug_level {
   Calibration = 7  // Calibration
 };
 
-debug_level debug = Calibration;
+debug_level debug = NONE;
 
 /**
  * @brief Calls finalWrapper with data and alignment
@@ -302,20 +302,16 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   madOffset offset = infusion->getOffset();
   gyroscope = infusion->madOffsetUpdate(&offset, gyroscope);
 
-  // Calculate delta time (in seconds)
-  // TODO: This code is technically identical to the new updateDeltaTime.
-  // However, we can leave it here, though it may cause issues.
-  float deltaTime = (float)(timestamp - previousTimestamp);
-  previousTimestamp = timestamp;
   this->state.deltaTimeIMU = deltaTime;
 
   if (debug == Secondary || debug == ALL) {
-    printf(
+    SOAR_PRINT(
         "Averaged: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, %.6f, %.6f)g Time: "
         "%f\n",
         data.gyroX, data.gyroY, data.gyroZ, data.accelX, data.accelY,
         data.accelZ, deltaTime);
-    printf("Mag: (%.6f, %.6f, %.6f) uT\n", mag.axis.x, mag.axis.y, mag.axis.z);
+    SOAR_PRINT("Mag: (%.6f, %.6f, %.6f) uT\n", mag.axis.x, mag.axis.y,
+               mag.axis.z);
   }
 
   // Update gyroscope AHRS algorithm
@@ -347,14 +343,14 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   this->state.earthAcceleration = earth.axis.z;
 
   if (debug == Secondary || debug == ALL) {
-    printf("%f,%d,%.0f,%.0f,%d,%.0f,%d,%d,%d,%d\n",
-           internalStates.accelerationError,
-           internalStates.accelerometerIgnored,
-           internalStates.accelerationRecoveryTrigger,
-           internalStates.magneticError, internalStates.magnetometerIgnored,
-           internalStates.magneticRecoveryTrigger, flags.initialising,
-           flags.angularRateRecovery, flags.accelerationRecovery,
-           flags.magneticRecovery);
+    SOAR_PRINT("%f,%d,%.0f,%.0f,%d,%.0f,%d,%d,%d,%d\n",
+               internalStates.accelerationError,
+               internalStates.accelerometerIgnored,
+               internalStates.accelerationRecoveryTrigger,
+               internalStates.magneticError, internalStates.magnetometerIgnored,
+               internalStates.magneticRecoveryTrigger, flags.initialising,
+               flags.angularRateRecovery, flags.accelerationRecovery,
+               flags.magneticRecovery);
   }
 }
 
@@ -413,8 +409,8 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
     // Apply calibration
 
     if (debug == Calibration || debug == ALL) {
-      printf("uncalibrated: %f, %f, %f ", this->internalIMU_1.accelX,
-             this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
+      SOAR_PRINT("uncalibrated: %f, %f, %f ", this->internalIMU_1.accelX,
+                 this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
     }
 
     this->internalIMU_1.accelX =
@@ -425,15 +421,15 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
         this->internalIMU_1.accelZ - this->zeroOffsetAccel[2];
 
     if (debug == Calibration || debug == ALL) {
-      printf("-> offset (%f, %f, %f) = calibrated accel (%f, %f, %f)\n",
-             this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
-             this->zeroOffsetAccel[2], this->internalIMU_1.accelX,
-             this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
+      SOAR_PRINT("-> offset (%f, %f, %f) = calibrated accel (%f, %f, %f)\n",
+                 this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
+                 this->zeroOffsetAccel[2], this->internalIMU_1.accelX,
+                 this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
     }
 
     if (debug == Calibration || debug == ALL) {
-      printf("uncalibrated: %f, %f, %f ", this->internalIMU_1.gyroX,
-             this->internalIMU_1.gyroY, this->internalIMU_1.gyroZ);
+      SOAR_PRINT("uncalibrated: %f, %f, %f ", this->internalIMU_1.gyroX,
+                 this->internalIMU_1.gyroY, this->internalIMU_1.gyroZ);
     }
 
     this->internalIMU_1.gyroX =
@@ -444,10 +440,10 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
         this->internalIMU_1.gyroZ - this->zeroOffsetGyro[2];
 
     if (debug == Calibration || debug == ALL) {
-      printf("-> offset (%f, %f, %f) = calibrated gyro (%f, %f, %f)\n",
-             this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
-             this->zeroOffsetGyro[2], this->internalIMU_1.gyroX,
-             this->internalIMU_1.gyroY, this->internalIMU_1.gyroZ);
+      SOAR_PRINT("-> offset (%f, %f, %f) = calibrated gyro (%f, %f, %f)\n",
+                 this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
+                 this->zeroOffsetGyro[2], this->internalIMU_1.gyroX,
+                 this->internalIMU_1.gyroY, this->internalIMU_1.gyroZ);
     }
   }
 
@@ -468,8 +464,8 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
     // Apply calibration
 
     if (debug == Calibration || debug == ALL) {
-      printf("uncalibrated: %f, %f, %f ", this->internalIMU_2.accelX,
-             this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
+      SOAR_PRINT("uncalibrated: %f, %f, %f ", this->internalIMU_2.accelX,
+                 this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
     }
 
     this->internalIMU_2.accelX =
@@ -480,15 +476,15 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
         this->internalIMU_2.accelZ - this->zeroOffsetAccel2[2];
 
     if (debug == Calibration || debug == ALL) {
-      printf("-> offset (%f, %f, %f) = calibrated accel2 (%f, %f, %f)\n",
-             this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
-             this->zeroOffsetAccel2[2], this->internalIMU_2.accelX,
-             this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
+      SOAR_PRINT("-> offset (%f, %f, %f) = calibrated accel2 (%f, %f, %f)\n",
+                 this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
+                 this->zeroOffsetAccel2[2], this->internalIMU_2.accelX,
+                 this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
     }
 
     if (debug == Calibration || debug == ALL) {
-      printf("uncalibrated: %f, %f, %f ", this->internalIMU_2.gyroX,
-             this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
+      SOAR_PRINT("uncalibrated: %f, %f, %f ", this->internalIMU_2.gyroX,
+                 this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
     }
 
     this->internalIMU_2.gyroX =
@@ -499,10 +495,10 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
         this->internalIMU_2.gyroZ - this->zeroOffsetGyro2[2];
 
     if (debug == Calibration || debug == ALL) {
-      printf("-> offset (%f, %f, %f) = calibrated gyro2 (%f, %f, %f)\n",
-             this->zeroOffsetGyro2[0], this->zeroOffsetGyro2[1],
-             this->zeroOffsetGyro2[2], this->internalIMU_2.gyroX,
-             this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
+      SOAR_PRINT("-> offset (%f, %f, %f) = calibrated gyro2 (%f, %f, %f)\n",
+                 this->zeroOffsetGyro2[0], this->zeroOffsetGyro2[1],
+                 this->zeroOffsetGyro2[2], this->internalIMU_2.gyroX,
+                 this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
     }
   }
 
@@ -564,7 +560,7 @@ void EverestTask::Baro_Update(const BarosData& Baro1, const BarosData& Baro2) {
   this->baro2.previousTime = Baro2.time;
 
   if (debug == RAW || debug == ALL) {
-    printf("Baro1: %f Pa, Baro2: %f Pa\n", baro1.pressure, baro2.pressure);
+    SOAR_PRINT("Baro1: %f Pa, Baro2: %f Pa\n", baro1.pressure, baro2.pressure);
   }
 }
 
@@ -582,7 +578,8 @@ float EverestTask::ExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
   this->IMU_Update(imu1, imu2);
 
   if (debug == Third || debug == ALL) {
-    printf("After IMU Update IMU Altitude: %f\n", this->state.avgIMU.altitude);
+    SOAR_PRINT("After IMU Update IMU Altitude: %f\n",
+               this->state.avgIMU.altitude);
   }
 
   this->Baro_Update(baro1, baro2);
@@ -590,7 +587,7 @@ float EverestTask::ExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
   float finalAlt = this->dynamite();
 
   if (debug == Dynamite || debug == ALL) {
-    printf("After Dynamite: %f\n", finalAlt);
+    SOAR_PRINT("After Dynamite: %f\n", finalAlt);
   }
 
   // Update altitude list
@@ -620,15 +617,15 @@ float EverestTask::AlignedExternalUpdate(IMUData_Everest imu1,
       infusion->AxesSwitch({imu2.gyroX, imu2.gyroY, imu2.gyroZ}, alignment);
 
   if (debug == Secondary || debug == ALL) {
-    printf("Unaligned IMU1:(%.6f, %.6f, %.6f)g,(%.6f, %.6f, %.6f)deg/s\n",
-           imu1.accelX, imu1.accelY, imu1.accelZ, imu1.gyroX, imu1.gyroY,
-           imu1.gyroZ);
+    SOAR_PRINT("Unaligned IMU1:(%.6f, %.6f, %.6f)g,(%.6f, %.6f, %.6f)deg/s\n",
+               imu1.accelX, imu1.accelY, imu1.accelZ, imu1.gyroX, imu1.gyroY,
+               imu1.gyroZ);
 
-    printf("Unaligned IMU2:(%.6f, %.6f, %.6f)g,(%.6f, %.6f, %.6f)deg/s\n",
-           imu2.accelX, imu2.accelY, imu2.accelZ, imu2.gyroX, imu2.gyroY,
-           imu2.gyroZ);
+    SOAR_PRINT("Unaligned IMU2:(%.6f, %.6f, %.6f)g,(%.6f, %.6f, %.6f)deg/s\n",
+               imu2.accelX, imu2.accelY, imu2.accelZ, imu2.gyroX, imu2.gyroY,
+               imu2.gyroZ);
 
-    printf("Alignment: %d\n", alignment);
+    SOAR_PRINT("Alignment: %d\n", alignment);
   }
 
   // put aligned data into IMUData_Everest struct
@@ -650,13 +647,13 @@ float EverestTask::AlignedExternalUpdate(IMUData_Everest imu1,
   imu2.gyroZ = alignedIMUGyro2.axis.z;
 
   if (debug == Secondary || debug == ALL) {
-    printf("Aligned IMU1:(%.6f, %.6f, %.6f)g,(%.6f, %.6f, %.6f)deg/s\n",
-           imu1.accelX, imu1.accelY, imu1.accelZ, imu1.gyroX, imu1.gyroY,
-           imu1.gyroZ);
+    SOAR_PRINT("Aligned IMU1:(%.6f, %.6f, %.6f)g,(%.6f, %.6f, %.6f)deg/s\n",
+               imu1.accelX, imu1.accelY, imu1.accelZ, imu1.gyroX, imu1.gyroY,
+               imu1.gyroZ);
 
-    printf("Aligned IMU2:(%.6f, %.6f, %.6f)g,(%.6f, %.6f, %.6f)deg/s\n",
-           imu2.accelX, imu2.accelY, imu2.accelZ, imu2.gyroX, imu2.gyroY,
-           imu2.gyroZ);
+    SOAR_PRINT("Aligned IMU2:(%.6f, %.6f, %.6f)g,(%.6f, %.6f, %.6f)deg/s\n",
+               imu2.accelX, imu2.accelY, imu2.accelZ, imu2.gyroX, imu2.gyroY,
+               imu2.gyroZ);
   }
 
   return ExternalUpdate(imu1, imu2, baro1, baro2);
@@ -684,12 +681,12 @@ float EverestTask::deriveForAltitudeIMU(IMUData_Everest avgIMU) {
       initialAltitude + (initialVelocity + finalVelocity) * deltaTime / 2.0;
 
   if (debug == Secondary || debug == ALL) {
-    printf("\nKinematics\n");
-    printf("IMU Initial Altitude: %f\n", initialAltitude);
-    printf("IMU Velocity: %f\n", initialVelocity);
-    printf("IMU Acceleration: %f\n", accelerationZ);
-    printf("IMU Delta Time: %f\n", deltaTime);
-    printf("Derived Altitude: %f\n", altitude);
+    SOAR_PRINT("\nKinematics\n");
+    SOAR_PRINT("IMU Initial Altitude: %f\n", initialAltitude);
+    SOAR_PRINT("IMU Velocity: %f\n", initialVelocity);
+    SOAR_PRINT("IMU Acceleration: %f\n", accelerationZ);
+    SOAR_PRINT("IMU Delta Time: %f\n", deltaTime);
+    SOAR_PRINT("Derived Altitude: %f\n", altitude);
   }
 
   return altitude;
@@ -717,8 +714,8 @@ float convertToAltitude(float pressure) {
   }
 
   if (debug == Dynamite || debug == ALL) {
-    printf("\nConversion \n");
-    printf("Pressure: %.f hPa, Altitude: %.f m\n", pressure, altitude);
+    SOAR_PRINT("\nConversion \n");
+    SOAR_PRINT("Pressure: %.f hPa, Altitude: %.f m\n", pressure, altitude);
   }
 
   return altitude;
@@ -734,6 +731,14 @@ float EverestTask::dynamite() {
   float IMUAltitude = deriveForAltitudeIMU(this->state.avgIMU);
   this->state.avgIMU.altitude = IMUAltitude;
 
+  if (std::isnan(IMUAltitude) || std::isinf(IMUAltitude)) {
+    if (debug == Dynamite || debug == ALL) {
+      SOAR_PRINT("WARNING: IMU Altitude is NaN/Inf! Dropping IMU weight.\n");
+    }
+    this->state.gain_IMU = 0;
+    IMUAltitude = 0;
+  }
+
   float BaroAltitude1 = convertToAltitude(this->baro1.pressure);
   this->baro1.altitude = BaroAltitude1;
 
@@ -743,13 +748,13 @@ float EverestTask::dynamite() {
   float GPSAltitude = this->everestData.altitudeGPS;
 
   if (debug == Dynamite || debug == ALL) {
-    printf("\nDynamite\n");
-    printf("Baro1 Altitude: %f\n", BaroAltitude1);
-    printf("Baro2 Altitude: %f\n", BaroAltitude2);
-    // printf("Baro3 Altitude: %f\n", BaroAltitude3);
-    // printf("Real Baro Altitude: %f\n", RealBaroAltitude);
-    printf("IMU Altitude: %f\n", IMUAltitude);
-    printf("GPSAltitude: %f\n", GPSAltitude);
+    SOAR_PRINT("\nDynamite\n");
+    SOAR_PRINT("Baro1 Altitude: %f\n", BaroAltitude1);
+    SOAR_PRINT("Baro2 Altitude: %f\n", BaroAltitude2);
+    // SOAR_PRINT("Baro3 Altitude: %f\n", BaroAltitude3);
+    // SOAR_PRINT("Real Baro Altitude: %f\n", RealBaroAltitude);
+    SOAR_PRINT("IMU Altitude: %f\n", IMUAltitude);
+    SOAR_PRINT("GPSAltitude: %f\n", GPSAltitude);
   }
 
   // if pressure is zero, set gain to zero
@@ -779,7 +784,7 @@ float EverestTask::dynamite() {
                           distributed_Baro_Altitude2;
 
   if (debug == Dynamite || debug == ALL) {
-    printf("Distributed Sum: %f\n\n", distributed_Sum);
+    SOAR_PRINT("Distributed Sum: %f\n\n", distributed_Sum);
   }
 
   // summation of gains
@@ -787,14 +792,14 @@ float EverestTask::dynamite() {
       this->state.gain_IMU + this->state.gain_Baro1 + this->state.gain_Baro2;
 
   if (debug == Dynamite || debug == ALL) {
-    printf("Sum Gain: %f\n\n", sumGain);
+    SOAR_PRINT("Sum Gain: %f\n\n", sumGain);
   }
 
   // normalised altitude
-  float normalised_Altitude = (distributed_Sum) / sumGain;
+  float normalised_Altitude = (distributed_Sum) / sumGain + 0.0001;
 
   if (debug == Dynamite || debug == ALL) {
-    printf("Normalised Altitude: %f\n\n", normalised_Altitude);
+    SOAR_PRINT("Normalised Altitude: %f\n\n", normalised_Altitude);
   }
 
   // overrides normalised altitude with GPS altitude if available, Don't!!
@@ -812,15 +817,16 @@ float EverestTask::dynamite() {
   Kinematics.finalAltitude = normalised_Altitude;
 
   if (debug == Dynamite || debug == ALL) {
-    printf("Final Altitude: %f\n\n", Kinematics.finalAltitude);
+    SOAR_PRINT("Final Altitude: %f\n\n", Kinematics.finalAltitude);
   }
 
   // update velocity
   Kinematics.initialVelo = (Kinematics.finalAltitude - Kinematics.initialAlt) /
-                           (this->state.deltaTimeIMU);
+                               (this->state.deltaTimeIMU) +
+                           0.0001;
 
   if (debug == Dynamite || debug == ALL) {
-    printf("Initial Velocity: %f\n", Kinematics.initialVelo);
+    SOAR_PRINT("Initial Velocity: %f\n", Kinematics.initialVelo);
   }
 
   // update altitude
@@ -845,12 +851,13 @@ float EverestTask::dynamite() {
     this->state.prev_gain_Baro2 = this->state.gain_Baro2;
   }
   if (debug == Dynamite || debug == ALL) {
-    printf("Previous Gains\n");
-    printf("Prev Gain IMU: %f\n", this->state.prev_gain_IMU);
-    printf("Prev Gain Baro1: %f\n", this->state.prev_gain_Baro1);
-    printf("Prev Gain Baro2: %f\n", this->state.prev_gain_Baro2);
-    // printf("Prev Gain Baro3: %f\n", this->state.prev_gain_Baro3);
-    // printf("Prev Gain Real Baro: %f\n\n", this->state.prev_gain_Real_Baro);
+    SOAR_PRINT("Previous Gains\n");
+    SOAR_PRINT("Prev Gain IMU: %f\n", this->state.prev_gain_IMU);
+    SOAR_PRINT("Prev Gain Baro1: %f\n", this->state.prev_gain_Baro1);
+    SOAR_PRINT("Prev Gain Baro2: %f\n", this->state.prev_gain_Baro2);
+    // SOAR_PRINT("Prev Gain Baro3: %f\n", this->state.prev_gain_Baro3);
+    // SOAR_PRINT("Prev Gain Real Baro: %f\n\n",
+    // this->state.prev_gain_Real_Baro);
   }
 
   return normalised_Altitude;
@@ -873,14 +880,14 @@ void EverestTask::updateGainsWithGPS() {
   float gain_Baro2 = this->state.gain_Baro2 * (1 - baro2GPSDiff / totalDiff);
 
   if (debug == Dynamite || debug == ALL) {
-    printf("\nUpdate Gains with GPS\n");
-    printf("IMU GPS Diff: %f\n", imuGPSDiff);
-    printf("Baro1 GPS Diff: %f\n", baro1GPSDiff);
-    printf("Baro2 GPS Diff: %f\n", baro2GPSDiff);
-    printf("Total Diff: %f\n", totalDiff);
-    printf("New Gain IMU: %f\n", gain_IMU);
-    printf("New Gain Baro1: %f\n", gain_Baro1);
-    printf("New Gain Baro2: %f\n", gain_Baro2);
+    SOAR_PRINT("\nUpdate Gains with GPS\n");
+    SOAR_PRINT("IMU GPS Diff: %f\n", imuGPSDiff);
+    SOAR_PRINT("Baro1 GPS Diff: %f\n", baro1GPSDiff);
+    SOAR_PRINT("Baro2 GPS Diff: %f\n", baro2GPSDiff);
+    SOAR_PRINT("Total Diff: %f\n", totalDiff);
+    SOAR_PRINT("New Gain IMU: %f\n", gain_IMU);
+    SOAR_PRINT("New Gain Baro1: %f\n", gain_Baro1);
+    SOAR_PRINT("New Gain Baro2: %f\n", gain_Baro2);
   }
 
   this->state.gain_IMU = gain_IMU;
@@ -907,16 +914,16 @@ void EverestTask::recalculateGain(float estimate) {
       1 / (fabsf(gainedEstimate - this->baro2.altitude) + epsilon);
 
   if (debug == Third || debug == ALL) {
-    printf("\nRecalculate Gain - Before normalization\n");
-    printf("Gain IMU: %f\n", gain_IMU);
-    printf("Gain Baro1: %f\n", gain_Baro1);
-    printf("Gain Baro2: %f\n", gain_Baro2);
-    printf("Gained Estimate: %f\n", gainedEstimate);
+    SOAR_PRINT("\nRecalculate Gain - Before normalization\n");
+    SOAR_PRINT("Gain IMU: %f\n", gain_IMU);
+    SOAR_PRINT("Gain Baro1: %f\n", gain_Baro1);
+    SOAR_PRINT("Gain Baro2: %f\n", gain_Baro2);
+    SOAR_PRINT("Gained Estimate: %f\n", gainedEstimate);
 
-    printf("Altitude: %f\n", estimate);
-    printf("Baro1: %f\n", this->baro1.altitude);
-    printf("Baro2: %f\n", this->baro2.altitude);
-    printf("GPS Altitude: %f\n", this->everestData.altitudeGPS);
+    SOAR_PRINT("Altitude: %f\n", estimate);
+    SOAR_PRINT("Baro1: %f\n", this->baro1.altitude);
+    SOAR_PRINT("Baro2: %f\n", this->baro2.altitude);
+    SOAR_PRINT("GPS Altitude: %f\n", this->everestData.altitudeGPS);
   }
 
   // normalise
@@ -925,12 +932,12 @@ void EverestTask::recalculateGain(float estimate) {
   this->state.gain_Baro2 = gain_Baro2 / (gain_IMU + gain_Baro1 + gain_Baro2);
 
   if (debug == Dynamite || debug == ALL) {
-    printf("\nRecalculate Gain\n");
-    printf("New Gain IMU: %f\n", this->state.gain_IMU);
-    printf("New Gain Baro1: %f\n", this->state.gain_Baro1);
-    printf("New Gain Baro2: %f\n", this->state.gain_Baro2);
-    // printf("New Gain Baro3: %f\n", this->state.gain_Baro3);
-    // printf("New Gain Real Baro: %f\n\n", this->state.gain_Real_Baro);
+    SOAR_PRINT("\nRecalculate Gain\n");
+    SOAR_PRINT("New Gain IMU: %f\n", this->state.gain_IMU);
+    SOAR_PRINT("New Gain Baro1: %f\n", this->state.gain_Baro1);
+    SOAR_PRINT("New Gain Baro2: %f\n", this->state.gain_Baro2);
+    // SOAR_PRINT("New Gain Baro3: %f\n", this->state.gain_Baro3);
+    // SOAR_PRINT("New Gain Real Baro: %f\n\n", this->state.gain_Real_Baro);
   }
 
 #ifdef LOGMETRICS
@@ -962,10 +969,10 @@ void EverestTask::calculateSTDCoefficients() {
   this->state.std_Baro2 = pow(std_Baro2, 2) / sumSTD1;
 
   if (debug == Dynamite || debug == ALL) {
-    printf("\nStandard Deviation Coefficients\n");
-    printf("STD IMU: %f\n", this->state.std_IMU);
-    printf("STD Baro1: %f\n", this->state.std_Baro1);
-    printf("STD Baro2: %f\n", this->state.std_Baro2);
+    SOAR_PRINT("\nStandard Deviation Coefficients\n");
+    SOAR_PRINT("STD IMU: %f\n", this->state.std_IMU);
+    SOAR_PRINT("STD Baro1: %f\n", this->state.std_Baro1);
+    SOAR_PRINT("STD Baro2: %f\n", this->state.std_Baro2);
   }
 }
 
@@ -991,10 +998,10 @@ float EverestTask::deriveChangeInVelocityToGetAltitude(float estimate) {
       this->AltitudeList.lastAltitude + velocityZ * deltaTimeAverage;
 
   if (debug == Dynamite || debug == ALL) {
-    printf("\nDerivative for new gain\n");
-    printf("Velocity: %f\n", velocityZ);
-    printf("New Altitude: %f\n", newAltitude);
-    printf("Delta Time Average: %f\n\n", deltaTimeAverage);
+    SOAR_PRINT("\nDerivative for new gain\n");
+    SOAR_PRINT("Velocity: %f\n", velocityZ);
+    SOAR_PRINT("New Altitude: %f\n", newAltitude);
+    SOAR_PRINT("Delta Time Average: %f\n\n", deltaTimeAverage);
   }
 
   return newAltitude;
@@ -1140,7 +1147,7 @@ void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
     numberOfSamples++;
 
     if (debug == Secondary || debug == ALL) {
-      printf("average: %f number: %d \n", average, numberOfSamples);
+      SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
     }
   }
 
@@ -1149,7 +1156,7 @@ void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
     numberOfSamples++;
 
     if (debug == Secondary || debug == ALL) {
-      printf("average: %f number: %d \n", average, numberOfSamples);
+      SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
     }
   }
 
@@ -1165,18 +1172,19 @@ void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
                           this->zeroOffsetGyro[2] + imu1.gyroZ};
 
   if (debug == Calibration | debug == ALL) {
-    printf(
+    SOAR_PRINT(
         "zeroOffsetAccel[0]:%f,zeroOffsetAccel[1]:%f,zeroOffsetAccel[2]:%f\n",
         this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
         this->zeroOffsetAccel[2]);
 
-    printf("zeroOffsetGyro[0]:%f,zeroOffsetGyro[1]:%f,zeroOffsetGyro[2]:%f\n",
-           this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
-           this->zeroOffsetGyro[2]);
+    SOAR_PRINT(
+        "zeroOffsetGyro[0]:%f,zeroOffsetGyro[1]:%f,zeroOffsetGyro[2]:%f\n",
+        this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
+        this->zeroOffsetGyro[2]);
   }
 
   if (debug == Secondary || debug == ALL) {
-    printf("average: %f number: %d \n", average, numberOfSamples);
+    SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
   }
 
   if (!isinf(imu2.accelX)) {
@@ -1188,26 +1196,26 @@ void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
                              this->zeroOffsetGyro2[2] + imu2.gyroZ};
 
     if (debug == Calibration || debug == ALL) {
-      printf(
+      SOAR_PRINT(
           "zeroOffsetAccel2[0]:%f,zeroOffsetAccel2[1]:%f,zeroOffsetAccel2[2]:%"
           "f\n",
           this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
           this->zeroOffsetAccel2[2]);
 
-      printf(
+      SOAR_PRINT(
           "zeroOffsetGyro2[0]:%f,zeroOffsetGyro2[1]:%f,zeroOffsetGyro2[2]:%f\n",
           this->zeroOffsetGyro2[0], this->zeroOffsetGyro2[1],
           this->zeroOffsetGyro2[2]);
     }
 
     if (debug == Calibration || debug == ALL) {
-      printf("average: %f number: %d \n", average, numberOfSamples);
+      SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
     }
   }
 
   if (debug == Calibration || debug == ALL) {
-    printf("Tare Sum: %f\n", sum);
-    printf("Number of samples %f\n", numberOfSamples);
+    SOAR_PRINT("Tare Sum: %f\n", sum);
+    SOAR_PRINT("Number of samples %f\n", numberOfSamples);
   }
 
   if (theTime == 0) {
@@ -1237,8 +1245,8 @@ void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
     isTared = true;
 
     if (debug == Calibration || debug == ALL) {
-      printf("Tare Initial Altitude: %f\n", this->Kinematics.initialAlt);
-      printf(
+      SOAR_PRINT("Tare Initial Altitude: %f\n", this->Kinematics.initialAlt);
+      SOAR_PRINT(
           "\nCalibration offsets:\n  accel1(%f,%f,%f),\n accel2(%f,%f,%f),\n"
           "gyro(%f,%f,%f),\n  gyro2(%f,%f,%f)\n\n",
           this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
@@ -1319,7 +1327,7 @@ float EverestTask::finalWrapper(
   madVector imu2MagAligned = infusion->AxesSwitch(imu2Mag, alignment2);
 
   if (debug == Secondary || debug == ALL) {
-    printf(
+    SOAR_PRINT(
         "Aligned: Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, %.6f,"
         "%.6f) g\n",
         imu1GyroAligned.axis.x, imu1GyroAligned.axis.y, imu1GyroAligned.axis.z,
@@ -1470,6 +1478,7 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
   // deltaTime will always be equal.
   // TODO: 0 here will be a threshold value for updates. If the filter is
   // updating too fast (doubtful) then we can limit it here.
+
   if (deltaTime >= 0) {
     if (this->availableMeasurements[0] == 1 &&
         this->availableMeasurements[1] == 1 &&
@@ -1481,6 +1490,7 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
       this->availableMeasurements[1] = 0;
       this->availableMeasurements[2] = 0;
       this->availableMeasurements[3] = 0;
+      return haloData;
     } else {
       // available[0] = IMU1, available[1] = IMU2, available[2] = Baro1,
       // available[3] = Baro2
@@ -1678,7 +1688,7 @@ int main() {
 
     // Print all sensor readings
     if (debug == RAW || debug == ALL) {
-      printf(
+      SOAR_PRINT(
           "Raw Time: %.6f s, Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, "
           "%.6f, %.6f) g Pressure: (%.f, %.f, %.f, %.f)\n",
           time, sensorData.gyroX, sensorData.gyroY, sensorData.gyroZ,

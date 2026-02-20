@@ -2,6 +2,8 @@
 #include <fstream>
 #include "Data.hpp"
 #include <map>
+#include "SystemDefines.hpp"
+#include "UARTDriver.hpp"
 
 // #define LOGON
 // #define LOGMETRICS
@@ -200,11 +202,11 @@ void HALO::stateUpdate() {
     fprintf(stderr, "Errno: %d\n", errno);
     exit(1);
   }
+
   for (int rows = 0; rows < 3; rows++) {
     fprintf(kalmangains, "%f,%f,%f,%f,%f\n", time, K(rows, 0), K(rows, 1),
             K(rows, 2), K(rows, 3));
   }
-
 #endif
 
   bool kZero = false;
@@ -770,7 +772,7 @@ float HALO::euclideanDistance(const std::vector<float>& vec1,
 std::pair<std::vector<int>, std::vector<std::vector<float>>>
 HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
                            VectorXf& measurement) {
-  std::vector<std::pair<float, std::pair<float, int>>> distances;
+  std::vector<std::pair<float, std::pair<int, int>>> distances;
   distances.reserve(scenarios->size());
   float minDistance = std::numeric_limits<float>::max();
   int i = 0;
@@ -853,7 +855,7 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 
     minDistance = euclideanDistance(vect.first, measurement);
 
-    lowestDistanceIndex = vect.second;
+    int currentLowestDistanceIndex = static_cast<int>(vect.second);
 
 #ifdef TIMERON
 
@@ -871,8 +873,9 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 #endif
 
     // pass index of scenario / struct
-    std::pair<float, std::pair<float, int>> vector = {
-        minDistance, {lowestDistanceIndex, (((scenarios->at(s)).name) - 1)}};
+    std::pair<float, std::pair<int, int>> vector = {
+        minDistance,
+        {currentLowestDistanceIndex, (((scenarios->at(s)).name) - 1)}};
     distances.push_back(vector);
 
 #ifdef TIMERON
@@ -899,9 +902,9 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 
 #endif
 
-  float lowestDistance = std::numeric_limits<int>::max();
+  float lowestDistance = std::numeric_limits<float>::max();
   int lowestDistanceIndex = 0;
-  float secondLowestDistance = std::numeric_limits<int>::max();
+  float secondLowestDistance = std::numeric_limits<float>::max();
   int secondLowestDistanceIndex = 0;
 
   for (size_t s = 0; s < scenarios->size(); s++) {
@@ -970,10 +973,17 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
 
   // find current vector (by index) and future vector (by time)
   int indexFirst = distances[lowestDistanceIndex].second.first;
+
+  if (indexFirst < 0 || indexFirst >= 10000) {
+    SOAR_PRINT("indexFirst is garbage: %d\n", indexFirst);
+    return {};
+  }
+
   Scenario* scenario1 =
       &scenarios->at(distances[lowestDistanceIndex].second.second);
   std::vector<float> currentVector1 = scenario1->evaluateVectorAt(indexFirst);
   float nextTimeStep = currentVector1[3] + deltaTime;
+
   std::vector<float> futureVector1 =
       scenario1->evaluateVectorAtTime(nextTimeStep);
 

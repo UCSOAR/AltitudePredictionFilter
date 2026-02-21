@@ -24,7 +24,7 @@
 // CHANGE
 #define REFRESH_RATE (3)  // replace this with actual sample rate
 #define RATE_BARO (3)
-#define CALIBRATION_TIME (2)
+#define CALIBRATION_TIME (20)
 
 /* Macros/Enums
    ------------------------------------------------------------*/
@@ -141,7 +141,7 @@ class EverestTask {
   bool useSTD = false;
 
   // INTERNAL VARIABLES
-  double theTime = CALIBRATION_TIME * RATE_BARO;
+  double calibrationTimeRemaining = CALIBRATION_TIME * RATE_BARO;
   float sum = 0;
   float pressureSum = 0;
   float previousTimestamp = 0;

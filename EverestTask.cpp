@@ -213,7 +213,7 @@ enum debug_level {
   Calibration = 7  // Calibration
 };
 
-debug_level debug = NONE;
+debug_level debug = Calibration;
 
 /**
  * @brief Calls finalWrapper with data and alignment
@@ -1218,7 +1218,7 @@ void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
     SOAR_PRINT("Number of samples %f\n", numberOfSamples);
   }
 
-  if (theTime == 0) {
+  if (calibrationTimeRemaining == 0) {
     sum = sum / (CALIBRATION_TIME * RATE_BARO);
     this->Kinematics.initialAlt = sum;
 
@@ -1262,7 +1262,7 @@ void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
   IMU_Update(imu1, imu2);
 
   // keeps track of remaining time for tare
-  theTime -= 1;
+  calibrationTimeRemaining -= 1;
 }
 
 /**
@@ -1466,7 +1466,6 @@ float roundToDecimalPlaces(double value, int decimalPlaces) {
 
 std::vector<float> EverestTask::QueueEverest(float currentTime) {
   if (everestInitialized == 0) {
-    initEverest();
     // size 0 float indicates not ready. I doubt a union return type would be a
     // good solution here.
     return std::vector<float>();
@@ -1479,7 +1478,7 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
   // TODO: 0 here will be a threshold value for updates. If the filter is
   // updating too fast (doubtful) then we can limit it here.
 
-  if (deltaTime >= 0) {
+  if (deltaTime > 0) {
     if (this->availableMeasurements[0] == 1 &&
         this->availableMeasurements[1] == 1 &&
         this->availableMeasurements[2] == 1 &&

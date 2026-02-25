@@ -315,10 +315,17 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   }
 
   // Update gyroscope AHRS algorithm
-  infusion->madAhrsUpdate(ahrs, gyroscope, accelerometer, mag, deltaTime);
+  if (mag.axis.x == 0.0f && mag.axis.y == 0.0f && mag.axis.z == 0.0f) {
+    infusion->madAhrsUpdateNoMagnetometer(ahrs, gyroscope, accelerometer,
+                                          deltaTime);
+  } else {
+    infusion->madAhrsUpdate(ahrs, gyroscope, accelerometer, mag, deltaTime);
+  }
 
   madEuler euler = infusion->getEuler(ahrs);
   madVector earth = infusion->madAhrsGetEarthAcceleration(ahrs);
+
+  SOAR_PRINT("EARTH XYZ: %f %f %f\n", earth.axis.x, earth.axis.y, earth.axis.z);
 
   internalStates = infusion->madAhrsGetInternalStates(infusion->getMadAhrs());
   flags = infusion->madAhrsGetFlags(infusion->getMadAhrs());
@@ -392,7 +399,8 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
   this->internalIMU_2.magY = imu2.magY;
   this->internalIMU_2.magZ = imu2.magZ;
 
-  if (isinf(internalIMU_1.accelX)) {
+  if (isinf(internalIMU_1.accelX) && isinf(internalIMU_1.accelY) &&
+      isinf(internalIMU_1.accelZ)) {
     numberOfSamples -= 1;
     this->internalIMU_1.gyroX = 0;
     this->internalIMU_1.gyroY = 0;
@@ -410,20 +418,6 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
 
     if (debug == Calibration || debug == ALL) {
       SOAR_PRINT("uncalibrated: %f, %f, %f ", this->internalIMU_1.accelX,
-                 this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
-    }
-
-    this->internalIMU_1.accelX =
-        this->internalIMU_1.accelX - this->zeroOffsetAccel[0];
-    this->internalIMU_1.accelY =
-        this->internalIMU_1.accelY - this->zeroOffsetAccel[1];
-    this->internalIMU_1.accelZ =
-        this->internalIMU_1.accelZ - this->zeroOffsetAccel[2];
-
-    if (debug == Calibration || debug == ALL) {
-      SOAR_PRINT("-> offset (%f, %f, %f) = calibrated accel (%f, %f, %f)\n",
-                 this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
-                 this->zeroOffsetAccel[2], this->internalIMU_1.accelX,
                  this->internalIMU_1.accelY, this->internalIMU_1.accelZ);
     }
 
@@ -447,7 +441,8 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
     }
   }
 
-  if (isinf(internalIMU_2.accelX)) {
+  if (isinf(internalIMU_2.accelX) && isinf(internalIMU_2.accelY) &&
+      isinf(internalIMU_2.accelZ)) {
     numberOfSamples -= 1;
     this->internalIMU_2.gyroX = 0;
     this->internalIMU_2.gyroY = 0;
@@ -465,20 +460,6 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
 
     if (debug == Calibration || debug == ALL) {
       SOAR_PRINT("uncalibrated: %f, %f, %f ", this->internalIMU_2.accelX,
-                 this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
-    }
-
-    this->internalIMU_2.accelX =
-        this->internalIMU_2.accelX - this->zeroOffsetAccel2[0];
-    this->internalIMU_2.accelY =
-        this->internalIMU_2.accelY - this->zeroOffsetAccel2[1];
-    this->internalIMU_2.accelZ =
-        this->internalIMU_2.accelZ - this->zeroOffsetAccel2[2];
-
-    if (debug == Calibration || debug == ALL) {
-      SOAR_PRINT("-> offset (%f, %f, %f) = calibrated accel2 (%f, %f, %f)\n",
-                 this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
-                 this->zeroOffsetAccel2[2], this->internalIMU_2.accelX,
                  this->internalIMU_2.accelY, this->internalIMU_2.accelZ);
     }
 
@@ -500,6 +481,11 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
                  this->zeroOffsetGyro2[2], this->internalIMU_2.gyroX,
                  this->internalIMU_2.gyroY, this->internalIMU_2.gyroZ);
     }
+  }
+
+  if (numberOfSamples == 0) {
+    this->state.avgIMU = {imu1.time, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    return;
   }
 
 // Calculate average of IMU parameters
@@ -527,16 +513,12 @@ void EverestTask::IMU_Update(const IMUData_Everest& imu1,
   averageIMU.magY =
       (this->internalIMU_1.magY + this->internalIMU_2.magY) / numberOfSamples;
   averageIMU.magZ =
-      (this->internalIMU_1.magX + this->internalIMU_2.magZ) / numberOfSamples;
+      (this->internalIMU_1.magZ + this->internalIMU_2.magZ) / numberOfSamples;
 
   averageIMU.time =
       (this->internalIMU_1.time + this->internalIMU_2.time) / numberOfSamples;
 
 #undef averageIMU
-
-  if (numberOfSamples == 0) {
-    this->state.avgIMU = {imu1.time, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  }
 
   // feed to Madgwick
   this->MadgwickWrapper(state.avgIMU);
@@ -1136,80 +1118,53 @@ int EverestTask::findAlignment(IMUData_Everest& imu1, IMUData_Everest& imu2) {
  * altitude
  *
  */
-void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
-                       BarosData baro1, BarosData baro2) {
+void EverestTask::tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
+                       const BarosData& baro1, const BarosData& baro2) {
   // average pressures
-  float average = 0;  // have to do since function is weird
-  int numberOfSamples = 0;
 
   if (baro1.pressure != 0) {
-    average = average + convertToAltitude(baro1.pressure);
+    sum += convertToAltitude(baro1.pressure);
     numberOfSamples++;
 
     if (debug == Secondary || debug == ALL) {
-      SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
+      SOAR_PRINT("sum: %f number: %d \n", sum, numberOfSamples);
     }
   }
 
   if (baro2.pressure != 0) {
-    average = average + convertToAltitude(baro2.pressure);
+    sum += convertToAltitude(baro2.pressure);
     numberOfSamples++;
 
     if (debug == Secondary || debug == ALL) {
-      SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
+      SOAR_PRINT("sum: %f number: %d \n", sum, numberOfSamples);
     }
   }
 
-  if (numberOfSamples != 0) {
-    sum += average / numberOfSamples;
+  if (!isinf(imu1.accelX) || !isinf(imu1.accelY) || !isinf(imu1.accelZ)) {
+    this->zeroOffsetGyro = {this->zeroOffsetGyro[0] + imu1.gyroX,
+                            this->zeroOffsetGyro[1] + imu1.gyroY,
+                            this->zeroOffsetGyro[2] + imu1.gyroZ};
+
+    imu1SampleCount++;
+    if (debug == Calibration || debug == ALL) {
+      SOAR_PRINT(
+          "zeroOffsetGyro[0]:%f,zeroOffsetGyro[1]:%f,zeroOffsetGyro[2]:%f\n",
+          this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
+          this->zeroOffsetGyro[2]);
+    }
   }
 
-  this->zeroOffsetAccel = {this->zeroOffsetAccel[0] + imu1.accelX,
-                           this->zeroOffsetAccel[1] + imu1.accelY,
-                           this->zeroOffsetAccel[2] + imu1.accelZ};
-  this->zeroOffsetGyro = {this->zeroOffsetGyro[0] + imu1.gyroX,
-                          this->zeroOffsetGyro[1] + imu1.gyroY,
-                          this->zeroOffsetGyro[2] + imu1.gyroZ};
-
-  if (debug == Calibration | debug == ALL) {
-    SOAR_PRINT(
-        "zeroOffsetAccel[0]:%f,zeroOffsetAccel[1]:%f,zeroOffsetAccel[2]:%f\n",
-        this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
-        this->zeroOffsetAccel[2]);
-
-    SOAR_PRINT(
-        "zeroOffsetGyro[0]:%f,zeroOffsetGyro[1]:%f,zeroOffsetGyro[2]:%f\n",
-        this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
-        this->zeroOffsetGyro[2]);
-  }
-
-  if (debug == Secondary || debug == ALL) {
-    SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
-  }
-
-  if (!isinf(imu2.accelX)) {
-    this->zeroOffsetAccel2 = {this->zeroOffsetAccel2[0] + imu2.accelX,
-                              this->zeroOffsetAccel2[1] + imu2.accelY,
-                              this->zeroOffsetAccel2[2] + imu2.accelZ};
+  if (!isinf(imu2.accelX) || !isinf(imu2.accelY) || !isinf(imu2.accelZ)) {
     this->zeroOffsetGyro2 = {this->zeroOffsetGyro2[0] + imu2.gyroX,
                              this->zeroOffsetGyro2[1] + imu2.gyroY,
                              this->zeroOffsetGyro2[2] + imu2.gyroZ};
 
+    imu2SampleCount++;
     if (debug == Calibration || debug == ALL) {
-      SOAR_PRINT(
-          "zeroOffsetAccel2[0]:%f,zeroOffsetAccel2[1]:%f,zeroOffsetAccel2[2]:%"
-          "f\n",
-          this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
-          this->zeroOffsetAccel2[2]);
-
       SOAR_PRINT(
           "zeroOffsetGyro2[0]:%f,zeroOffsetGyro2[1]:%f,zeroOffsetGyro2[2]:%f\n",
           this->zeroOffsetGyro2[0], this->zeroOffsetGyro2[1],
           this->zeroOffsetGyro2[2]);
-    }
-
-    if (debug == Calibration || debug == ALL) {
-      SOAR_PRINT("average: %f number: %d \n", average, numberOfSamples);
     }
   }
 
@@ -1219,47 +1174,32 @@ void EverestTask::tare(IMUData_Everest& imu1, IMUData_Everest& imu2,
   }
 
   if (calibrationTimeRemaining == 0) {
-    sum = sum / (CALIBRATION_TIME * RATE_BARO);
-    this->Kinematics.initialAlt = sum;
+    this->Kinematics.initialAlt = sum / numberOfSamples;
 
-    this->zeroOffsetAccel = {
-        this->zeroOffsetAccel[0] / (CALIBRATION_TIME * RATE_BARO),
-        this->zeroOffsetAccel[1] / (CALIBRATION_TIME * RATE_BARO),
-        this->zeroOffsetAccel[2] / (CALIBRATION_TIME * RATE_BARO)};
+    this->zeroOffsetGyro = {this->zeroOffsetGyro[0] / imu1SampleCount,
+                            this->zeroOffsetGyro[1] / imu1SampleCount,
+                            this->zeroOffsetGyro[2] / imu1SampleCount};
 
-    this->zeroOffsetGyro = {
-        this->zeroOffsetGyro[0] / (CALIBRATION_TIME * RATE_BARO),
-        this->zeroOffsetGyro[1] / (CALIBRATION_TIME * RATE_BARO),
-        this->zeroOffsetGyro[2] / (CALIBRATION_TIME * RATE_BARO)};
-
-    this->zeroOffsetAccel2 = {
-        this->zeroOffsetAccel2[0] / (CALIBRATION_TIME * RATE_BARO),
-        this->zeroOffsetAccel2[1] / (CALIBRATION_TIME * RATE_BARO),
-        this->zeroOffsetAccel2[2] / (CALIBRATION_TIME * RATE_BARO)};
-
-    this->zeroOffsetGyro2 = {
-        this->zeroOffsetGyro2[0] / (CALIBRATION_TIME * RATE_BARO),
-        this->zeroOffsetGyro2[1] / (CALIBRATION_TIME * RATE_BARO),
-        this->zeroOffsetGyro2[2] / (CALIBRATION_TIME * RATE_BARO)};
+    this->zeroOffsetGyro2 = {this->zeroOffsetGyro2[0] / imu2SampleCount,
+                             this->zeroOffsetGyro2[1] / imu2SampleCount,
+                             this->zeroOffsetGyro2[2] / imu2SampleCount};
 
     isTared = true;
 
     if (debug == Calibration || debug == ALL) {
       SOAR_PRINT("Tare Initial Altitude: %f\n", this->Kinematics.initialAlt);
       SOAR_PRINT(
-          "\nCalibration offsets:\n  accel1(%f,%f,%f),\n accel2(%f,%f,%f),\n"
+          "\nCalibration offsets:"
           "gyro(%f,%f,%f),\n  gyro2(%f,%f,%f)\n\n",
-          this->zeroOffsetAccel[0], this->zeroOffsetAccel[1],
-          this->zeroOffsetAccel[2], this->zeroOffsetGyro[0],
-          this->zeroOffsetGyro[1], this->zeroOffsetGyro[2],
-          this->zeroOffsetAccel2[0], this->zeroOffsetAccel2[1],
-          this->zeroOffsetAccel2[2], this->zeroOffsetGyro2[0],
+
+          this->zeroOffsetGyro[0], this->zeroOffsetGyro[1],
+          this->zeroOffsetGyro[2], this->zeroOffsetGyro2[0],
           this->zeroOffsetGyro2[1], this->zeroOffsetGyro2[2]);
     }
   }
 
   // call to update time and offsets for these structs
-  IMU_Update(imu1, imu2);
+  // IMU_Update(imu1, imu2);
 
   // keeps track of remaining time for tare
   calibrationTimeRemaining -= 1;
@@ -1277,31 +1217,29 @@ float EverestTask::finalWrapper(
     float timeIMU1, float timeIMU2, float timeBaro1, float timeBaro2,
     MadAxesAlignment alignment, MadAxesAlignment alignment2) {
   // converts from m/s to gs
-  IMUData_Everest sensorData = {
-      timeIMU1,
-      gyroX1,
-      gyroY1,
-      gyroZ1,
-      (float)(accelX1 / 9.81),
-      (float)(accelY1 / 9.81),
-      (float)(accelZ1 / 9.81),
-      magX1,
-      magY1,
-      magZ1,
-  };
+  IMUData_Everest sensorData = {timeIMU1,
+                                gyroX1,
+                                gyroY1,
+                                gyroZ1,
+                                (float)(accelX1),
+                                (float)(accelY1),
+                                (float)(accelZ1),
+                                magX1,
+                                magY1,
+                                magZ1,
+                                0};
 
-  IMUData_Everest sensorData2 = {
-      timeIMU2,
-      gyroX2,
-      gyroY2,
-      gyroZ2,
-      (float)(accelX2 / 9.81),
-      (float)(accelY2 / 9.81),
-      (float)(accelZ2 / 9.81),
-      magX2,
-      magY2,
-      magZ2,
-  };
+  IMUData_Everest sensorData2 = {timeIMU2,
+                                 gyroX2,
+                                 gyroY2,
+                                 gyroZ2,
+                                 (float)(accelX2),
+                                 (float)(accelY2),
+                                 (float)(accelZ2),
+                                 magX2,
+                                 magY2,
+                                 magZ2,
+                                 0};
 
   BarosData baro1 = {timeBaro1, pressure1, 0, 0};
   BarosData baro2 = {timeBaro2, pressure2, 0, 0};
@@ -1408,6 +1346,8 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData) {
   return haloData;
 }
 
+// tiny epsilon to prevent NaN.
+
 // update IMU1
 void EverestTask::IMU1_Measurements(IMUData_Everest imu1) {
   this->everestData.accelX1 = imu1.accelX;
@@ -1419,7 +1359,7 @@ void EverestTask::IMU1_Measurements(IMUData_Everest imu1) {
   this->everestData.magX1 = imu1.magX;
   this->everestData.magY1 = imu1.magY;
   this->everestData.magZ1 = imu1.magZ;
-  this->everestData.timeIMU1 = imu1.time;
+  this->everestData.timeIMU1 = imu1.time + 1e-1f;
   this->availableMeasurements[0] = 1;
 }
 
@@ -1434,21 +1374,21 @@ void EverestTask::IMU2_Measurements(IMUData_Everest imu2) {
   this->everestData.magX2 = imu2.magX;
   this->everestData.magY2 = imu2.magY;
   this->everestData.magZ2 = imu2.magZ;
-  this->everestData.timeIMU2 = imu2.time;
+  this->everestData.timeIMU2 = imu2.time + 1e-1f;
   this->availableMeasurements[1] = 1;
 }
 
 // update Baro1
 void EverestTask::Baro1_Measurements(BarosData baro1) {
   this->everestData.pressure1 = baro1.pressure;
-  this->everestData.timeBaro1 = baro1.time;
+  this->everestData.timeBaro1 = baro1.time + 1e-1f;
   this->availableMeasurements[2] = 1;
 }
 
 // update Baro2
 void EverestTask::Baro2_Measurements(BarosData baro2) {
   this->everestData.pressure2 = baro2.pressure;
-  this->everestData.timeBaro2 = baro2.time;
+  this->everestData.timeBaro2 = baro2.time + 1e-1f;
   this->availableMeasurements[3] = 1;
 }
 
@@ -1496,11 +1436,15 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
       if (this->availableMeasurements[0] == 0) {
         // set to infinity
         this->everestData.accelX1 = std::numeric_limits<float>::infinity();
+        this->everestData.accelY1 = std::numeric_limits<float>::infinity();
+        this->everestData.accelZ1 = std::numeric_limits<float>::infinity();
       }
 
       if (this->availableMeasurements[1] == 0) {
         // set to infinity
         this->everestData.accelX2 = std::numeric_limits<float>::infinity();
+        this->everestData.accelY2 = std::numeric_limits<float>::infinity();
+        this->everestData.accelZ2 = std::numeric_limits<float>::infinity();
       }
 
       if (this->availableMeasurements[2] == 0) {
@@ -1553,24 +1497,24 @@ void EverestTask::initEverest() {
 
   if (this->isAligned == 0) {
     IMUData_Everest imu1 = {this->everestData.timeIMU1,
-                            this->everestData.accelX1,
-                            this->everestData.accelY1,
-                            this->everestData.accelZ1,
                             this->everestData.gyroX1,
                             this->everestData.gyroY1,
                             this->everestData.gyroZ1,
+                            this->everestData.accelX1,
+                            this->everestData.accelY1,
+                            this->everestData.accelZ1,
                             this->everestData.magX1,
                             this->everestData.magY1,
                             this->everestData.magZ1,
                             0.0f};
 
     IMUData_Everest imu2 = {this->everestData.timeIMU2,
-                            this->everestData.accelX2,
-                            this->everestData.accelY2,
-                            this->everestData.accelZ2,
                             this->everestData.gyroX2,
                             this->everestData.gyroY2,
                             this->everestData.gyroZ2,
+                            this->everestData.accelX2,
+                            this->everestData.accelY2,
+                            this->everestData.accelZ2,
                             this->everestData.magX2,
                             this->everestData.magY2,
                             this->everestData.magZ2,
@@ -1581,24 +1525,24 @@ void EverestTask::initEverest() {
 
   if (!isTared) {
     IMUData_Everest imu1 = {this->everestData.timeIMU1,
-                            this->everestData.accelX1,
-                            this->everestData.accelY1,
-                            this->everestData.accelZ1,
                             this->everestData.gyroX1,
                             this->everestData.gyroY1,
                             this->everestData.gyroZ1,
+                            this->everestData.accelX1,
+                            this->everestData.accelY1,
+                            this->everestData.accelZ1,
                             this->everestData.magX1,
                             this->everestData.magY1,
                             this->everestData.magZ1,
                             0.0f};
 
     IMUData_Everest imu2 = {this->everestData.timeIMU2,
-                            this->everestData.accelX2,
-                            this->everestData.accelY2,
-                            this->everestData.accelZ2,
                             this->everestData.gyroX2,
                             this->everestData.gyroY2,
                             this->everestData.gyroZ2,
+                            this->everestData.accelX2,
+                            this->everestData.accelY2,
+                            this->everestData.accelZ2,
                             this->everestData.magX2,
                             this->everestData.magY2,
                             this->everestData.magZ2,

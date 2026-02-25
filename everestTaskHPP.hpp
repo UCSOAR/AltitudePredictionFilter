@@ -158,6 +158,10 @@ class EverestTask {
   float oldTime = 0;
   HALO halo;
 
+  int imu1SampleCount = 0;
+  int imu2SampleCount = 0;
+  int numberOfSamples = 0;
+
   madAhrsFlags flags;
   madAhrsInternalStates internalStates;
 
@@ -195,8 +199,8 @@ class EverestTask {
                               BarosData baro1, BarosData baro2,
                               MadAxesAlignment alignment);
 
-  void tare(IMUData_Everest& imu1, IMUData_Everest& imu2, BarosData baro1,
-            BarosData baro2);
+  void tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
+            const BarosData& baro1, const BarosData& baro2);
 
   void MadgwickSetup();
 
@@ -229,12 +233,12 @@ class EverestTask {
 
   std::vector<int> availableMeasurements = {0, 0, 0, 0, 0};
 
-  EverestData everestData;
+  EverestData everestData{};
 
   float timeEverest = 0;
 
-  // the change between oldTime and timeEverest.
-  float deltaTime = 0;
+  // the change between oldTime and timeEverest. Start value is dummy.
+  float deltaTime = 0.333;
 
   void IMU1_Measurements(IMUData_Everest imu1);
   void IMU2_Measurements(IMUData_Everest imu2);
@@ -256,8 +260,9 @@ class EverestTask {
  protected:
   IMUData_Everest internalIMU_1, internalIMU_2;
 
-  std::vector<float> zeroOffsetAccel = {0, 0, 0};
-  std::vector<float> zeroOffsetAccel2 = {0, 0, 0};
+  // our accelerometers are already normalized.
+  // std::vector<float> zeroOffsetAccel = {0, 0, 0};
+  // std::vector<float> zeroOffsetAccel2 = {0, 0, 0};
   std::vector<float> zeroOffsetGyro = {0, 0, 0};
   std::vector<float> zeroOffsetGyro2 = {0, 0, 0};
 

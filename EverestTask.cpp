@@ -213,7 +213,7 @@ enum debug_level {
   Calibration = 7  // Calibration
 };
 
-debug_level debug = HAL0;
+debug_level debug = ALL;
 
 /**
  * @brief Calls finalWrapper with data and alignment
@@ -325,8 +325,8 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   madEuler euler = infusion->getEuler(ahrs);
   madVector earth = infusion->madAhrsGetEarthAcceleration(ahrs);
 
-  // SOAR_PRINT("EARTH XYZ: %f %f %f\n", earth.axis.x, earth.axis.y,
-  // earth.axis.z);
+  SOAR_PRINT("EARTH XYZ (adjusted for gravity): %f %f %f\n", earth.axis.x,
+             earth.axis.y, earth.axis.z);
 
   internalStates = infusion->madAhrsGetInternalStates(infusion->getMadAhrs());
   flags = infusion->madAhrsGetFlags(infusion->getMadAhrs());
@@ -667,7 +667,7 @@ float EverestTask::deriveForAltitudeIMU(IMUData_Everest avgIMU) {
     SOAR_PRINT("\nKinematics\n");
     SOAR_PRINT("IMU Initial Altitude: %f\n", initialAltitude);
     SOAR_PRINT("IMU Velocity: %f\n", initialVelocity);
-    SOAR_PRINT("IMU Acceleration: %f\n", accelerationZ);
+    SOAR_PRINT("IMU Acceleration: %fm/s^2\n", accelerationZ);
     SOAR_PRINT("IMU Delta Time: %f\n", deltaTime);
     SOAR_PRINT("Derived Altitude: %f\n", altitude);
   }
@@ -1465,11 +1465,7 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
   // }
 }
 
-void EverestTask::updateDeltaTime(float currentTime) {
-  oldTime = timeEverest;
-  deltaTime = currentTime - oldTime;
-  timeEverest = currentTime;
-}
+void EverestTask::updateDeltaTime(float currentTime) { deltaTime = 0.3; }
 
 #ifdef TEST_BUILD
 float findClosestTime(float time) {

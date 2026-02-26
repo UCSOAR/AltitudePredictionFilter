@@ -195,15 +195,21 @@ void HALO::stateUpdate() {
   K.setZero();
   K = Pxz * Pz.inverse();
 
-  // Print Kalman Gain using SOAR_PRINT
-  /*
+  SOAR_PRINT("  Pxz:\n");
+  for (int i = 0; i < Pxz.rows(); i++) {
+    for (int j = 0; j < Pxz.cols(); j++) {
+      SOAR_PRINT("Pxz(%d,%d) = %f  ", i, j, K(i, j));
+    }
+    SOAR_PRINT("\n");
+  }
+
   SOAR_PRINT("Kalman Gain K:\n");
   for (int i = 0; i < K.rows(); i++) {
-      for (int j = 0; j < K.cols(); j++) {
-          SOAR_PRINT("K(%d,%d) = %f  ", i, j, K(i, j));
-      }
-      SOAR_PRINT("\n");
-  }*/
+    for (int j = 0; j < K.cols(); j++) {
+      SOAR_PRINT("K(%d,%d) = %f  ", i, j, K(i, j));
+    }
+    SOAR_PRINT("\n");
+  }
 
 #if defined(LOGON) || defined(LOGMETRICS)
 

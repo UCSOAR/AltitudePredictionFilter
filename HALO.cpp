@@ -25,6 +25,7 @@
 #define REFRESH_RATE 3
 
 #define printf(...) ;
+// #define SOAR_PRINT(...) ;
 
 /* Constants for the UKF... do we ever use it?
 #define N 6
@@ -171,9 +172,12 @@ void HALO::stateUpdate() {
   MatrixXf R_GPS(OBSERVATION_DIMENSIONS, OBSERVATION_DIMENSIONS);
   R_GPS.setZero();
   R_GPS.block<3, 3>(0, 0) = this->R;  // original 3x3 R matrix
-  R_GPS(3, 3) =
-      25;  // dummy value for 5m std dev. low R for GPS means higher trust!
-
+  if (!gpsAvailable) {
+    R_GPS(3, 3) = 1e9;  // high noise when GPS is off or dead.
+  } else {
+    R_GPS(3, 3) =
+        25;  // dummy value for 5m std dev. low R for GPS means higher trust!
+  }
   // calculate the innovation covariance, measurement covariance
   MatrixXf Pz(OBSERVATION_DIMENSIONS, OBSERVATION_DIMENSIONS);
   Pz.setZero(OBSERVATION_DIMENSIONS, OBSERVATION_DIMENSIONS);
@@ -190,6 +194,16 @@ void HALO::stateUpdate() {
   MatrixXf K(3, OBSERVATION_DIMENSIONS);
   K.setZero();
   K = Pxz * Pz.inverse();
+
+  // Print Kalman Gain using SOAR_PRINT
+  /*
+  SOAR_PRINT("Kalman Gain K:\n");
+  for (int i = 0; i < K.rows(); i++) {
+      for (int j = 0; j < K.cols(); j++) {
+          SOAR_PRINT("K(%d,%d) = %f  ", i, j, K(i, j));
+      }
+      SOAR_PRINT("\n");
+  }*/
 
 #if defined(LOGON) || defined(LOGMETRICS)
 
@@ -1393,7 +1407,7 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
     fclose(file);
 #endif
 
-    printf("X is nan, defaulting to static integration\n");
+    SOAR_PRINT("X is nan, defaulting to static integration\n");
 
     float finalVelocity = X(1) + X(0) * getDeltaTime();
     float altitude = X(2) + (X(1) + finalVelocity) * getDeltaTime() / 2.0;
@@ -1457,7 +1471,7 @@ VectorXf HALO::dynamicModelOnce(
             this->time);
     fclose(file);
 
-    printf("X is nan, defaulting to static integration\n");
+    SOAR_PRINT("X is nan, defaulting to static integration\n");
 
     float finalVelocity = X(1) + X(0) * getDeltaTime();
     float altitude = X(2) + (X(1) + finalVelocity) * getDeltaTime() / 2.0;

@@ -224,6 +224,8 @@ class HALO {
 
   float getGPSAlt();
 
+  bool gpsAvailable = 0;
+
   void setAlt(float gps_alt);
 
   VectorXf predictNextValues(std::vector<std::vector<float>> &vectors,

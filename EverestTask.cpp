@@ -213,7 +213,7 @@ enum debug_level {
   Calibration = 7  // Calibration
 };
 
-debug_level debug = Calibration;
+debug_level debug = HAL0;
 
 /**
  * @brief Calls finalWrapper with data and alignment
@@ -325,7 +325,8 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   madEuler euler = infusion->getEuler(ahrs);
   madVector earth = infusion->madAhrsGetEarthAcceleration(ahrs);
 
-  SOAR_PRINT("EARTH XYZ: %f %f %f\n", earth.axis.x, earth.axis.y, earth.axis.z);
+  // SOAR_PRINT("EARTH XYZ: %f %f %f\n", earth.axis.x, earth.axis.y,
+  // earth.axis.z);
 
   internalStates = infusion->madAhrsGetInternalStates(infusion->getMadAhrs());
   flags = infusion->madAhrsGetFlags(infusion->getMadAhrs());
@@ -1424,11 +1425,8 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
         this->availableMeasurements[2] == 1 &&
         this->availableMeasurements[3] == 1) {
       std::vector<float> haloData = this->EverestToHalo(this->everestData);
-      // reset available measurements
-      this->availableMeasurements[0] = 0;
-      this->availableMeasurements[1] = 0;
-      this->availableMeasurements[2] = 0;
-      this->availableMeasurements[3] = 0;
+      // do not reset measurements, but leave stale data.
+
       return haloData;
     } else {
       // available[0] = IMU1, available[1] = IMU2, available[2] = Baro1,
@@ -1455,13 +1453,11 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
         this->everestData.pressure2 = 0;
       }
 
+      halo.gpsAvailable = this->availableMeasurements[4];
+
       std::vector<float> haloData = this->EverestToHalo(this->everestData);
 
-      // reset available measurements
-      this->availableMeasurements[0] = 0;
-      this->availableMeasurements[1] = 0;
-      this->availableMeasurements[2] = 0;
-      this->availableMeasurements[3] = 0;
+      // do not reset measurements, but leave stale data.
 
       return haloData;
     }

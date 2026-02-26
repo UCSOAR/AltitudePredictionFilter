@@ -60,6 +60,8 @@ struct Scenario {
   std::vector<float> measurement;
   bool isBeforeApogeeBool = true;
 
+  Measurement prediction{};
+
   // conversions between vector and array.
   inline std::array<float, 3> vec2arr(const std::vector<float> &v) {
     assert(v.size() == 3);
@@ -376,9 +378,6 @@ class HALO {
 
   // use REFRESH_RATE here somehow
   float timeStep = 1.0f / 3.0f;
-
-  // last time that a prediction was made. done to prevent multiple triggers.
-  int lastTriggerTime = -1;
 
   std::vector<float> prevGain1 = {0.5, 0.5, 0.5};
   std::vector<float> prevGain2 = {0.5, 0.5, 0.5};

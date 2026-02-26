@@ -1623,14 +1623,6 @@ std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
 
     // X0 = {eAltitude, eVelocity, eAccelerationZ};
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
-
-    // predict 100 slices every 5 time slices.
-    int t = (int)floor(time);
-
-    if (t % 5 == 0 && t != lastTriggerTime) {
-      haloPointer->predictNStates(100);
-      lastTriggerTime = t;
-    }
   }
 
   if (counter == 524) {

@@ -10,29 +10,28 @@
 #include "KDTree.hpp"
 #include <deque>
 
-#ifdef HOME
-#include "C:\Users\andin\OneDrive\Documents\AllRepos\UnscentedKalmanFilter\eigen-3.4.0\Eigen\Cholesky"
-#include "C:\Users\andin\OneDrive\Documents\AllRepos\UnscentedKalmanFilter\eigen-3.4.0\Eigen\Dense"
-#endif
+#include "SystemDefines.hpp"
+#include "UARTDriver.hpp"
 
 // away
 #ifndef HOME
-#include "C:\Users\Andrey\Downloads\eigen-5.0.0\eigen-5.0.0\Eigen\Cholesky"
-#include "C:\Users\Andrey\Downloads\eigen-5.0.0\eigen-5.0.0\Eigen\Dense"
+#include "Eigen\Cholesky"
+#include "Eigen\Dense"
 #endif
 
 using namespace Eigen;
-#define LOGON
+// #define LOGON
+// #define LOGMETRICS
 
 /**
  * @brief Measurement struct to store the time, altitude, velocity and
  * acceleration
  */
 struct Measurement {
-  double altitude;
-  double velocity;
-  double acceleration;
-  double time;
+  float altitude;
+  float velocity;
+  float acceleration;
+  float time;
 };
 
 /**
@@ -61,8 +60,20 @@ struct Scenario {
   std::vector<float> measurement;
   bool isBeforeApogeeBool = true;
 
-  Scenario(std::vector<std::vector<float>> beforeList,
-           std::vector<std::vector<float>> afterList, int Name)
+  Measurement prediction{};
+
+  // conversions between vector and array.
+  inline std::array<float, 3> vec2arr(const std::vector<float> &v) {
+    assert(v.size() == 3);
+    return {v[0], v[1], v[2]};
+  }
+
+  inline std::vector<float> arr2vec(const std::array<float, 3> &a) {
+    return {a[0], a[1], a[2]};
+  }
+
+  Scenario(std::vector<std::vector<float>> &beforeList,
+           std::vector<std::vector<float>> &afterList, int Name)
       : BeforeList(beforeList), AfterList(afterList), name(Name) {}
 
   // Function to find the vector and split the list
@@ -104,31 +115,37 @@ struct Scenario {
    */
   std::pair<std::vector<float>, size_t> nearestKDTree(
       std::vector<float> measurement) {
+    std::array<float, 3> convertedMeasurement = vec2arr(measurement);
+    pointIndex result;
     if (isBeforeApogeeBool) {
-      return treeBefore.nearest_pointIndex(measurement);
+      treeBefore.reset_last_nearest();
+      result = treeBefore.nearest_pointIndex(convertedMeasurement);
     } else {
-      return treeAfter.nearest_pointIndex(measurement);
+      treeAfter.reset_last_nearest();
+      result = treeAfter.nearest_pointIndex(convertedMeasurement);
     }
+
+    return {arr2vec(result.first), result.second};
   }
 
   void createTree() {
-    std::vector<std::vector<float>> beforeVectorofVectors;
-    std::vector<std::vector<float>> afterVectorofVectors;
+    std::vector<std::array<float, 3>> beforeArrayOfArrays;
+    std::vector<std::array<float, 3>> afterArrayOfArrays;
 
-    for (int i = 0; i < BeforeList.size(); i++) {
-      std::vector<float> vect = {BeforeList[i][0], BeforeList[i][1],
-                                 BeforeList[i][2]};
-      beforeVectorofVectors.push_back(vect);
+    beforeArrayOfArrays.reserve(BeforeList.size());
+    afterArrayOfArrays.reserve(AfterList.size());
+
+    for (const auto &pt : BeforeList) {
+      // Assuming BeforeList[i] has at least 3 elements
+      beforeArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
     }
 
-    for (int i = 0; i < AfterList.size(); i++) {
-      std::vector<float> vect = {AfterList[i][0], AfterList[i][1],
-                                 AfterList[i][2]};
-      afterVectorofVectors.push_back(vect);
+    for (const auto &pt : AfterList) {
+      afterArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
     }
 
-    treeBefore = KDTree(beforeVectorofVectors);
-    treeAfter = KDTree(afterVectorofVectors);
+    treeBefore = KDTree(beforeArrayOfArrays);
+    treeAfter = KDTree(afterArrayOfArrays);
   }
 
   /**
@@ -166,7 +183,9 @@ struct Scenario {
 
   /** finds vector at specified index **/
   std::vector<float> evaluateVectorAt(int index) {
-    return (*getLists())[index];
+    auto *lists = getLists();
+
+    return lists->at(index);
   }
 
   /** finds vector at specified time **/
@@ -207,19 +226,32 @@ class HALO {
 
   float getGPSAlt();
 
+  bool gpsAvailable = 0;
+
   void setAlt(float gps_alt);
 
   VectorXf predictNextValues(std::vector<std::vector<float>> &vectors,
                              VectorXf &X_in, int scenario1Index,
                              int scenario2Index);
 
-  void setStateVector(float filteredAcc, float filteredVelo, float filteredAlt);
+  VectorXf predictNextValuesOnce(
+      std::vector<std::vector<float>> &vectors, VectorXf &X_in,
+      int scenario1Index, int scenario2Index, int firstTimeForPoint,
+      std::vector<float> &prevGain1, std::vector<float> &prevGain2,
+      std::vector<std::vector<int>> &scenariosGainsList,
+      int &counterSigmaPoint);
+
+  void setStateVector(float filteredAcc, float filteredVelo, float filteredAlt,
+                      float gpsAlt);
 
   std::pair<std::vector<int>, std::vector<std::vector<float>>>
   findNearestScenarios(std::vector<Scenario> *scenarios, VectorXf &measurement);
 
   // Takes Altitude, Velocity, Acceleration
   void calculateSigmaPoints();
+
+  // loop through calculateSigmaOnce n times.
+  VectorXf predictNStates(int n);
 
   // Acceleration, Velocity, Altitude
   VectorXf X;  // state vector
@@ -240,6 +272,13 @@ class HALO {
 
   VectorXf dynamicModel(VectorXf &X);
 
+  VectorXf dynamicModelOnce(VectorXf &X, int firstTimeForPoint,
+                            std::vector<float> &prevGain1,
+                            std::vector<float> &prevGain2,
+                            std::vector<std::vector<int>> &scenariosGainsList,
+                            int &counterSigmaPoint,
+                            std::vector<Scenario> &scenarios);
+
   void setScenarios(std::vector<Scenario> &scenarios) {
     this->scenarios = scenarios;
   };
@@ -251,15 +290,16 @@ class HALO {
   bool isBeforeApogee(float acceleration, float velocity, float altitude,
                       float lastAltitude);
 
-  float deltaTime = 1.0 / 3;
+  // baseline rate of change
+  float deltaTime = 1.0 / 3.0f;
 
-  void setDeltaTime(float deltaTime) { this->deltaTime; }
+  void setDeltaTime(float deltaTime) { this->deltaTime = deltaTime; }
 
   float getDeltaTime() { return this->deltaTime; }
 
   float time = 0;
 
-  void setTime(float time) { this->time; }
+  void setTime(float time) { this->time = time; }
 
   float euclideanDistance(const std::vector<float> &vec1, const VectorXf &vec2);
 
@@ -286,37 +326,43 @@ class HALO {
 
   void initializeHALO(float initialAlt, HALO *halo);
 
-  std::vector<double> Halo_Input(HALO *haloPointer, bool isInitialized,
-                                 double eAccelerationZ, double eVelocity,
-                                 double eAltitude, float time);
+  std::vector<float> Halo_Input(HALO *haloPointer, bool isInitialized,
+                                float eAccelerationZ, float eVelocity,
+                                float eAltitude, float gpsAltitude, float time,
+                                float deltaTime);
 
   // for predictNextValues
   int counterSigmaPoint = 0;
   std::vector<std::vector<int>> scenariosGainsList = {{0, 0}, {0, 0}, {0, 0},
                                                       {0, 0}, {0, 0}, {0, 0}};
 
-  std::chrono::duration<double> updateTime;
-  std::chrono::duration<double> predictTime;
-  std::chrono::duration<double> triangulationTime;
-  std::chrono::duration<double> dynamicModelTime;
-  std::chrono::duration<double> nearestScenariosTime;
-  std::chrono::duration<double> KDTreeTime;
-  std::chrono::duration<double> euclideanTime;
-  std::chrono::duration<double> twoDistancesTime;
-  std::chrono::duration<double> vectorsTime;
-  std::chrono::duration<double> push_backTime;
-  std::chrono::duration<double> loopScenariosTime;
-  std::chrono::duration<double> emplaceBackTime;
-  std::chrono::duration<double> getListsTime;
-  std::chrono::duration<double> othersTime;
-  std::chrono::duration<double> PpredictionTime;
-  std::chrono::duration<double> projErrorTime;
-  std::chrono::duration<double> sPointTime;
-  std::chrono::duration<double> preMeanTime;
-  std::chrono::duration<double> predictLoopTime;
-  std::chrono::duration<double> endPredictLoopTime;
-  std::chrono::duration<double> getScenarioTime;
-  std::chrono::duration<double> treeCreationTime;
+  std::chrono::duration<float> updateTime;
+  std::chrono::duration<float> predictTime;
+  std::chrono::duration<float> triangulationTime;
+  std::chrono::duration<float> dynamicModelTime;
+  std::chrono::duration<float> nearestScenariosTime;
+  std::chrono::duration<float> KDTreeTime;
+  std::chrono::duration<float> euclideanTime;
+  std::chrono::duration<float> twoDistancesTime;
+  std::chrono::duration<float> vectorsTime;
+  std::chrono::duration<float> push_backTime;
+  std::chrono::duration<float> loopScenariosTime;
+  std::chrono::duration<float> emplaceBackTime;
+  std::chrono::duration<float> getListsTime;
+  std::chrono::duration<float> othersTime;
+  std::chrono::duration<float> PpredictionTime;
+  std::chrono::duration<float> projErrorTime;
+  std::chrono::duration<float> sPointTime;
+  std::chrono::duration<float> preMeanTime;
+  std::chrono::duration<float> predictLoopTime;
+  std::chrono::duration<float> endPredictLoopTime;
+  std::chrono::duration<float> getScenarioTime;
+  std::chrono::duration<float> treeCreationTime;
+
+  // timers for the forward predict phase
+  std::chrono::duration<float> predictNStatesTime;
+  std::chrono::duration<float> predictNStates_getScenarioTime;
+  std::chrono::duration<float> predictNStates_nearestScenariosTime;
 
   void initializeHALOWithQR(float initialAlt, HALO *halo, MatrixXf &Q,
                             MatrixXf &R0);
@@ -325,25 +371,27 @@ class HALO {
   float Uaccel;
   float Ualt;
   float Uvelo;
+  float gpsAlt;
 
   VectorXf X_in;
   VectorXf X_pred;
 
-  float timeStep = 1 / 3;
+  // use REFRESH_RATE here somehow
+  float timeStep = 1.0f / 3.0f;
 
   std::vector<float> prevGain1 = {0.5, 0.5, 0.5};
   std::vector<float> prevGain2 = {0.5, 0.5, 0.5};
 
-  double altitudeAccumulator = 0;
+  float altitudeAccumulator = 0;
 
-  double maxAltitude = 0;
+  float maxAltitude = 0;
 
-  double calculateConfidence(double current, double previous, double variance) {
+  float calculateConfidence(float current, float previous, float variance) {
     if (current > maxAltitude) {
       maxAltitude = current;
     }
 
-    double difference = maxAltitude - current;
+    float difference = maxAltitude - current;
 
     if (difference > 0) {
       altitudeAccumulator += difference;
@@ -358,7 +406,7 @@ class HALO {
     return std::max(difference, altitudeAccumulator) / std::abs(variance);
   }
 
-  double calculateVelocityConfidence(double currentVelo, double varianceVelo) {
+  float calculateVelocityConfidence(float currentVelo, float varianceVelo) {
     // velocity should be < 0 for apogee
     // range
     if (currentVelo > varianceVelo) {
@@ -368,19 +416,18 @@ class HALO {
     return 1 - std::abs((currentVelo) / (2 * std::abs(varianceVelo)));
   }
 
-  double calculateAccelerationConfidence(double currentAcc,
-                                         double varianceAcc) {
-    double targetAcc = -9.81;
-    double difference = std::abs(currentAcc - targetAcc);
+  float calculateAccelerationConfidence(float currentAcc, float varianceAcc) {
+    float targetAcc = -9.81;
+    float difference = std::abs(currentAcc - targetAcc);
 
-    double lowerBound = currentAcc - varianceAcc;
-    double upperBound = currentAcc + varianceAcc;
+    float lowerBound = currentAcc - varianceAcc;
+    float upperBound = currentAcc + varianceAcc;
 
     if (lowerBound > targetAcc && upperBound < targetAcc) {
       return 0;
     }
 
-    double confidence = 1 - (difference / (2 * varianceAcc));
+    float confidence = 1 - (difference / (2 * varianceAcc));
 
     return confidence;
   }
@@ -388,14 +435,14 @@ class HALO {
   bool apogeeDetection(const Measurement &currentMeasurement) {
     updateBuffer(currentMeasurement);
 
-    double avgAltitude = altitudeSum / buffer.size();
-    double avgVelocity = velocitySum / buffer.size();
-    double avgAcceleration = accelerationSum / buffer.size();
+    float avgAltitude = altitudeSum / buffer.size();
+    float avgVelocity = velocitySum / buffer.size();
+    float avgAcceleration = accelerationSum / buffer.size();
 
     // Square root the P values to get std deviation
-    double sqrtP_altitude = std::sqrt(this->P(0, 0));
-    double sqrtP_velocity = std::sqrt(this->P(1, 1));
-    double sqrtP_acceleration = std::sqrt(this->P(2, 2));
+    float sqrtP_altitude = std::sqrt(this->P(0, 0));
+    float sqrtP_velocity = std::sqrt(this->P(1, 1));
+    float sqrtP_acceleration = std::sqrt(this->P(2, 2));
 
     if (buffer.size() < windowSize) {
       return false;
@@ -405,10 +452,10 @@ class HALO {
       prevAvgAltitude = avgAltitude;
     }
 
-    double altitudeConfidence =
+    float altitudeConfidence =
         calculateConfidence(avgAltitude, prevAvgAltitude, sqrtP_altitude);
 
-    double velocityConfidence = 0.0;
+    float velocityConfidence = 0.0;
 
     if (avgVelocity < sqrtP_velocity) {
       velocityConfidence =
@@ -419,7 +466,7 @@ class HALO {
         velocityConfidence = 0.0;
       }
     }
-    double accelerationConfidence =
+    float accelerationConfidence =
         calculateAccelerationConfidence(avgAcceleration, sqrtP_acceleration);
 
     // cap confidence at 1
@@ -440,11 +487,11 @@ class HALO {
       accelerationConfidence = 0;
     }
 
-    double totalConfidence =
+    float totalConfidence =
         (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
          accelerationConfidence * 0.4);
 
-#ifdef LOGON
+#if defined(LOGON) || defined(LOGMETRICS)
     // write to file confidence values
     FILE *file = fopen("testSuite/results/confidence.txt",
                        "a+");  // Open the file for writing
@@ -516,13 +563,13 @@ class HALO {
   }
 
   std::deque<Measurement> buffer;
-  double altitudeSum;
-  double velocitySum;
-  double accelerationSum;
-  double prevAvgAltitude = 0.0;
-  double prevAvgVelocity = 0.0;
-  double prevAvgAcceleration = 0.0;
-  double maxAvgConfidence = 0.0;
+  float altitudeSum;
+  float velocitySum;
+  float accelerationSum;
+  float prevAvgAltitude = 0.0;
+  float prevAvgVelocity = 0.0;
+  float prevAvgAcceleration = 0.0;
+  float maxAvgConfidence = 0.0;
   bool hitOne = false;
   bool wait = false;
 

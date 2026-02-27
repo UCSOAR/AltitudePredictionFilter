@@ -18,11 +18,20 @@ data_list = [
 ]
 
 # Generate the C++ code
+hpp_code = """
+#ifndef DATA_HPP_
+#define DATA_HPP_
+
+const int num_scenarios_parsed = {};
+
+""".format((len(data_list[0])) // 4)
+
 cpp_code = """
 #include <vector>
 
-const int num_scenarios_parsed = {};
-""".format((len(data_list[0])) // 4)
+#include "Data.hpp"
+
+"""
 
 # Determine the number of scenarios based on the data
 num_scenarios = (len(data_list[0])) // 4  # Assuming each scenario has 4 columns
@@ -83,14 +92,26 @@ for scenario in range(1, num_scenarios + 1):
         + ",\n".join(before_apogee_entries)
         + "\n};\n"
     )
+    hpp_code += (f"\nextern std::vector<std::vector<float>> beforeApogeeSim{scenario};\n"
+    )
+
     cpp_code += (
         f"\nstd::vector<std::vector<float>> afterApogeeSim{scenario} = {{\n"
         + ",\n".join(after_apogee_entries)
         + "\n};\n"
     )
+    hpp_code += (f"\nextern std::vector<std::vector<float>> afterApogeeSim{scenario};\n"
+    )
+
+hpp_code += "\n#endif"
 
 # Write the generated C++ code to a file
 with open("Data.cpp", "w") as file:
     file.write(cpp_code)
 
 print("Data.cpp file has been generated.")
+
+with open("Data.hpp", "w") as file:
+    file.write(hpp_code)
+
+print("Data.hpp file has been generated.")

@@ -16,22 +16,18 @@
 #include <iostream>
 #include <sstream>
 
-#ifdef HOME
-#include "C:\Users\andin\OneDrive\Documents\AllRepos\UnscentedKalmanFilter\EverestLibrary_HALO\EverestL\EverestLibrary\HALO.hpp"
-#endif
-
 #ifndef HOME
-#include "C:\Users\Andrey\Documents\AllRepos\AltitudePredictionFilter\HALO.hpp"
+#include "C:\Users\harry\Desktop\soar\extra\HALO.hpp"
 #endif
 
 // Definitions
 // CHANGE
-#define SAMPLE_RATE (3)  // replace this with actual sample rate
-#define DELTA_TIME (1.0f / 3.0f)
+#define REFRESH_RATE (3)  // replace this with actual sample rate
 #define RATE_BARO (3)
-#define CALIBRATION_TIME (2)
+#define CALIBRATION_TIME (20)
 
-/* Macros/Enums ------------------------------------------------------------*/
+/* Macros/Enums
+   ------------------------------------------------------------*/
 enum EVEREST_TASK_COMMANDS { EVEREST_NONE = 0, UPDATE, TEST, RETARE };
 
 /*Defines------------------------------------------------------------------*/
@@ -50,7 +46,7 @@ typedef struct {
   float accelX, accelY, accelZ;
   float magX, magY, magZ;
   float altitude;
-} IMUData;
+} IMUData_Everest;
 
 /**
  * @brief Keeps whole system's states, including apogee detection results and
@@ -69,8 +65,9 @@ typedef struct {
   float std_IMU;
   float std_Baro1;
   float std_Baro2;
+  float std_GPS;
 
-  IMUData avgIMU;
+  IMUData_Everest avgIMU;
   float deltaTimeIMU;
   float earthAcceleration;
 } systemState;
@@ -127,9 +124,50 @@ typedef struct {
 
 class EverestTask {
  public:
-  void IMU_Update(const IMUData& imu1, const IMUData& imu2);
+  void IMU_Update(const IMUData_Everest& imu1, const IMUData_Everest& imu2);
+
+  int averageIMU(IMUData_Everest& imu1, IMUData_Everest& imu2);
+
+  int counterEverest = 0;
+  IMUData_Everest avgIMU1Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  IMUData_Everest avgIMU2Align = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  int isAligned = 0;
+
+  int madgwickInitialized = 0;
+  int everestInitialized = 0;
+
+  bool isTared = false;
+  bool firstSampleAfterCalibration = true;
+  bool useSTD = false;
+
+  // INTERNAL VARIABLES
+  double calibrationTimeRemaining = CALIBRATION_TIME * RATE_BARO;
+  float sum = 0;
+  float pressureSum = 0;
+  float previousTimestamp = 0;
+  bool haloInitialized = false;
+  std::vector<float> sumZeroOffsetAccel;
+  std::vector<float> sumZeroOffsetAccel2;
+  std::vector<float> sumZeroOffsetGyro;
+  std::vector<float> sumZeroOffsetGyro2;
+
+  // Instantiate Everest
+  madAhrs* ahrs;
+  Infusion* infusion;
+
+  float oldTime = 0;
+  HALO halo;
+
+  int imu1SampleCount = 0;
+  int imu2SampleCount = 0;
+  int numberOfSamples = 0;
+
+  madAhrsFlags flags;
+  madAhrsInternalStates internalStates;
 
   Infusion* ExternalInitialize();
+
+  void initEverest();
 
   static EverestTask getEverest();
 
@@ -138,31 +176,31 @@ class EverestTask {
 
   void Baro_Update(const BarosData& baro1, const BarosData& baro2);
 
-  double dynamite();
+  float dynamite();
 
   kinematics Kinematics;
-
-  kinematics* getKinematics();
 
   Infusion madgwick;
 
   altitudeList AltitudeList;
 
-  void recalculateGain(double estimate);
+  void recalculateGain(float estimate);
 
-  double deriveChangeInVelocityToGetAltitude(double estimate);
+  float deriveChangeInVelocityToGetAltitude(float estimate);
 
-  void MadgwickWrapper(IMUData data);
+  void MadgwickWrapper(IMUData_Everest data);
 
-  double ExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
-                        BarosData baro2);
+  float ExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
+                       BarosData baro1, BarosData baro2);
 
-  double deriveForAltitudeIMU(IMUData avgIMU);
+  float deriveForAltitudeIMU(IMUData_Everest avgIMU);
 
-  double AlignedExternalUpdate(IMUData imu1, IMUData imu2, BarosData baro1,
-                               BarosData baro2, MadAxesAlignment alignment);
+  float AlignedExternalUpdate(IMUData_Everest imu1, IMUData_Everest imu2,
+                              BarosData baro1, BarosData baro2,
+                              MadAxesAlignment alignment);
 
-  void tare(IMUData& imu1, IMUData& imu2, BarosData baro1, BarosData baro2);
+  void tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
+            const BarosData& baro1, const BarosData& baro2);
 
   void MadgwickSetup();
 
@@ -170,78 +208,65 @@ class EverestTask {
 
   void calculateSTDCoefficients();
 
-  double TaskWrapper(EverestData everestData, MadAxesAlignment alignment,
-                     MadAxesAlignment alignment2);
+  float TaskWrapper(EverestData everestData, MadAxesAlignment alignment,
+                    MadAxesAlignment alignment2);
 
-  double finalWrapper(float accelX1, float accelY1, float accelZ1, float gyroX1,
-                      float gyroY1, float gyroZ1, float accelX2, float magX1,
-                      float magY1, float magZ1, float accelY2, float accelZ2,
-                      float gyroX2, float gyroY2, float gyroZ2, float magX2,
-                      float magY2, float magZ2, float pressure1,
-                      float pressure2, float timeIMU1, float timeIMU2,
-                      float timeBaro1, float timeBaro2,
-                      MadAxesAlignment alignment, MadAxesAlignment alignment2);
+  float finalWrapper(float accelX1, float accelY1, float accelZ1, float gyroX1,
+                     float gyroY1, float gyroZ1, float accelX2, float magX1,
+                     float magY1, float magZ1, float accelY2, float accelZ2,
+                     float gyroX2, float gyroY2, float gyroZ2, float magX2,
+                     float magY2, float magZ2, float pressure1, float pressure2,
+                     float timeIMU1, float timeIMU2, float timeBaro1,
+                     float timeBaro2, MadAxesAlignment alignment,
+                     MadAxesAlignment alignment2);
 
   bool getIsTared();
 
-  std::vector<double> EverestToHalo(EverestData everestData,
-                                    EverestTask* everest);
+  void setIsTare(bool isTare);
 
-  std::vector<double> QueueEverest(EverestTask* everest);
+  std::vector<float> EverestToHalo(EverestData everestData);
+
+  std::vector<float> QueueEverest(float currentTime);
+
+  // calculate deltaTime and adjust everestTime and oldTime
+  void updateDeltaTime(float currentTime);
 
   std::vector<int> availableMeasurements = {0, 0, 0, 0, 0};
 
-  EverestData everestData;
+  EverestData everestData{};
 
   float timeEverest = 0;
 
-  void IMU1_Measurements(IMUData imu1, EverestTask* everest);
-  void IMU2_Measurements(IMUData imu2, EverestTask* everest);
-  void Baro1_Measurements(BarosData baro1, EverestTask* everest);
-  void Baro2_Measurements(BarosData baro2, EverestTask* everest);
+  // the change between oldTime and timeEverest. Start value is dummy.
+  float deltaTime = 0.333;
 
-  int findAlignment(IMUData& imu1, IMUData& imu2);
+  void IMU1_Measurements(IMUData_Everest imu1);
+  void IMU2_Measurements(IMUData_Everest imu2);
+  void Baro1_Measurements(BarosData baro1);
+  void Baro2_Measurements(BarosData baro2);
+
+  int findAlignment(IMUData_Everest& imu1, IMUData_Everest& imu2);
 
   MadAxesAlignment alignment1, alignment2;
 
-  void GPS_Measurements(float altitude, EverestTask* everest);
+  void GPS_Measurements(float altitude);
 
   BarosData baro1, baro2;
 
   void updateGainsWithGPS();
 
- protected:
-  IMUData internalIMU_1, internalIMU_2;
+  float getFinalAltitude();
 
-  std::vector<double> zeroOffsetAccel = {0, 0, 0};
-  std::vector<double> zeroOffsetAccel2 = {0, 0, 0};
-  std::vector<double> zeroOffsetGyro = {0, 0, 0};
-  std::vector<double> zeroOffsetGyro2 = {0, 0, 0};
+ protected:
+  IMUData_Everest internalIMU_1, internalIMU_2;
+
+  // our accelerometers are already normalized.
+  // std::vector<float> zeroOffsetAccel = {0, 0, 0};
+  // std::vector<float> zeroOffsetAccel2 = {0, 0, 0};
+  std::vector<float> zeroOffsetGyro = {0, 0, 0};
+  std::vector<float> zeroOffsetGyro2 = {0, 0, 0};
 
  private:
 };
-
-void EverestTask::initialize1(systemState& state) {
-  // Initially we trust systems equally
-  this->state.gain_IMU = 4 / 10.0;  // change to actual initial trusts
-  this->state.gain_Baro1 = 3 / 10.0;
-  state.gain_Baro2 = 3 / 10.0;
-
-  Kinematics.initialVelo = 0;
-  Kinematics.initialAlt = 0;
-  Kinematics.finalAltitude = 0;
-}
-
-Infusion* EverestTask::ExternalInitialize() {
-  initialize1(state);
-  return &madgwick;
-}
-
-EverestTask EverestTask::getEverest() {
-  EverestTask everest = EverestTask();
-  return everest;
-}
-
-kinematics* EverestTask::getKinematics() { return &Kinematics; }
 
 #endif

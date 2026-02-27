@@ -15,27 +15,28 @@
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
+#include <array>
 
 /// The point type (vector of float precision floats)
-// using std::vector<float> = std::vector<float>;
+// using std::array<float, 3> = std::array<float, 3>;
 
 /// Array of indices
 using indexArr = std::vector<size_t>;
 
 /// Pair of point and Index
-using pointIndex = typename std::pair<std::vector<float>, size_t>;
+using pointIndex = typename std::pair<std::array<float, 3>, size_t>;
 
 class KDNode {
  public:
   using KDNodePtr = std::shared_ptr<KDNode>;
   size_t index;
-  std::vector<float> x;
+  std::array<float, 3> x;
   KDNodePtr left;
   KDNodePtr right;
 
   // initializer
   KDNode();
-  KDNode(std::vector<float> const&, size_t const&, KDNodePtr const&,
+  KDNode(std::array<float, 3> const&, size_t const&, KDNodePtr const&,
          KDNodePtr const&);
   KDNode(pointIndex const&, KDNodePtr const&, KDNodePtr const&);
   ~KDNode();
@@ -44,8 +45,8 @@ class KDNode {
   float coord(size_t const&);
 
   // conversions
-  explicit operator bool();
-  explicit operator std::vector<float>();
+
+  explicit operator std::array<float, 3>();
   explicit operator size_t();
   explicit operator pointIndex();
 };
@@ -55,7 +56,7 @@ using KDNodePtr = std::shared_ptr<KDNode>;
 KDNodePtr NewKDNodePtr();
 
 // square euclidean distance
-inline float dist2(std::vector<float> const&, std::vector<float> const&);
+inline float dist2(std::array<float, 3> const&, std::array<float, 3> const&);
 inline float dist2(KDNodePtr const&, KDNodePtr const&);
 
 // Need for sorting
@@ -63,8 +64,8 @@ class comparer {
  public:
   size_t idx;
   explicit comparer(size_t idx_);
-  inline bool compare_idx(std::pair<std::vector<float>, size_t> const&,  //
-                          std::pair<std::vector<float>, size_t> const&   //
+  inline bool compare_idx(std::pair<std::array<float, 3>, size_t> const&,  //
+                          std::pair<std::array<float, 3>, size_t> const&   //
   );
 };
 
@@ -74,28 +75,29 @@ inline void sort_on_idx(pointIndexArr::iterator const&,  //
                         pointIndexArr::iterator const&,  //
                         size_t idx);
 
-// using std::vector<std::vector<float>> = std::vector<std::vector<float>>;
+// using std::vector<std::array<float, 3>> = std::vector<std::array<float, 3>>;
 
 class KDTree {
  public:
+  void reset_last_nearest() { last_nearest_ = nullptr; }
   KDTree() = default;
 
   /// Build a KDtree
-  explicit KDTree(std::vector<std::vector<float>> point_array);
+  explicit KDTree(std::vector<std::array<float, 3>>& point_array);
 
   /// Get the point which lies closest to the input point.
   /// @param pt input point.
-  std::vector<float> nearest_point(std::vector<float> const& pt);
+  std::array<float, 3> nearest_point(std::array<float, 3> const& pt);
 
   /// Get the index of the point which lies closest to the input point.
   ///
   /// @param pt input point.
-  size_t nearest_index(std::vector<float> const& pt);
+  size_t nearest_index(std::array<float, 3> const& pt);
 
   /// Get the point and its index which lies closest to the input point.
   ///
   /// @param pt input point.
-  pointIndex nearest_pointIndex(std::vector<float> const& pt);
+  pointIndex nearest_pointIndex(std::array<float, 3> const& pt);
 
   /// Get both the point and the index of the points closest to the input
   /// point.
@@ -105,7 +107,7 @@ class KDTree {
   ///
   /// @returns a vector containing the points and their respective indices
   /// which are at a distance smaller than rad to the input point.
-  pointIndexArr nearest_pointIndices(std::vector<float> const& pt,
+  pointIndexArr nearest_pointIndices(std::array<float, 3> const& pt,
                                      size_t const& num_nearest);
 
   /// Get the nearest set of points to the given input point.
@@ -115,8 +117,8 @@ class KDTree {
   ///
   /// @returns a vector containing the points which are at a distance smaller
   /// than rad to the input point.
-  std::vector<std::vector<float>> nearest_points(std::vector<float> const& pt,
-                                                 size_t const& num_nearest);
+  std::vector<std::array<float, 3>> nearest_points(
+      std::array<float, 3> const& pt, size_t const& num_nearest);
 
   /// Get the indices of points closest to the input point.
   ///
@@ -125,7 +127,7 @@ class KDTree {
   ///
   /// @returns a vector containing the indices of the points which are at a
   /// distance smaller than rad to the input point.
-  indexArr nearest_indices(std::vector<float> const& pt,
+  indexArr nearest_indices(std::array<float, 3> const& pt,
                            size_t const& num_nearest);
 
   /// Get both the point and the index of the points which are at a distance
@@ -136,7 +138,7 @@ class KDTree {
   ///
   /// @returns a vector containing the points and their respective indices
   /// which are at a distance smaller than rad to the input point.
-  pointIndexArr neighborhood(std::vector<float> const& pt, float const& rad);
+  pointIndexArr neighborhood(std::array<float, 3> const& pt, float const& rad);
 
   /// Get the points that are at a distance to the input point which is
   /// smaller than the input radius.
@@ -146,8 +148,8 @@ class KDTree {
   ///
   /// @returns a vector containing the points which are at a distance smaller
   /// than rad to the input point.
-  std::vector<std::vector<float>> neighborhood_points(
-      std::vector<float> const& pt, float const& rad);
+  std::vector<std::array<float, 3>> neighborhood_points(
+      std::array<float, 3> const& pt, float const& rad);
 
   // side = 0 means left, side = 1 means right, side = 2 means root
   // void printRecursive(KDNodePtr node, size_t depth, int side,
@@ -216,29 +218,33 @@ class KDTree {
   ///
   /// @returns a vector containing the indices of the points which are at a
   /// distance smaller than rad to the input point.
-  indexArr neighborhood_indices(std::vector<float> const& pt, float const& rad);
+  indexArr neighborhood_indices(std::array<float, 3> const& pt,
+                                float const& rad);
 
  private:
   KDNodePtr make_tree(pointIndexArr::iterator const& begin,
                       pointIndexArr::iterator const& end, size_t const& level);
 
-  void knearest_(KDNodePtr const& branch, std::vector<float> const& pt,
+  void knearest_(KDNodePtr const& branch, std::array<float, 3> const& pt,
                  size_t const& level, size_t const& num_nearest,
-                 std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer);
+                 std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer);
 
-  void node_query_(KDNodePtr const& branch, std::vector<float> const& pt,
+  void node_query_(KDNodePtr const& branch, std::array<float, 3> const& pt,
                    size_t const& level, size_t const& num_nearest,
-                   std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer);
+                   std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer);
 
   // default caller
-  KDNodePtr nearest_(std::vector<float> const& pt);
+  KDNodePtr nearest_(std::array<float, 3> const& pt);
 
-  void neighborhood_(KDNodePtr const& branch, std::vector<float> const& pt,
+  void neighborhood_(KDNodePtr const& branch, std::array<float, 3> const& pt,
                      float const& rad2, size_t const& level,
                      pointIndexArr& nbh);
 
   KDNodePtr root_;
   KDNodePtr leaf_;
+
+  // the last node found. Used as a starting point for later searches.
+  KDNodePtr last_nearest_;
 
   // void printTheTree() const {
   //   // Clear tree log file

@@ -16,17 +16,24 @@
 // #define LOGMETRICS
 
 #define TIMERON
-#define printf(...) ;
+
+#define TESTING_BUILD
+
+#ifdef TESTING_BUILD
+#define SOAR_PRINT(...) printf(__VA_ARGS__)
+#endif
+
+// #define printf(...) ;
 
 #ifdef LOGMETRICS
 static FILE* everestGains = NULL;
 #endif
 
-#ifdef TEST_BUILD
+#ifdef TESTING_BUILD
 #include <direct.h>
-#include "input_data.cpp"
-#include "pre_flight_data.cpp"
-#include "gpsData.cpp"
+#include "input_data.hpp"
+// #include "pre_flight_data.cpp"
+#include "gpsData.hpp"
 #endif
 
 FILE* haloFile;
@@ -47,7 +54,7 @@ Infusion* EverestTask::ExternalInitialize() {
   return &madgwick;
 }
 
-#ifdef TEST_BUILD
+#ifdef TESTING_BUILD
 int openFiles() {
   // Define the directory path
   std::string directoryPath = "testSuite/results";
@@ -1467,7 +1474,7 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
 
 void EverestTask::updateDeltaTime(float currentTime) { deltaTime = 0.3; }
 
-#ifdef TEST_BUILD
+#ifdef TESTING_BUILD
 float findClosestTime(float time) {
   // cycle through the times until you find one bigger and return one or after
   // before it
@@ -1570,7 +1577,7 @@ void EverestTask::initEverest() {
 // --------------------------------------------------- END OF EVEREST
 #define MAX_LINE_LENGTH 1024
 
-#ifdef TEST_BUILD
+#ifdef TESTING_BUILD
 /**
  * Serves to just initialize structs
  */
@@ -1586,10 +1593,46 @@ int main() {
   std::clock_t start;
   float totalTime = 0;
 
+  // calibrationTime is weird and too long at the moment.
+  float everest_time = 0.0f;
+  float launchTime = 1 * 60.0f;
+
+  while (everest_time < launchTime) {
+    float pressure = baroData[0][1];
+
+    IMUData_Everest sensorData = {
+        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+    };
+
+    IMUData_Everest sensorData2 = {
+        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+    };
+
+    BarosData baro1 = {everest_time, pressure, 0, 0};
+
+    BarosData baro2 = {everest_time, pressure, 0, 0};
+
+    float gps = findClosestTime(everest_time);
+
+    // get measurements (this will be done from subscribing to the sensors)
+    everest.IMU1_Measurements(sensorData);
+    everest.IMU2_Measurements(sensorData2);
+    everest.Baro1_Measurements(baro1);
+    everest.Baro2_Measurements(baro2);
+    everest.GPS_Measurements(findClosestTime(everest_time));
+    everest_time += 0.333f;
+    if (everest.everestInitialized == 0) {
+      everest.updateDeltaTime(everest_time);
+      everest.initEverest();
+    } else if (everest_time < launchTime) {
+      everest.updateDeltaTime(everest_time);
+    }
+  }
+
   for (int i = 0; i < taberLaunch.size(); i++) {
     // Tokenize the line using strtok
     // Parse accelerometer readings (X, Y, Z)
-    float time = taberLaunch[i][0];
+    float time = everest_time + taberLaunch[i][0];
     float accelX = taberLaunch[i][1];
     float accelY = taberLaunch[i][2];
     float accelZ = taberLaunch[i][3];

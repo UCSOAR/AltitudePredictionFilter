@@ -10,8 +10,18 @@
 #include "KDTree.hpp"
 #include <deque>
 
+#define TESTING_BUILD
+
+#ifdef TESTING_BUILD
+#define SOAR_PRINT(...) printf(__VA_ARGS__)
+#endif
+
+// #define printf(...)
+
+#ifndef TESTING_BUILD
 #include "SystemDefines.hpp"
 #include "UARTDriver.hpp"
+#endif
 
 // away
 #ifndef HOME

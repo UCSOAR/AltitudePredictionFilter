@@ -2,13 +2,16 @@
 #include <fstream>
 #include "Data.hpp"
 #include <map>
-#include "SystemDefines.hpp"
-#include "UARTDriver.hpp"
 
 // #define LOGON
 // #define LOGMETRICS
 // #define TIMERON
-// #define TESTING_BUILD
+#define TESTING_BUILD
+
+#ifndef TESTING_BUILD
+#include "SystemDefines.hpp"
+#include "UARTDriver.hpp"
+#endif
 
 // home
 #ifdef HOME
@@ -24,7 +27,11 @@
 #define HALO_CPP
 #define REFRESH_RATE 3
 
-#define printf(...) ;
+#ifdef TESTING_BUILD
+#define SOAR_PRINT(...) printf(__VA_ARGS__)
+#endif
+
+// #define printf(...) ;
 // #define SOAR_PRINT(...) ;
 
 /* Constants for the UKF... do we ever use it?
@@ -254,21 +261,21 @@ void HALO::stateUpdate() {
 #endif
     }
   }
-}
 
 #ifdef TESTING_BUILD
-if (kZero) {
-  FILE* log = fopen(
-      "log.txt",
-      "a+");  // Open the file for appending or create it if it doesn't exist
+  if (kZero) {
+    FILE* log = fopen(
+        "log.txt",
+        "a+");  // Open the file for appending or create it if it doesn't exist
 
-  if (!log) {
-    fprintf(stderr, "Error opening log.txt...exiting\n");
-    exit(1);
+    if (!log) {
+      fprintf(stderr, "Error opening log.txt...exiting\n");
+      exit(1);
+    }
+
+    fprintf(log, "\n");
+    fclose(log);
   }
-
-  fprintf(log, "\n");
-  fclose(log);
 #endif
 
   VectorXf difference(OBSERVATION_DIMENSIONS, 1);
@@ -388,6 +395,7 @@ if (kZero) {
 
 #endif
 }
+
 // ------------------------------------------------
 
 // Prediction--------------------------------------

@@ -4,7 +4,7 @@
 #include <map>
 
 // #define LOGON
-// #define LOGMETRICS
+#define LOGMETRICS
 // #define TIMERON
 #define TESTING_BUILD
 
@@ -31,7 +31,7 @@
 #define SOAR_PRINT(...) printf(__VA_ARGS__)
 #endif
 
-// #define printf(...) ;
+#define printf(...) ;
 // #define SOAR_PRINT(...) ;
 
 /* Constants for the UKF... do we ever use it?

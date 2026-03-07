@@ -13,7 +13,7 @@
 #include <sstream>
 
 // #define LOGON
-// #define LOGMETRICS
+#define LOGMETRICS
 
 #define TIMERON
 
@@ -220,7 +220,7 @@ enum debug_level {
   Calibration = 7  // Calibration
 };
 
-debug_level debug = ALL;
+debug_level debug = NONE;
 
 /**
  * @brief Calls finalWrapper with data and alignment
@@ -1593,6 +1593,8 @@ int main() {
   std::clock_t start;
   float totalTime = 0;
 
+  int sensorThisCycle = 0;
+
   // calibrationTime is weird and too long at the moment.
   float everest_time = 0.0f;
   float launchTime = 1 * 60.0f;
@@ -1626,6 +1628,79 @@ int main() {
       everest.initEverest();
     } else if (everest_time < launchTime) {
       everest.updateDeltaTime(everest_time);
+    }
+  }
+
+  // stationary phase
+  for (int i = 0; i < 30; i++) {
+    // Tokenize the line using strtok
+    // Parse accelerometer readings (X, Y, Z)
+    everest_time += 0.333f;
+    float pressure = baroData[0][1];
+
+    IMUData_Everest sensorData = {
+        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+    };
+
+    IMUData_Everest sensorData2 = {
+        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+    };
+
+    BarosData baro1 = {everest_time, pressure, 0, 0};
+
+    BarosData baro2 = {everest_time, pressure, 0, 0};
+
+    float gps = findClosestTime(everest_time);
+
+    // Print all sensor readings
+    if (debug == RAW || debug == ALL) {
+      SOAR_PRINT(
+          "Raw Time: %.6f s, Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, "
+          "%.6f, %.6f) g Pressure: (%.f, %.f, %.f, %.f)\n",
+          time, sensorData.gyroX, sensorData.gyroY, sensorData.gyroZ,
+          sensorData.accelX, sensorData.accelY, sensorData.accelZ,
+          baro1.pressure, baro2.pressure);
+    }
+
+    // get measurements (this will be done from subscribing to the sensors)
+    /* switch (sensorThisCycle) {
+      case 0:
+        everest.IMU1_Measurements(sensorData);
+        sensorThisCycle++;
+        break;
+      case 1:
+        everest.IMU2_Measurements(sensorData2);
+        sensorThisCycle++;
+        break;
+      case 2:
+        everest.Baro1_Measurements(baro1);
+        sensorThisCycle++;
+        break;
+      case 3:
+        everest.Baro2_Measurements(baro2);
+        sensorThisCycle = 0;
+        break;
+    } */
+    everest.IMU1_Measurements(sensorData);
+    everest.IMU2_Measurements(sensorData2);
+    everest.Baro1_Measurements(baro1);
+    everest.Baro2_Measurements(baro2);
+    // everest.GPS_Measurements(findClosestTime(time));
+
+    // start timer for iteration
+    start = std::clock();
+
+    // calls the entirety of the power of HALO, peak modularization
+    std::vector<float> haloData = everest.QueueEverest(everest_time);
+
+    clock_t endTime = std::clock();
+
+    totalTime += endTime - start;
+
+    if (i == taberLaunch.size() - 13) {
+      std::cout << "Overall time:\t\t\t\t\t\t\t\t\t"
+                << totalTime / (double)CLOCKS_PER_SEC << std::endl;
+      break;
     }
   }
 
@@ -1675,11 +1750,29 @@ int main() {
     }
 
     // get measurements (this will be done from subscribing to the sensors)
+    /* switch (sensorThisCycle) {
+      case 0:
+        everest.IMU1_Measurements(sensorData);
+        sensorThisCycle++;
+        break;
+      case 1:
+        everest.IMU2_Measurements(sensorData2);
+        sensorThisCycle++;
+        break;
+      case 2:
+        everest.Baro1_Measurements(baro1);
+        sensorThisCycle++;
+        break;
+      case 3:
+        everest.Baro2_Measurements(baro2);
+        sensorThisCycle = 0;
+        break;
+    } */
     everest.IMU1_Measurements(sensorData);
     everest.IMU2_Measurements(sensorData2);
     everest.Baro1_Measurements(baro1);
     everest.Baro2_Measurements(baro2);
-    everest.GPS_Measurements(findClosestTime(time));
+    // everest.GPS_Measurements(findClosestTime(time));
 
     // start timer for iteration
     start = std::clock();

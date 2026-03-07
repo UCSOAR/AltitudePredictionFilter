@@ -21,7 +21,7 @@
 
 KDNode::KDNode() = default;
 
-KDNode::KDNode(std::array<float, 3> const& pt, size_t const& idx_,
+KDNode::KDNode(std::vector<float> const& pt, size_t const& idx_,
                KDNodePtr const& left_, KDNodePtr const& right_) {
   x = pt;
   index = idx_;
@@ -40,7 +40,8 @@ KDNode::KDNode(pointIndex const& pi, KDNodePtr const& left_,
 KDNode::~KDNode() = default;
 
 float KDNode::coord(size_t const& idx) { return x.at(idx); }
-KDNode::operator std::array<float, 3>() { return x; }
+KDNode::operator bool() { return (!x.empty()); }
+KDNode::operator std::vector<float>() { return x; }
 KDNode::operator size_t() { return index; }
 KDNode::operator pointIndex() { return std::make_pair(x, index); }
 
@@ -49,11 +50,11 @@ KDNodePtr NewKDNodePtr() {
   return mynode;
 }
 
-inline float dist2(std::array<float, 3> const& a,
-                   std::array<float, 3> const& b) {
+inline float dist2(std::vector<float> const& a, std::vector<float> const& b) {
   float distc = 0.0f;
   for (size_t i = 0; i < 3; ++i) {
-    float di = a[i] - b[i];
+    float di = a.at(i) - b.at(i);
+
     distc += di * di;
   }
   return distc;
@@ -88,7 +89,7 @@ inline bool compare_node_distance(std::pair<KDNodePtr, float> a,
 }
 }  // namespace detail
 
-// using std::vector<std::array<float, 3>> = std::vector<std::array<float, 3>>;
+// using std::vector<std::vector<float>> = std::vector<std::vector<float>>;
 
 KDNodePtr KDTree::make_tree(pointIndexArr::iterator const& begin,
                             pointIndexArr::iterator const& end,
@@ -111,7 +112,7 @@ KDNodePtr KDTree::make_tree(pointIndexArr::iterator const& begin,
   return std::make_shared<KDNode>(*middle, left, right);
 }
 
-KDTree::KDTree(std::vector<std::array<float, 3>>& point_array)
+KDTree::KDTree(std::vector<std::vector<float>> point_array)
     : leaf_{std::make_shared<KDNode>()} {
   pointIndexArr arr;
   for (size_t i = 0; i < point_array.size(); i++) {
@@ -121,17 +122,15 @@ KDTree::KDTree(std::vector<std::array<float, 3>>& point_array)
 }
 
 void KDTree::node_query_(
-    KDNodePtr const& branch, std::array<float, 3> const& pt,
-    size_t const& level, size_t const& num_nearest,
-    std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
-  if (!branch) {
+    KDNodePtr const& branch, std::vector<float> const& pt, size_t const& level,
+    size_t const& num_nearest,
+    std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
+  if (!static_cast<bool>(*branch)) {
     return;
   }
   knearest_(branch, pt, level, num_nearest, k_nearest_buffer);
-
-  // x array in branch is null when called, find out why!!!!
   float const dl = dist2(branch->x, pt);
-  if (!branch) return;
+  assert(*branch);
   auto const node_distance = std::make_pair(branch, dl);
   auto const insert_it =
       std::upper_bound(k_nearest_buffer.begin(), k_nearest_buffer.end(),
@@ -146,12 +145,14 @@ void KDTree::node_query_(
 }
 
 void KDTree::knearest_(
-    KDNodePtr const& branch, std::array<float, 3> const& pt,
-    size_t const& level, size_t const& num_nearest,
-    std::vector<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
-  if (!branch) return;
+    KDNodePtr const& branch, std::vector<float> const& pt, size_t const& level,
+    size_t const& num_nearest,
+    std::list<std::pair<KDNodePtr, float>>& k_nearest_buffer) {
+  if (branch == nullptr || !static_cast<bool>(*branch)) {
+    return;
+  }
 
-  std::array<float, 3> branch_pt = static_cast<std::array<float, 3>>(*branch);
+  std::vector<float> branch_pt{*branch};
   size_t dim = branch_pt.size();
   assert(dim != 0);
   assert(dim == pt.size());
@@ -174,16 +175,12 @@ void KDTree::knearest_(
 };
 
 // default caller
-KDNodePtr KDTree::nearest_(std::array<float, 3> const& pt) {
+KDNodePtr KDTree::nearest_(std::vector<float> const& pt) {
   size_t level = 0;
-  std::vector<std::pair<KDNodePtr, float>> k_buffer{};
+  std::list<std::pair<KDNodePtr, float>> k_buffer{};
 
-  if (last_nearest_) {
-    k_buffer.emplace_back(last_nearest_, dist2(last_nearest_->x, pt));
-  } else {
-    k_buffer.emplace_back(root_, dist2(root_->x, pt));
-  }
-
+  k_buffer.emplace_back(root_,
+                        dist2(static_cast<std::vector<float>>(*root_), pt));
   knearest_(root_,    // beginning of tree
             pt,       // point we are querying
             level,    // start from level 0
@@ -191,31 +188,30 @@ KDNodePtr KDTree::nearest_(std::array<float, 3> const& pt) {
             k_buffer  // list of k nearest neigbours (to be filled)
   );
   if (k_buffer.size() > 0) {
-    last_nearest_ = k_buffer.front().first;
-    return last_nearest_;
+    return k_buffer.front().first;
   }
   return nullptr;
 };
 
-std::array<float, 3> KDTree::nearest_point(std::array<float, 3> const& pt) {
-  return static_cast<std::array<float, 3>>(*nearest_(pt));
+std::vector<float> KDTree::nearest_point(std::vector<float> const& pt) {
+  return static_cast<std::vector<float>>(*nearest_(pt));
 }
 
-size_t KDTree::nearest_index(std::array<float, 3> const& pt) {
+size_t KDTree::nearest_index(std::vector<float> const& pt) {
   return static_cast<size_t>(*nearest_(pt));
 }
 
-pointIndex KDTree::nearest_pointIndex(std::array<float, 3> const& pt) {
+pointIndex KDTree::nearest_pointIndex(std::vector<float> const& pt) {
   KDNodePtr Nearest = nearest_(pt);
   return static_cast<pointIndex>(*Nearest);
 }
 
-pointIndexArr KDTree::nearest_pointIndices(std::array<float, 3> const& pt,
+pointIndexArr KDTree::nearest_pointIndices(std::vector<float> const& pt,
                                            size_t const& num_nearest) {
   size_t level = 0;
-  std::vector<std::pair<KDNodePtr, float>> k_buffer{};
-  k_buffer.emplace_back(root_, dist2(root_->x, pt));
-
+  std::list<std::pair<KDNodePtr, float>> k_buffer{};
+  k_buffer.emplace_back(root_,
+                        dist2(static_cast<std::vector<float>>(*root_), pt));
   knearest_(root_,        // beginning of tree
             pt,           // point we are querying
             level,        // start from level 0
@@ -229,16 +225,16 @@ pointIndexArr KDTree::nearest_pointIndices(std::array<float, 3> const& pt,
   return output;
 }
 
-std::vector<std::array<float, 3>> KDTree::nearest_points(
-    std::array<float, 3> const& pt, size_t const& num_nearest) {
+std::vector<std::vector<float>> KDTree::nearest_points(
+    std::vector<float> const& pt, size_t const& num_nearest) {
   auto const k_nearest{nearest_pointIndices(pt, num_nearest)};
-  std::vector<std::array<float, 3>> k_nearest_points{k_nearest.size()};
+  std::vector<std::vector<float>> k_nearest_points{k_nearest.size()};
   std::transform(k_nearest.begin(), k_nearest.end(), k_nearest_points.begin(),
                  [](pointIndex const& x) { return x.first; });
   return k_nearest_points;
 }
 
-indexArr KDTree::nearest_indices(std::array<float, 3> const& pt,
+indexArr KDTree::nearest_indices(std::vector<float> const& pt,
                                  size_t const& num_nearest) {
   auto const k_nearest{nearest_pointIndices(pt, num_nearest)};
   indexArr k_nearest_indices{k_nearest.size()};
@@ -248,17 +244,19 @@ indexArr KDTree::nearest_indices(std::array<float, 3> const& pt,
 }
 
 void KDTree::neighborhood_(KDNodePtr const& branch,
-                           std::array<float, 3> const& pt, float const& rad2,
+                           std::vector<float> const& pt, float const& rad2,
                            size_t const& level, pointIndexArr& nbh) {
-  if (!branch) return;
-  // branch has no point, means it is a leaf,
-  // no points to add
+  if (!bool(*branch)) {
+    // branch has no point, means it is a leaf,
+    // no points to add
+    return;
+  }
 
   size_t const dim = pt.size();
 
-  float const d = dist2(branch->x, pt);
+  float const d = dist2(static_cast<std::vector<float>>(*branch), pt);
   float const dx =
-      static_cast<std::array<float, 3>>(*branch).at(level) - pt.at(level);
+      static_cast<std::vector<float>>(*branch).at(level) - pt.at(level);
   float const dx2 = dx * dx;
 
   if (d <= rad2) {
@@ -275,24 +273,24 @@ void KDTree::neighborhood_(KDNodePtr const& branch,
   }
 }
 
-pointIndexArr KDTree::neighborhood(std::array<float, 3> const& pt,
+pointIndexArr KDTree::neighborhood(std::vector<float> const& pt,
                                    float const& rad) {
   pointIndexArr nbh;
   neighborhood_(root_, pt, rad * rad, /*level*/ 0, nbh);
   return nbh;
 }
 
-std::vector<std::array<float, 3>> KDTree::neighborhood_points(
-    std::array<float, 3> const& pt, float const& rad) {
+std::vector<std::vector<float>> KDTree::neighborhood_points(
+    std::vector<float> const& pt, float const& rad) {
   auto nbh = std::make_shared<pointIndexArr>();
   neighborhood_(root_, pt, rad * rad, /*level*/ 0, *nbh);
-  std::vector<std::array<float, 3>> nbhp(nbh->size());
+  std::vector<std::vector<float>> nbhp(nbh->size());
   auto const first = [](pointIndex const& x) { return x.first; };
   std::transform(nbh->begin(), nbh->end(), nbhp.begin(), first);
   return nbhp;
 }
 
-indexArr KDTree::neighborhood_indices(std::array<float, 3> const& pt,
+indexArr KDTree::neighborhood_indices(std::vector<float> const& pt,
                                       float const& rad) {
   auto nbh = std::make_shared<pointIndexArr>();
   neighborhood_(root_, pt, rad * rad, /*level*/ 0, *nbh);

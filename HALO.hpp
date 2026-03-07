@@ -125,37 +125,35 @@ struct Scenario {
    */
   std::pair<std::vector<float>, size_t> nearestKDTree(
       std::vector<float> measurement) {
-    std::array<float, 3> convertedMeasurement = vec2arr(measurement);
     pointIndex result;
     if (isBeforeApogeeBool) {
-      treeBefore.reset_last_nearest();
-      result = treeBefore.nearest_pointIndex(convertedMeasurement);
+      return treeBefore.nearest_pointIndex(measurement);
     } else {
-      treeAfter.reset_last_nearest();
-      result = treeAfter.nearest_pointIndex(convertedMeasurement);
+      return treeAfter.nearest_pointIndex(measurement);
     }
-
-    return {arr2vec(result.first), result.second};
   }
 
   void createTree() {
-    std::vector<std::array<float, 3>> beforeArrayOfArrays;
-    std::vector<std::array<float, 3>> afterArrayOfArrays;
+    std::vector<std::vector<float>> beforeVectorofVectors;
+    std::vector<std::vector<float>> afterVectorofVectors;
 
-    beforeArrayOfArrays.reserve(BeforeList.size());
-    afterArrayOfArrays.reserve(AfterList.size());
+    beforeVectorofVectors.reserve(BeforeList.size());
+    afterVectorofVectors.reserve(AfterList.size());
 
-    for (const auto &pt : BeforeList) {
-      // Assuming BeforeList[i] has at least 3 elements
-      beforeArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
+    for (int i = 0; i < BeforeList.size(); i++) {
+      std::vector<float> vect = {BeforeList[i][0], BeforeList[i][1],
+                                 BeforeList[i][2]};
+      beforeVectorofVectors.push_back(vect);
     }
 
-    for (const auto &pt : AfterList) {
-      afterArrayOfArrays.push_back({pt[0], pt[1], pt[2]});
+    for (int i = 0; i < AfterList.size(); i++) {
+      std::vector<float> vect = {AfterList[i][0], AfterList[i][1],
+                                 AfterList[i][2]};
+      afterVectorofVectors.push_back(vect);
     }
 
-    treeBefore = KDTree(beforeArrayOfArrays);
-    treeAfter = KDTree(afterArrayOfArrays);
+    treeBefore = KDTree(beforeVectorofVectors);
+    treeAfter = KDTree(afterVectorofVectors);
   }
 
   /**

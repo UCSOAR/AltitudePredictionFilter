@@ -812,8 +812,7 @@ float EverestTask::dynamite() {
 
   // update velocity
   Kinematics.initialVelo = (Kinematics.finalAltitude - Kinematics.initialAlt) /
-                               (this->state.deltaTimeIMU) +
-                           0.0001;
+                           ((this->state.deltaTimeIMU) + 0.0001);
 
   if (debug == Dynamite || debug == ALL) {
     SOAR_PRINT("Initial Velocity: %f\n", Kinematics.initialVelo);

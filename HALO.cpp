@@ -48,7 +48,7 @@ std::string directoryPath = "testSuite/results";
 
 bool isInitialized = false;
 int counter = 0;
-int isBeforeApogeeBoolHALO = 0;
+int isAfterApogee = 0;
 int predictionCounter = 0;
 
 using namespace Eigen;
@@ -324,9 +324,7 @@ void HALO::stateUpdate() {
   }
 
   // check and update before apogee bool
-  // this variable seems misnamed... isBeforeApogeeBoolHALO == 1 means it is
-  // AFTER apogee, not before.
-  if (isBeforeApogeeBoolHALO == 1) {
+  if (isAfterApogee == 1) {
 #ifdef TIMERON
     std::chrono::high_resolution_clock::time_point getScenario =
         std::chrono::high_resolution_clock::now();
@@ -346,7 +344,7 @@ void HALO::stateUpdate() {
 
   } else {
     // check if the rocket is before apogee
-    isBeforeApogeeBoolHALO =
+    isAfterApogee =
         this->apogeeDetection(Measurement{X0[0], X0[1], X0[2], this->time});
   }
 

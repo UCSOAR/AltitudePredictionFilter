@@ -55,7 +55,7 @@ Infusion* EverestTask::ExternalInitialize() {
 }
 
 #ifdef TESTING_BUILD
-int openFiles() {
+int EverestTask::openFiles() {
   // Define the directory path
   std::string directoryPath = "testSuite/results";
 
@@ -89,7 +89,8 @@ int openFiles() {
                                         "sigmaPoints6.txt",
                                         "predictnalt.txt",
                                         "kalmangains.txt",
-                                        "everestgains.txt"};
+                                        "everestgains.txt",
+                                        "NIS.txt"};
 
   // Deleting files
   for (size_t i = 0; i < fileNames.size(); ++i) {
@@ -128,7 +129,8 @@ int openFiles() {
           "time,predicted_alt,predicted_vel,predicted_acc,prediction\n"),
       std::make_pair("kalmangains.txt", "time,alt,velo,acc,gps_alt\n"),
       std::make_pair("everestgains.txt",
-                     "time,gain_IMU,gain_Baro1,gain_Baro2,gainedEstimate\n")};
+                     "time,gain_IMU,gain_Baro1,gain_Baro2,gainedEstimate\n"),
+      std::make_pair("nis.txt", "time,nis\n")};
 
   for (size_t i = 0; i < filesToCreate.size(); ++i) {
     std::string filePath = directoryPath + "/" + filesToCreate[i].first;
@@ -1334,15 +1336,15 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData) {
 
   if (isTared) {
 #if defined(LOGON) || defined(LOGMETRICS)
-    fprintf(haloFile, "%f,%f,%f,%f,", everestData.timeIMU1, eAltitude,
-            eVelocity, eAccelerationZ);
+    fprintf(haloFile, "%f,%f,%f,%f,", timeEverest, eAltitude, eVelocity,
+            eAccelerationZ);
 #endif
 
     // TODO: Shouldn't everestTime be the source of truth?  At some point we
     // should decide. Update HALO
     haloData = halo.Halo_Input(&halo, haloInitialized, eAccelerationZ,
                                eVelocity, eAltitude, everestData.altitudeGPS,
-                               everestData.timeIMU1, deltaTime);
+                               timeEverest, deltaTime);
 
 #if defined(LOGON) || defined(LOGMETRICS)
     fprintf(haloFile, "%f,%f,%f\n", haloData[0], haloData[1], haloData[2]);
@@ -1471,24 +1473,11 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
   // }
 }
 
-void EverestTask::updateDeltaTime(float currentTime) { deltaTime = 0.3; }
-
-#ifdef TESTING_BUILD
-float findClosestTime(float time) {
-  // cycle through the times until you find one bigger and return one or after
-  // before it
-  float altitude = 1000;
-  int once = 0;
-  for (int i = 0; i < gpsData1.size(); i++) {
-    if (gpsData1[i][0] > time) {
-      altitude = gpsData1[i][1];
-      once = 1;
-      break;
-    }
-  }
-  return altitude;
+void EverestTask::updateDeltaTime(float currentTime) {
+  oldTime = timeEverest;
+  deltaTime = currentTime - oldTime;
+  timeEverest = currentTime;
 }
-#endif
 
 void EverestTask::initEverest() {
   if (madgwickInitialized == 0) this->MadgwickSetup();
@@ -1572,227 +1561,3 @@ void EverestTask::initEverest() {
 
   return;
 }
-
-// --------------------------------------------------- END OF EVEREST
-#define MAX_LINE_LENGTH 1024
-
-#ifdef TESTING_BUILD
-/**
- * Serves to just initialize structs
- */
-int main() {
-  // open files. moved here and out of madgwick setup.
-#if defined(LOGON) || defined(LOGMETRICS)
-  openFiles();
-#endif
-
-  EverestTask everest = EverestTask();
-  // read first line and preset the deltaTime to timestamp
-  char line[MAX_LINE_LENGTH];
-  std::clock_t start;
-  float totalTime = 0;
-
-  int sensorThisCycle = 0;
-
-  // calibrationTime is weird and too long at the moment.
-  float everest_time = 0.0f;
-  float launchTime = 1 * 60.0f;
-
-  while (everest_time < launchTime) {
-    float pressure = baroData[0][1];
-
-    IMUData_Everest sensorData = {
-        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-    };
-
-    IMUData_Everest sensorData2 = {
-        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-    };
-
-    BarosData baro1 = {everest_time, pressure, 0, 0};
-
-    BarosData baro2 = {everest_time, pressure, 0, 0};
-
-    float gps = findClosestTime(everest_time);
-
-    // get measurements (this will be done from subscribing to the sensors)
-    everest.IMU1_Measurements(sensorData);
-    everest.IMU2_Measurements(sensorData2);
-    everest.Baro1_Measurements(baro1);
-    everest.Baro2_Measurements(baro2);
-    everest.GPS_Measurements(findClosestTime((float)everest_time));
-    everest_time += 0.333f;
-    if (everest.everestInitialized == 1) {
-      break;
-    }
-    if (everest.everestInitialized == 0) {
-      everest.updateDeltaTime(everest_time);
-      everest.initEverest();
-    } else if (everest_time < launchTime) {
-      everest.updateDeltaTime(everest_time);
-    }
-  }
-
-  // stationary phase
-  while (!everest.everestInitialized) {
-    // Tokenize the line using strtok
-    // Parse accelerometer readings (X, Y, Z)
-    everest_time += 0.333f;
-    float pressure = baroData[0][1];
-
-    IMUData_Everest sensorData = {
-        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-    };
-
-    IMUData_Everest sensorData2 = {
-        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-    };
-
-    BarosData baro1 = {everest_time, pressure, 0, 0};
-
-    BarosData baro2 = {everest_time, pressure, 0, 0};
-
-    float gps = findClosestTime((float)everest_time);
-
-    // Print all sensor readings
-    if (debug == RAW || debug == ALL) {
-      SOAR_PRINT(
-          "Raw Time: %.6f s, Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, "
-          "%.6f, %.6f) g Pressure: (%.f, %.f, %.f, %.f)\n",
-          time, sensorData.gyroX, sensorData.gyroY, sensorData.gyroZ,
-          sensorData.accelX, sensorData.accelY, sensorData.accelZ,
-          baro1.pressure, baro2.pressure);
-    }
-
-    // get measurements (this will be done from subscribing to the sensors)
-    /* switch (sensorThisCycle) {
-      case 0:
-        everest.IMU1_Measurements(sensorData);
-        sensorThisCycle++;
-        break;
-      case 1:
-        everest.IMU2_Measurements(sensorData2);
-        sensorThisCycle++;
-        break;
-      case 2:
-        everest.Baro1_Measurements(baro1);
-        sensorThisCycle++;
-        break;
-      case 3:
-        everest.Baro2_Measurements(baro2);
-        sensorThisCycle = 0;
-        break;
-    } */
-    everest.IMU1_Measurements(sensorData);
-    everest.IMU2_Measurements(sensorData2);
-    everest.Baro1_Measurements(baro1);
-    everest.Baro2_Measurements(baro2);
-    everest.GPS_Measurements(findClosestTime(everest_time));
-
-    // start timer for iteration
-    start = std::clock();
-
-    // calls the entirety of the power of HALO, peak modularization
-    std::vector<float> haloData = everest.QueueEverest(everest_time);
-
-    clock_t endTime = std::clock();
-
-    totalTime += endTime - start;
-  }
-
-  for (int i = 0; i < taberLaunch.size(); i++) {
-    // Tokenize the line using strtok
-    // Parse accelerometer readings (X, Y, Z)
-    float time = taberLaunch[i][0];
-    float accelX = taberLaunch[i][1];
-    float accelY = taberLaunch[i][2];
-    float accelZ = taberLaunch[i][3];
-
-    // Parse gyroscope readings (X, Y, Z)
-    float gyroX = taberLaunch[i][4];
-    float gyroY = taberLaunch[i][5];
-    float gyroZ = taberLaunch[i][6];
-
-    // Parse magnetometer readings (X, Y, Z)
-    float magX = taberLaunch[i][7];
-    float magY = taberLaunch[i][8];
-    float magZ = taberLaunch[i][9];
-
-    // Parse pressure readings
-    float pressure = baroData[i][1];
-
-    IMUData_Everest sensorData = {
-        time, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, magX, magY, magZ,
-    };
-
-    IMUData_Everest sensorData2 = {
-        time, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, magX, magY, magZ,
-    };
-
-    BarosData baro1 = {time, pressure, 0, 0};
-
-    BarosData baro2 = {time, pressure, 0, 0};
-
-    float gps = findClosestTime(float(time));
-
-    // Print all sensor readings
-    if (debug == RAW || debug == ALL) {
-      SOAR_PRINT(
-          "Raw Time: %.6f s, Gyro: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, "
-          "%.6f, %.6f) g Pressure: (%.f, %.f, %.f, %.f)\n",
-          time, sensorData.gyroX, sensorData.gyroY, sensorData.gyroZ,
-          sensorData.accelX, sensorData.accelY, sensorData.accelZ,
-          baro1.pressure, baro2.pressure);
-    }
-
-    // get measurements (this will be done from subscribing to the sensors)
-    /* switch (sensorThisCycle) {
-      case 0:
-        everest.IMU1_Measurements(sensorData);
-        sensorThisCycle++;
-        break;
-      case 1:
-        everest.IMU2_Measurements(sensorData2);
-        sensorThisCycle++;
-        break;
-      case 2:
-        everest.Baro1_Measurements(baro1);
-        sensorThisCycle++;
-        break;
-      case 3:
-        everest.Baro2_Measurements(baro2);
-        sensorThisCycle = 0;
-        break;
-    } */
-    everest.IMU1_Measurements(sensorData);
-    everest.IMU2_Measurements(sensorData2);
-    everest.Baro1_Measurements(baro1);
-    everest.Baro2_Measurements(baro2);
-    everest.GPS_Measurements(findClosestTime(time));
-
-    // start timer for iteration
-    start = std::clock();
-
-    // calls the entirety of the power of HALO, peak modularization
-    std::vector<float> haloData = everest.QueueEverest(time);
-
-    clock_t endTime = std::clock();
-
-    totalTime += endTime - start;
-
-    if (i == taberLaunch.size() - 13) {
-      std::cout << "Overall time:\t\t\t\t\t\t\t\t\t"
-                << totalTime / (double)CLOCKS_PER_SEC << std::endl;
-      break;
-    }
-  }
-
-#if defined(LOGON) || defined(LOGMETRICS)
-  // exit to close files. No idea if this is a good idea on a board.
-  exit(0);
-#endif
-
-  return 0;
-}
-
-#endif

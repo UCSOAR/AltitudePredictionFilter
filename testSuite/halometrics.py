@@ -11,7 +11,7 @@ apogee_time = 30.505
 halo = pd.read_csv("testSuite/results/HALO.txt")
 altimeter = pd.read_csv("testSuite/data/altimeter(in)(in).csv")
 covariance = pd.read_csv("testSuite/results/P.txt")
-nis_data = pd.read_csv("testSuite/results/nis.txt", header=None, names=["time", "nis"])
+nis_data = pd.read_csv("testSuite/results/nis.txt")
 
 halo.rename(columns={"Time": "time"}, inplace=True)
 

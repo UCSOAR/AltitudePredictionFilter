@@ -140,6 +140,11 @@ class EverestTask {
   bool firstSampleAfterCalibration = true;
   bool useSTD = false;
 
+// don't use this on a board!
+#ifdef TESTING_BUILD
+  int openFiles();
+#endif
+
   // INTERNAL VARIABLES
   double calibrationTimeRemaining = CALIBRATION_TIME * RATE_BARO;
   float sum = 0;

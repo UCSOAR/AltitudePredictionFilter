@@ -1,6 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
+apogee_time = 30.505
+
 df = pd.read_csv("testSuite/results/HALO.txt")
 alt = pd.read_csv("testSuite/data/Altimeter(in)(in).csv")
 
@@ -34,6 +36,7 @@ plt.plot(alt["time"], alt["altitude"], label="Altimeter Alt")
 # plt.plot(df['Time'], df['Sigma_Alt_Lower'], label='Sigma Alt Lower', marker = "o")
 plt.plot(sims["avg_time_1"], sims["avg_alt_1"], label="Scenarios Alt1")
 plt.plot(sims["avg_time_2"], sims["avg_alt_2"], label="Scenarios Alt2")
+plt.axvline(x=apogee_time, color="purple", linestyle="--", alpha=0.7, label="Apogee")
 
 
 plt.xlabel("Time")
@@ -50,11 +53,13 @@ plt.figure(figsize=(10, 6))
 # plt.plot(df['Time'], df['IMU_Alt'], label='IMU Alt')
 plt.plot(df["Time"], df["Everest_Velo"], label="Everest Velo")
 plt.plot(df["Time"], df["Halo_Velo"], label="HALO Velo")
+plt.plot(alt["time"], alt["speed"], label="Altimeter Speed")
 # plt.plot(df['Time'], df['GPS_Alt'], label='GPS Alt')
 # plt.plot(df['Time'], df['Sigma_Alt_Upper'], label='Sigma Alt Upper', marker = "x")
 # plt.plot(df['Time'], df['Sigma_Alt_Lower'], label='Sigma Alt Lower', marker = "o")
 plt.plot(sims["avg_time_1"], sims["avg_velo_1"], label="Scenarios Velo1")
 plt.plot(sims["avg_time_2"], sims["avg_velo_2"], label="Scenarios Velo2")
+plt.axvline(x=apogee_time, color="purple", linestyle="--", alpha=0.7, label="Apogee")
 
 
 plt.xlabel("Time")
@@ -71,11 +76,13 @@ plt.figure(figsize=(10, 6))
 # plt.plot(df['Time'], df['IMU_Alt'], label='IMU Alt')
 plt.plot(df["Time"], df["Everest_Accel"], label="Everest Acc")
 plt.plot(df["Time"], df["Halo_Accel"], label="HALO Acc")
+plt.plot(alt["time"], alt["acceleration"], label="Altimeter acc")
 # plt.plot(df['Time'], df['GPS_Alt'], label='GPS Alt')
 # plt.plot(df['Time'], df['Sigma_Alt_Upper'], label='Sigma Alt Upper', marker = "x")
 # plt.plot(df['Time'], df['Sigma_Alt_Lower'], label='Sigma Alt Lower', marker = "o")
 plt.plot(sims["avg_time_1"], sims["avg_acc_1"], label="Scenarios Acc1")
 plt.plot(sims["avg_time_2"], sims["avg_acc_2"], label="Scenarios Acc2")
+plt.axvline(x=apogee_time, color="purple", linestyle="--", alpha=0.7, label="Apogee")
 
 
 plt.xlabel("Time")

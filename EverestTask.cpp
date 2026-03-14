@@ -23,7 +23,7 @@
 #define SOAR_PRINT(...) printf(__VA_ARGS__)
 #endif
 
-// #define printf(...) ;
+#define printf(...) ;
 
 #ifdef LOGMETRICS
 static FILE* everestGains = NULL;
@@ -1620,8 +1620,11 @@ int main() {
     everest.IMU2_Measurements(sensorData2);
     everest.Baro1_Measurements(baro1);
     everest.Baro2_Measurements(baro2);
-    everest.GPS_Measurements(findClosestTime(everest_time));
+    everest.GPS_Measurements(findClosestTime((float)everest_time));
     everest_time += 0.333f;
+    if (everest.everestInitialized == 1) {
+      break;
+    }
     if (everest.everestInitialized == 0) {
       everest.updateDeltaTime(everest_time);
       everest.initEverest();
@@ -1631,7 +1634,7 @@ int main() {
   }
 
   // stationary phase
-  for (int i = 0; i < 30; i++) {
+  while (!everest.everestInitialized) {
     // Tokenize the line using strtok
     // Parse accelerometer readings (X, Y, Z)
     everest_time += 0.333f;
@@ -1649,7 +1652,7 @@ int main() {
 
     BarosData baro2 = {everest_time, pressure, 0, 0};
 
-    float gps = findClosestTime(everest_time);
+    float gps = findClosestTime((float)everest_time);
 
     // Print all sensor readings
     if (debug == RAW || debug == ALL) {
@@ -1684,7 +1687,7 @@ int main() {
     everest.IMU2_Measurements(sensorData2);
     everest.Baro1_Measurements(baro1);
     everest.Baro2_Measurements(baro2);
-    // everest.GPS_Measurements(findClosestTime(time));
+    everest.GPS_Measurements(findClosestTime(everest_time));
 
     // start timer for iteration
     start = std::clock();
@@ -1695,18 +1698,12 @@ int main() {
     clock_t endTime = std::clock();
 
     totalTime += endTime - start;
-
-    if (i == taberLaunch.size() - 13) {
-      std::cout << "Overall time:\t\t\t\t\t\t\t\t\t"
-                << totalTime / (double)CLOCKS_PER_SEC << std::endl;
-      break;
-    }
   }
 
   for (int i = 0; i < taberLaunch.size(); i++) {
     // Tokenize the line using strtok
     // Parse accelerometer readings (X, Y, Z)
-    float time = everest_time + taberLaunch[i][0];
+    float time = taberLaunch[i][0];
     float accelX = taberLaunch[i][1];
     float accelY = taberLaunch[i][2];
     float accelZ = taberLaunch[i][3];
@@ -1736,7 +1733,7 @@ int main() {
 
     BarosData baro2 = {time, pressure, 0, 0};
 
-    float gps = findClosestTime(time);
+    float gps = findClosestTime(float(time));
 
     // Print all sensor readings
     if (debug == RAW || debug == ALL) {
@@ -1771,7 +1768,7 @@ int main() {
     everest.IMU2_Measurements(sensorData2);
     everest.Baro1_Measurements(baro1);
     everest.Baro2_Measurements(baro2);
-    // everest.GPS_Measurements(findClosestTime(time));
+    everest.GPS_Measurements(findClosestTime(time));
 
     // start timer for iteration
     start = std::clock();

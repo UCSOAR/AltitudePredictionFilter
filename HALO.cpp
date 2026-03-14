@@ -98,7 +98,7 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
     exit(1);
   }
 
-  fprintf(file, "time,alt_std,velo_std,acc_std\n");
+  fprintf(file, "time,P00,P01,P02,P10,P11,P12,P20,P21,P22\n");
   fclose(file);
 #endif
 
@@ -286,6 +286,19 @@ void HALO::stateUpdate() {
   difference << (this->X[2] - zMean(0)), (this->X[1] - zMean(1)),
       (this->X[0] - zMean(2)), (this->gpsAlt - zMean(3));
 
+  float nis = (difference.transpose() * Pz.inverse() * difference)(0, 0);
+
+#if defined(LOGON) || defined(LOGMETRICS)
+  // Log NIS to file
+  FILE* nisFile = fopen((directoryPath + "/nis.txt").c_str(), "a+");
+  if (nisFile) {
+    fprintf(nisFile, "%f,%f\n", time, nis);
+    fclose(nisFile);
+  } else {
+    perror("Error opening nis.txt");
+  }
+#endif
+
   X0 = this->Xprediction + K * difference;
 
   if (std::isnan(X0(0)) || std::isnan(X0(1)) || std::isnan(X0(2))) {
@@ -355,18 +368,8 @@ void HALO::stateUpdate() {
     fprintf(stderr, "Error opening P.txt...exiting\n");
     exit(1);
   }
-  fprintf(file, "%f,", time);
-
-  for (int i = 0; i < 3; i++) {
-    // dont write a comma at the end
-    if (i == 2) {
-      fprintf(file, "%f", P1(i, i));
-      break;
-    }
-    fprintf(file, "%f,", P1(i, i));
-  }
-
-  fprintf(file, "\n");
+  fprintf(file, "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", time, P1(0, 0), P1(0, 1),
+          P1(0, 2), P1(1, 0), P1(1, 1), P1(1, 2), P1(2, 0), P1(2, 1), P1(2, 2));
 
   fclose(file);
 

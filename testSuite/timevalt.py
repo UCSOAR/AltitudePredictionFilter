@@ -1,14 +1,26 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 
 apogee_time = 30.505
+
+ignore_after_apogee = True
+
+save_graphs = True
+
+SAVE_DIR = "./plots"
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+
+def save_plot(name):
+    plt.savefig(os.path.join(SAVE_DIR, name), dpi=300, bbox_inches="tight")
+
 
 df = pd.read_csv("testSuite/results/HALO.txt")
 alt = pd.read_csv("testSuite/data/Altimeter(in)(in).csv")
 
 sims = pd.read_csv("testSuite/data/final_may_sims_formatted.csv")
 
-imu = pd.read_csv("testSuite/data/imu_baro.csv")
 imu = pd.read_csv("testSuite/data/imu_baro.csv")
 
 sims["avg_alt_1"] = pd.to_numeric(sims["avg_alt_1"], errors="coerce")
@@ -22,6 +34,10 @@ sims["avg_acc_2"] = pd.to_numeric(sims["avg_acc_2"], errors="coerce")
 sims["avg_time_2"] = pd.to_numeric(sims["avg_time_2"], errors="coerce")
 sims = sims.dropna()
 
+if ignore_after_apogee:
+    df = df[df["Time"] <= apogee_time]
+    alt = alt[alt["time"] <= apogee_time]
+    sims = sims[sims["avg_time_1"] <= apogee_time]
 
 # plot altitude (altimeter, baro, imu, everest, halo, gps, sigmaPoints, scenarios)
 plt.figure(figsize=(10, 6))
@@ -44,6 +60,8 @@ plt.ylabel("Altitude")
 plt.title("Time vs Alt")
 plt.legend()
 plt.grid(True)
+if save_graphs:
+    save_plot("Time vs Alt")
 
 
 # plot altitude (altimeter, baro, imu, everest, halo, gps, sigmaPoints, scenarios)
@@ -67,6 +85,8 @@ plt.ylabel("Velocity")
 plt.title("Time vs Velocity")
 plt.legend()
 plt.grid(True)
+if save_graphs:
+    save_plot("Time vs Velocity")
 
 
 # plot altitude (altimeter, baro, imu, everest, halo, gps, sigmaPoints, scenarios)
@@ -90,6 +110,8 @@ plt.ylabel("Acceleration")
 plt.title("Time vs Acceleration")
 plt.legend()
 plt.grid(True)
+if save_graphs:
+    save_plot("Time vs Acceleration")
 
 
 plt.show()

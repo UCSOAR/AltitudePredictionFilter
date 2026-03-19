@@ -68,3 +68,5 @@ STM32L152-Discovery.elf.launch
 # Doxygen docs
 docs/html/
 docs/latex/
+
+/plots/*

@@ -2,8 +2,21 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import chi2
+import os
 
 apogee_time = 30.505
+
+ignore_after_apogee = True
+
+save_graphs = True
+
+SAVE_DIR = "./plots"
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+
+def save_plot(name):
+    plt.savefig(os.path.join(SAVE_DIR, name), dpi=300, bbox_inches="tight")
+
 
 # -----------------------------
 # Load data
@@ -16,6 +29,10 @@ nis_data = pd.read_csv("testSuite/results/nis.txt")
 halo.rename(columns={"Time": "time"}, inplace=True)
 
 merged = pd.merge_asof(halo, altimeter, on="time", direction="nearest", tolerance=0.05)
+
+if ignore_after_apogee:
+    merged = merged[merged["time"] <= apogee_time]
+    nis_data = nis_data[nis_data["time"] <= apogee_time]
 
 # -----------------------------
 # Absolute state errors
@@ -49,6 +66,8 @@ plt.xlabel("Time")
 plt.ylabel("Error")
 plt.legend()
 plt.grid(True)
+if save_graphs:
+    save_plot("Absolute State Error (HALO)")
 
 # Everest Abs Error
 
@@ -81,6 +100,8 @@ plt.xlabel("Time")
 plt.ylabel("Error")
 plt.legend()
 plt.grid(True)
+if save_graphs:
+    save_plot("Absolute State Error (Everest)")
 
 # -----------------------------
 # Clipped percent error
@@ -108,6 +129,8 @@ plt.xlabel("Time")
 plt.ylabel("Error (%)")
 plt.legend()
 plt.grid(True)
+if save_graphs:
+    save_plot("Clipped Percent Error, HALO (200%)")
 
 
 # Everest
@@ -135,6 +158,8 @@ plt.xlabel("Time")
 plt.ylabel("Error (%)")
 plt.legend()
 plt.grid(True)
+if save_graphs:
+    save_plot("Clipped Percent Error, Everest (200%)")
 
 # -----------------------------
 # NEES calculation
@@ -193,6 +218,8 @@ plt.xlabel("Time (s)")
 plt.ylabel("NEES")
 plt.legend()
 plt.grid(True, alpha=0.3)
+if save_graphs:
+    save_plot("NEES Consistency Test")
 
 # -----------------------------
 # Smoothed NEES
@@ -208,6 +235,8 @@ plt.xlabel("Time (s)")
 plt.ylabel("NEES")
 plt.legend()
 plt.grid(True, alpha=0.3)
+if save_graphs:
+    save_plot("Smoothed NEES")
 
 # -----------------------------
 # NIS Analysis
@@ -255,6 +284,8 @@ plt.ylabel("NIS")
 plt.title("NIS Consistency Check")
 plt.legend()
 plt.grid(True, alpha=0.3)
+if save_graphs:
+    save_plot("NIS Consistency Check")
 
 # Add statistics text box
 stats_text = f"""NIS Statistics:
@@ -294,6 +325,8 @@ plt.ylabel("NIS")
 plt.title("Smoothed NIS (20-sample moving average)")
 plt.legend()
 plt.grid(True, alpha=0.3)
+if save_graphs:
+    save_plot("Smoothed NIS (20-sample moving average)")
 
 # -----------------------------
 # Print Summary Report

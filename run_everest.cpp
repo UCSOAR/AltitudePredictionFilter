@@ -9,10 +9,10 @@
 // test config //
 bool cycleSensors = 0;
 bool hasGPS = 1;
-bool hasIMU1 = 0;
-bool hasIMU2 = 0;
+bool hasIMU1 = 1;
+bool hasIMU2 = 1;
 bool hasMag = 1;
-bool hasBaro = 1;
+bool hasBaro = 0;
 float deltaTime = 0.333f;  // note this is still from taberLaunch. maybe we can
                            // find a way to fix it.
 float stationaryTime = 0.0f;
@@ -64,7 +64,6 @@ int getSensorData(EverestTask* everest, int i, int stationary) {
 
   if (stationary) {
     pressure = baroData[0][1];
-
     if (hasIMU1) {
       IMUData = {
           everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
@@ -101,10 +100,16 @@ int getSensorData(EverestTask* everest, int i, int stationary) {
     timestamp = taberLaunch[i][0];
 
     if (hasIMU1) {
-      IMUData = {
-          timestamp, gyroX,  gyroY, gyroZ, accelX,
-          accelY,    accelZ, magX,  magY,  magZ,
-      };
+      if (hasMag) {
+        IMUData = {
+            timestamp, gyroX,  gyroY, gyroZ, accelX,
+            accelY,    accelZ, magX,  magY,  magZ,
+        };
+      } else {
+        IMUData = {
+            timestamp, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, 0, 0, 0,
+        };
+      }
     } else {
       IMUData = {
           timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -112,10 +117,16 @@ int getSensorData(EverestTask* everest, int i, int stationary) {
     }
 
     if (hasIMU2) {
-      IMUData2 = {
-          timestamp, gyroX,  gyroY, gyroZ, accelX,
-          accelY,    accelZ, magX,  magY,  magZ,
-      };
+      if (hasMag) {
+        IMUData2 = {
+            timestamp, gyroX,  gyroY, gyroZ, accelX,
+            accelY,    accelZ, magX,  magY,  magZ,
+        };
+      } else {
+        IMUData2 = {
+            timestamp, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, 0, 0, 0,
+        };
+      }
     } else {
       IMUData2 = {
           timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -138,8 +149,12 @@ int getSensorData(EverestTask* everest, int i, int stationary) {
   if (cycleSensors) {
     switch (sensorThisCycle) {
       case 0:
-        if (hasIMU1) {
-        } else {
+        if (!hasMag) {
+          IMUData.magX = 0;
+          IMUData.magY = 0;
+          IMUData.magZ = 0;
+        }
+        if (!hasIMU1) {
           IMUData = {
               timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0,
           };
@@ -161,7 +176,13 @@ int getSensorData(EverestTask* everest, int i, int stationary) {
               magY,
               magZ,
           };
-        } else {
+        }
+        if (!hasMag) {
+          IMUData2.magX = 0;
+          IMUData2.magY = 0;
+          IMUData2.magZ = 0;
+        }
+        if (!hasIMU2) {
           IMUData2 = {
               timestamp + (1.0f / 15.0f),  // (1/3) / 5
               0,

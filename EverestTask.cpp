@@ -1438,6 +1438,7 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
   // updating too fast (doubtful) then we can limit it here.
 
   if (deltaTime > 0) {
+    halo.gpsAvailable = this->availableMeasurements[4];
     if (this->availableMeasurements[0] == 1 &&
         this->availableMeasurements[1] == 1 &&
         this->availableMeasurements[2] == 1 &&
@@ -1470,8 +1471,6 @@ std::vector<float> EverestTask::QueueEverest(float currentTime) {
       if (this->availableMeasurements[3] == 0) {
         this->everestData.pressure2 = 0;
       }
-
-      halo.gpsAvailable = this->availableMeasurements[4];
 
       std::vector<float> haloData = this->EverestToHalo(this->everestData);
 

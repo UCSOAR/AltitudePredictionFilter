@@ -9,8 +9,9 @@
 // test config //
 bool cycleSensors = 0;
 bool hasGPS = 1;
-bool hasIMU1 = 1;
-bool hasIMU2 = 1;
+bool hasIMU1 = 0;
+bool hasIMU2 = 0;
+bool hasMag = 1;
 bool hasBaro = 1;
 float deltaTime = 0.333f;  // note this is still from taberLaunch. maybe we can
                            // find a way to fix it.
@@ -38,8 +39,8 @@ float findClosestTime(float timestamp) {
 }
 
 int getSensorData(EverestTask* everest, int i, int stationary) {
-  IMUData_Everest sensorData;
-  IMUData_Everest sensorData2;
+  IMUData_Everest IMUData;
+  IMUData_Everest IMUData2;
   BarosData baro1;
   BarosData baro2;
   float gps;
@@ -64,40 +65,72 @@ int getSensorData(EverestTask* everest, int i, int stationary) {
   if (stationary) {
     pressure = baroData[0][1];
 
-    sensorData = {
-        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-    };
+    if (hasIMU1) {
+      IMUData = {
+          everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+      };
+    } else {
+      IMUData = {
+          everest_time, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      };
+    }
 
-    sensorData2 = {
-        everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-    };
+    if (hasIMU2) {
+      IMUData2 = {
+          everest_time, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+      };
+    } else {
+      IMUData2 = {
+          everest_time, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      };
+    }
 
-    baro1 = {everest_time, pressure, 0, 0};
+    if (hasBaro) {
+      baro1 = {everest_time, pressure, 0, 0};
+      baro2 = {everest_time, pressure, 0, 0};
+    } else {
+      baro1 = {everest_time, 0, 0, 0};
+      baro2 = {everest_time, 0, 0, 0};
+    }
 
-    baro2 = {everest_time, pressure, 0, 0};
-
-    gps = findClosestTime((float)everest_time);
+    gps = hasGPS ? findClosestTime((float)everest_time) : 0;
 
   } else {
     // Tokenize the line using strtok
     // Parse accelerometer readings (X, Y, Z)
     timestamp = taberLaunch[i][0];
 
-    sensorData = {
-        timestamp, gyroX,  gyroY, gyroZ, accelX,
-        accelY,    accelZ, magX,  magY,  magZ,
-    };
+    if (hasIMU1) {
+      IMUData = {
+          timestamp, gyroX,  gyroY, gyroZ, accelX,
+          accelY,    accelZ, magX,  magY,  magZ,
+      };
+    } else {
+      IMUData = {
+          timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      };
+    }
 
-    sensorData2 = {
-        timestamp, gyroX,  gyroY, gyroZ, accelX,
-        accelY,    accelZ, magX,  magY,  magZ,
-    };
+    if (hasIMU2) {
+      IMUData2 = {
+          timestamp, gyroX,  gyroY, gyroZ, accelX,
+          accelY,    accelZ, magX,  magY,  magZ,
+      };
+    } else {
+      IMUData2 = {
+          timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      };
+    }
 
-    baro1 = {timestamp, pressure, 0, 0};
+    if (hasBaro) {
+      baro1 = {timestamp, pressure, 0, 0};
+      baro2 = {timestamp, pressure, 0, 0};
+    } else {
+      baro1 = {timestamp, 0, 0, 0};
+      baro2 = {timestamp, 0, 0, 0};
+    }
 
-    baro2 = {timestamp, pressure, 0, 0};
-
-    gps = findClosestTime(float(timestamp));
+    gps = hasGPS ? findClosestTime(float(timestamp)) : 0;
   }
 
   // get measurements (this will be done from subscribing to the sensors)
@@ -105,47 +138,78 @@ int getSensorData(EverestTask* everest, int i, int stationary) {
   if (cycleSensors) {
     switch (sensorThisCycle) {
       case 0:
-        everest->IMU1_Measurements(sensorData);
+        if (hasIMU1) {
+        } else {
+          IMUData = {
+              timestamp, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          };
+        }
+        everest->IMU1_Measurements(IMUData);
         sensorThisCycle++;
         break;
       case 1:
-        sensorData2 = {
-            timestamp + (1.0f / 15.0f),  // (1/3) / 5
-            gyroX,
-            gyroY,
-            gyroZ,
-            accelX,
-            accelY,
-            accelZ,
-            magX,
-            magY,
-            magZ,
-        };
-        everest->IMU2_Measurements(sensorData2);
+        if (hasIMU2) {
+          IMUData2 = {
+              timestamp + (1.0f / 15.0f),  // (1/3) / 5
+              gyroX,
+              gyroY,
+              gyroZ,
+              accelX,
+              accelY,
+              accelZ,
+              magX,
+              magY,
+              magZ,
+          };
+        } else {
+          IMUData2 = {
+              timestamp + (1.0f / 15.0f),  // (1/3) / 5
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+          };
+        }
+        everest->IMU2_Measurements(IMUData2);
         sensorThisCycle++;
         break;
       case 2:
-        baro1 = {timestamp + (2.0f / 15.0f), pressure, 0, 0};
+        if (hasBaro) {
+          baro1 = {timestamp + (2.0f / 15.0f), pressure, 0, 0};
+        } else {
+          baro1 = {0, pressure, 0, 0};
+        }
         everest->Baro1_Measurements(baro1);
         sensorThisCycle++;
         break;
       case 3:
-        baro2 = {timestamp + (3.0f / 15.0f), pressure, 0, 0};
+        if (hasBaro) {
+          baro2 = {timestamp + (3.0f / 15.0f), pressure, 0, 0};
+        } else {
+          baro2 = {timestamp + (3.0f / 15.0f), 0, 0, 0};
+        }
         everest->Baro2_Measurements(baro2);
         sensorThisCycle++;
         break;
       case 4:
-        gps = findClosestTime(float(timestamp + (4.0f / 15.0f)));
+        gps = hasGPS ? findClosestTime(float(timestamp + (4.0f / 15.0f))) : 0;
         everest->GPS_Measurements(gps);
         sensorThisCycle = 0;
         break;
     }
   } else {
-    everest->IMU1_Measurements(sensorData);
-    everest->IMU2_Measurements(sensorData2);
-    everest->Baro1_Measurements(baro1);
-    everest->Baro2_Measurements(baro2);
-    everest->GPS_Measurements(gps);
+    if (hasIMU1) everest->IMU1_Measurements(IMUData);
+    if (hasIMU2) everest->IMU2_Measurements(IMUData2);
+    if (hasBaro) {
+      everest->Baro1_Measurements(baro1);
+      everest->Baro2_Measurements(baro2);
+    }
+    if (hasGPS) everest->GPS_Measurements(gps);
   }
 }
 

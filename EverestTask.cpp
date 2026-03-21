@@ -311,8 +311,6 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   madOffset offset = infusion->getOffset();
   gyroscope = infusion->madOffsetUpdate(&offset, gyroscope);
 
-  this->state.deltaTimeIMU = deltaTime;
-
   if (debug == Secondary || debug == ALL) {
     SOAR_PRINT(
         "Averaged: (%.6f, %.6f, %.6f) deg/s, Accel: (%.6f, %.6f, %.6f)g Time: "
@@ -334,8 +332,10 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
   madEuler euler = infusion->getEuler(ahrs);
   madVector earth = infusion->madAhrsGetEarthAcceleration(ahrs);
 
-  SOAR_PRINT("EARTH XYZ (adjusted for gravity): %f %f %f\n", earth.axis.x,
-             earth.axis.y, earth.axis.z);
+  if (debug == Calibration || debug == ALL) {
+    SOAR_PRINT("EARTH XYZ (adjusted for gravity): %f %f %f\n", earth.axis.x,
+               earth.axis.y, earth.axis.z);
+  }
 
   internalStates = infusion->madAhrsGetInternalStates(infusion->getMadAhrs());
   flags = infusion->madAhrsGetFlags(infusion->getMadAhrs());
@@ -664,7 +664,6 @@ float EverestTask::deriveForAltitudeIMU(IMUData_Everest avgIMU) {
   float accelerationZ = this->state.earthAcceleration * -9.81;
   float initialVelocity = this->Kinematics.initialVelo;
   float initialAltitude = this->Kinematics.initialAlt;
-  double deltaTime = this->state.deltaTimeIMU;
 
   // Derive altitude from IMU
   float finalVelocity = initialVelocity + accelerationZ * deltaTime;
@@ -813,8 +812,11 @@ float EverestTask::dynamite() {
   }
 
   // update velocity
-  Kinematics.initialVelo = (Kinematics.finalAltitude - Kinematics.initialAlt) /
-                           ((this->state.deltaTimeIMU) + 0.0001);
+  if (deltaTime > 0.01) {
+    Kinematics.initialVelo =
+        (Kinematics.finalAltitude - Kinematics.initialAlt) /
+        ((deltaTime) + 0.0001);
+  }
 
   if (debug == Dynamite || debug == ALL) {
     SOAR_PRINT("Initial Velocity: %f\n", Kinematics.initialVelo);
@@ -911,7 +913,8 @@ void EverestTask::recalculateGain(float estimate) {
     SOAR_PRINT("Gain Baro2: %f\n", gain_Baro2);
     SOAR_PRINT("Gained Estimate: %f\n", gainedEstimate);
 
-    SOAR_PRINT("Altitude: %f\n", estimate);
+    SOAR_PRINT("Altitude (Estimate): %f\n", estimate);
+    SOAR_PRINT("IMU Altitude: %f\n", this->state.avgIMU.altitude);
     SOAR_PRINT("Baro1: %f\n", this->baro1.altitude);
     SOAR_PRINT("Baro2: %f\n", this->baro2.altitude);
     SOAR_PRINT("GPS Altitude: %f\n", this->everestData.altitudeGPS);
@@ -977,9 +980,8 @@ void EverestTask::calculateSTDCoefficients() {
  *   Internal
  */
 float EverestTask::deriveChangeInVelocityToGetAltitude(float estimate) {
-  double deltaTimeAverage = (this->baro1.deltaTime + this->baro2.deltaTime +
-                             this->state.deltaTimeIMU) /
-                            3.0;
+  double deltaTimeAverage =
+      (this->baro1.deltaTime + this->baro2.deltaTime + deltaTime) / 3.0;
 
   float velocityZ = (this->AltitudeList.secondLastAltitude -
                      4 * this->AltitudeList.lastAltitude + 3 * estimate) /
@@ -1179,19 +1181,27 @@ void EverestTask::tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
 
   if (debug == Calibration || debug == ALL) {
     SOAR_PRINT("Tare Sum: %f\n", sum);
-    SOAR_PRINT("Number of samples %f\n", numberOfSamples);
+    SOAR_PRINT("Number of samples %d\n", numberOfSamples);
   }
 
   if (calibrationTimeRemaining == 0) {
-    this->Kinematics.initialAlt = sum / numberOfSamples;
+    if (numberOfSamples != 0) {
+      this->Kinematics.initialAlt = sum / numberOfSamples;
+    } else {
+      SOAR_PRINT("No samples collected, tare failed.\n");
+    }
 
-    this->zeroOffsetGyro = {this->zeroOffsetGyro[0] / imu1SampleCount,
-                            this->zeroOffsetGyro[1] / imu1SampleCount,
-                            this->zeroOffsetGyro[2] / imu1SampleCount};
+    if (imu1SampleCount != 0) {
+      this->zeroOffsetGyro = {this->zeroOffsetGyro[0] / imu1SampleCount,
+                              this->zeroOffsetGyro[1] / imu1SampleCount,
+                              this->zeroOffsetGyro[2] / imu1SampleCount};
+    }
 
-    this->zeroOffsetGyro2 = {this->zeroOffsetGyro2[0] / imu2SampleCount,
-                             this->zeroOffsetGyro2[1] / imu2SampleCount,
-                             this->zeroOffsetGyro2[2] / imu2SampleCount};
+    if (imu2SampleCount != 0) {
+      this->zeroOffsetGyro2 = {this->zeroOffsetGyro2[0] / imu2SampleCount,
+                               this->zeroOffsetGyro2[1] / imu2SampleCount,
+                               this->zeroOffsetGyro2[2] / imu2SampleCount};
+    }
 
     isTared = true;
 

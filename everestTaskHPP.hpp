@@ -68,7 +68,6 @@ typedef struct {
   float std_GPS;
 
   IMUData_Everest avgIMU;
-  float deltaTimeIMU;
   float earthAcceleration;
 } systemState;
 

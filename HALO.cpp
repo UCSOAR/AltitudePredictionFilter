@@ -4,9 +4,9 @@
 #include <map>
 
 // #define LOGON
-#define LOGMETRICS
+// #define LOGMETRICS
 // #define TIMERON
-#define TESTING_BUILD
+// #define TESTING_BUILD
 
 #ifndef TESTING_BUILD
 #include "SystemDefines.hpp"
@@ -257,8 +257,8 @@ void HALO::stateUpdate() {
                 this->time);
 
         fclose(log);
-      }
 #endif
+      }
     }
   }
 

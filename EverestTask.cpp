@@ -13,11 +13,11 @@
 #include <sstream>
 
 // #define LOGON
-#define LOGMETRICS
+// #define LOGMETRICS
 
-#define TIMERON
+// #define TIMERON
 
-#define TESTING_BUILD
+// #define TESTING_BUILD
 
 #ifdef TESTING_BUILD
 #define SOAR_PRINT(...) printf(__VA_ARGS__)

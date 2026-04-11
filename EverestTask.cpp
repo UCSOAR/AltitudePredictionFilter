@@ -39,6 +39,16 @@ static FILE* everestGains = NULL;
 FILE* haloFile;
 FILE* everestFile;
 
+void EverestTask::setFilterState(FILTER_STATE filterState) {
+	if (this->filterState < filterState) {
+		this->filterState = filterState;
+	}
+}
+
+FILTER_STATE EverestTask::getFilterState() {
+	return filterState;
+}
+
 void EverestTask::initialize1(systemState& state) {
   this->state.gain_IMU = 4 / 10.0;  // change to actual initial trusts
   this->state.gain_Baro1 = 3 / 10.0;
@@ -1133,6 +1143,8 @@ void EverestTask::tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
                        const BarosData& baro1, const BarosData& baro2) {
   // average pressures
 
+  filterState = FILTER_STATE::TAREING;
+
   if (baro1.pressure != 0) {
     sum += convertToAltitude(baro1.pressure);
     numberOfSamples++;
@@ -1203,7 +1215,7 @@ void EverestTask::tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
                                this->zeroOffsetGyro2[2] / imu2SampleCount};
     }
 
-    isTared = true;
+    filterState = FILTER_STATE::TARED;
 
     if (debug == Calibration || debug == ALL) {
       SOAR_PRINT("Tare Initial Altitude: %f\n", this->Kinematics.initialAlt);
@@ -1324,14 +1336,14 @@ float EverestTask::finalWrapper(
 }
 
 /**
- * @brief Resets isTared flag to re-initialize the tare
+ * @brief If filterState is less than TARED, set it.
  */
-void EverestTask::setIsTare(bool isTare) { isTared = isTare; }
+void EverestTask::setIsTare(bool isTare) { if (filterState < FILTER_STATE::TARED) filterState = FILTER_STATE::TARED; }
 
 /**
- * @brief Returns the isTared flag
+ * @brief Check if filter is at least TARED state or more.
  */
-bool EverestTask::getIsTared() { return isTared; }
+bool EverestTask::getIsTared() { return filterState >= FILTER_STATE::TARED; }
 
 /**
  * @brief initialized Halo, and passes Everest filtered values to HALO
@@ -1344,7 +1356,7 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData) {
 
   std::vector<float> haloData = {0, 0, 0};
 
-  if (isTared) {
+  if (filterState >= FILTER_STATE::TARED) {
 #if defined(LOGON) || defined(LOGMETRICS)
     fprintf(haloFile, "%f,%f,%f,%f,", timeEverest, eAltitude, eVelocity,
             eAccelerationZ);
@@ -1519,7 +1531,7 @@ void EverestTask::initEverest() {
     this->isAligned = this->findAlignment(imu1, imu2);
   }
 
-  if (!isTared) {
+  if (filterState < FILTER_STATE::TARED) {
     IMUData_Everest imu1 = {this->everestData.timeIMU1,
                             this->everestData.gyroX1,
                             this->everestData.gyroY1,
@@ -1554,7 +1566,7 @@ void EverestTask::initEverest() {
 
   if (haloInitialized == false) {
     // Done tareing, initialize once
-    if (isTared) {
+    if (filterState >= FILTER_STATE::TARED) {
       // Initialize HALO
       halo = HALO();
       // Set initial altitude to 1000 if it is zero (no baros in tareing)

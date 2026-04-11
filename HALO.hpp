@@ -59,8 +59,8 @@ struct Scenario {
   std::vector<float> beforeApogeeAlt;
   std::vector<float> afterApogeeAlt;
 
-  std::vector<std::vector<float>> BeforeList;
-  std::vector<std::vector<float>> AfterList;
+  std::vector<std::vector<float>>* BeforeList;
+  std::vector<std::vector<float>>* AfterList;
 
   KDTree treeBefore;
   KDTree treeAfter;
@@ -82,8 +82,8 @@ struct Scenario {
     return {a[0], a[1], a[2]};
   }
 
-  Scenario(std::vector<std::vector<float>> &beforeList,
-           std::vector<std::vector<float>> &afterList, int Name)
+  Scenario(std::vector<std::vector<float>>* beforeList,
+           std::vector<std::vector<float>>* afterList, int Name)
       : BeforeList(beforeList), AfterList(afterList), name(Name) {}
 
   // Function to find the vector and split the list
@@ -137,20 +137,21 @@ struct Scenario {
     std::vector<std::vector<float>> beforeVectorofVectors;
     std::vector<std::vector<float>> afterVectorofVectors;
 
-    beforeVectorofVectors.reserve(BeforeList.size());
-    afterVectorofVectors.reserve(AfterList.size());
+    beforeVectorofVectors.reserve(BeforeList->size());
+  afterVectorofVectors.reserve(AfterList->size());
 
-    for (int i = 0; i < BeforeList.size(); i++) {
-      std::vector<float> vect = {BeforeList[i][0], BeforeList[i][1],
-                                 BeforeList[i][2]};
-      beforeVectorofVectors.push_back(vect);
-    }
+    for (int i = 0; i < BeforeList->size(); i++) {
+	  // Use (*BeforeList)[i] to access the vector the pointer points to
+	  std::vector<float> vect = {(*BeforeList)[i][0], (*BeforeList)[i][1],
+								 (*BeforeList)[i][2]};
+	  beforeVectorofVectors.push_back(vect);
+	}
 
-    for (int i = 0; i < AfterList.size(); i++) {
-      std::vector<float> vect = {AfterList[i][0], AfterList[i][1],
-                                 AfterList[i][2]};
-      afterVectorofVectors.push_back(vect);
-    }
+	for (int i = 0; i < AfterList->size(); i++) {
+	  std::vector<float> vect = {(*AfterList)[i][0], (*AfterList)[i][1],
+								 (*AfterList)[i][2]};
+	  afterVectorofVectors.push_back(vect);
+	}
 
     treeBefore = KDTree(beforeVectorofVectors);
     treeAfter = KDTree(afterVectorofVectors);
@@ -162,9 +163,9 @@ struct Scenario {
    */
   std::vector<std::vector<float>> *getLists() {
     if (isBeforeApogeeBool) {
-      return &BeforeList;
+      return BeforeList;
     } else {
-      return &AfterList;
+      return AfterList;
     }
   }
 

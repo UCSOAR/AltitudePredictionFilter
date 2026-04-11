@@ -1476,7 +1476,9 @@ VectorXf HALO::dynamicModelOnce(
   // state
 
   // check if X is nan, if so default to static integration
+
   if (std::isnan(X(0)) || std::isnan(X(1)) || std::isnan(X(2))) {
+#ifdef TESTING_BUILD
     FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
     if (!file) {
       fprintf(stderr, "Error opening log.txt...exiting\n");
@@ -1485,7 +1487,7 @@ VectorXf HALO::dynamicModelOnce(
     fprintf(file, "At %f X is nan, defaulting to static integration\n",
             this->time);
     fclose(file);
-
+#endif
     SOAR_PRINT("X is nan, defaulting to static integration\n");
 
     float finalVelocity = X(1) + X(0) * getDeltaTime();
@@ -1497,6 +1499,7 @@ VectorXf HALO::dynamicModelOnce(
 
     return Xprediction;
   }
+
 
 #ifdef TIMERON
   std::chrono::high_resolution_clock::time_point
@@ -1538,6 +1541,8 @@ void HALO::createScenarios(HALO* halo) {
 
 #endif
 
+  initAllSimData();
+
   Scenario scenario1 = Scenario{beforeApogeeSim1, afterApogeeSim1, 1};
   scenario1.createTree();
   Scenario scenario2 = Scenario{beforeApogeeSim2, afterApogeeSim2, 2};
@@ -1554,7 +1559,9 @@ void HALO::createScenarios(HALO* halo) {
   // scenario6.createTree();
 
   // TODO: add them here as well {scenario3, scenario4, scenario5, scenario6}
-  std::vector<Scenario> scenarios = {scenario1, scenario2};
+  this->scenarios.clear();
+  this->scenarios.push_back(scenario1);
+  this->scenarios.push_back(scenario2);
 
 #ifdef TIMERON
 
@@ -1569,7 +1576,6 @@ void HALO::createScenarios(HALO* halo) {
 
 #endif
 
-  halo->setScenarios(scenarios);
 }
 
 /**

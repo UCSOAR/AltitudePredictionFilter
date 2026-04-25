@@ -9,6 +9,7 @@
 #include "KDTree.hpp"
 #include "FilterState.hpp"
 #include "HALO.hpp"
+#include "Command.hpp"
 #include <stdio.h>
 #include <ctime>
 #include <string.h>
@@ -17,9 +18,9 @@
 #include <iostream>
 #include <sstream>
 
-#ifndef HOME
-#include "C:\Users\harry\Desktop\soar\extra\HALO.hpp"
-#endif
+// #ifndef HOME
+// #include "C:\Users\harry\Desktop\soar\extra\HALO.hpp"
+// #endif
 
 // Definitions
 // CHANGE
@@ -176,7 +177,7 @@ class EverestTask {
 
   void initEverest();
 
-  static EverestTask getEverest();
+  static EverestTask& getEverest();
 
   // Initialize system state
   systemState state = {};
@@ -232,6 +233,9 @@ class EverestTask {
   void setIsTare(bool isTare);
 
   std::vector<float> EverestToHalo(EverestData everestData);
+
+  // Extract data from a DataBroker command and update internal measurement buffers
+  void Extract(const Command& cm);
 
   std::vector<float> QueueEverest(float currentTime);
 

@@ -1,7 +1,8 @@
+
 #define LOGMETRICS
 #define MAX_LINE_LENGTH 1024
 
-#include "EverestTaskHPP.hpp"
+#include "everest.hpp"
 #include "input_data.hpp"
 #include "gpsData.hpp"
 #include <direct.h>
@@ -237,7 +238,7 @@ int getSensorData(EverestTask* everest, int i, int stationary) {
 /**
  * Serves to just initialize structs
  */
-int main() {
+int main_test_run_everest() {
   EverestTask everest = EverestTask();
   // open files. moved here and out of madgwick setup.
 #if defined(LOGON) || defined(LOGMETRICS)

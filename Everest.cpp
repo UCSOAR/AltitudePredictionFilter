@@ -1,5 +1,4 @@
 // Altitude estimation using multiple sensors
-#include "everestTaskHPP.hpp"
 #include <stdio.h>
 #include <ctime>
 #include <string.h>
@@ -11,6 +10,9 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include "everest.hpp"
+#include "DataBroker.hpp"
+#include "cmsis_os.h"
 
 // #define LOGON
 // #define LOGMETRICS
@@ -47,6 +49,63 @@ void EverestTask::setFilterState(FILTER_STATE filterState) {
 
 FILTER_STATE EverestTask::getFilterState() {
 	return filterState;
+}
+
+// singleton accessor
+EverestTask& EverestTask::getEverest() {
+  static EverestTask inst;
+  return inst;
+}
+
+// Extract data from a DataBroker command and update measurements
+void EverestTask::Extract(const Command& cm) {
+  auto msgType = DataBroker::getMessageType(cm);
+  switch(msgType) {
+    case DataBrokerMessageTypes::IMU_DATA: {
+      IMUData imu = DataBroker::ExtractData<IMUData>(cm);
+      IMUData_Everest iev{};
+      float ts = static_cast<float>(xTaskGetTickCount() * portTICK_PERIOD_MS);
+      iev.time = ts;
+      iev.gyroX = static_cast<float>(imu.gyro.x);
+      iev.gyroY = static_cast<float>(imu.gyro.y);
+      iev.gyroZ = static_cast<float>(imu.gyro.z);
+      iev.accelX = static_cast<float>(imu.accel.x);
+      iev.accelY = static_cast<float>(imu.accel.y);
+      iev.accelZ = static_cast<float>(imu.accel.z);
+      iev.magX = 0.0f;
+      iev.magY = 0.0f;
+      iev.magZ = 0.0f;
+      if (imu.id == 0) { IMU1_Measurements(iev); availableMeasurements[0] = 1; }
+      else { IMU2_Measurements(iev); availableMeasurements[1] = 1; }
+      break;
+    }
+    case DataBrokerMessageTypes::BARO_DATA: {
+      BaroData b = DataBroker::ExtractData<BaroData>(cm);
+      BarosData bd{};
+      bd.time = static_cast<float>(xTaskGetTickCount() * portTICK_PERIOD_MS);
+      bd.pressure = b.pressure;
+      bd.altitude = 0;
+      if (b.id == 0) { Baro1_Measurements(bd); availableMeasurements[2] = 1; }
+      else { Baro2_Measurements(bd); availableMeasurements[3] = 1; }
+      break;
+    }
+    case DataBrokerMessageTypes::GPS_DATA: {
+      GPSData g = DataBroker::ExtractData<GPSData>(cm);
+      GPS_Measurements(static_cast<float>(g.antennaAltitude_.altitude_));
+      availableMeasurements[4] = 1;
+      break;
+    }
+    case DataBrokerMessageTypes::MAG_DATA: {
+      MagData m = DataBroker::ExtractData<MagData>(cm);
+      // Assign to imu1 mag fields by default; tasks can set as needed
+      this->everestData.magX1 = static_cast<float>(m.magX);
+      this->everestData.magY1 = static_cast<float>(m.magY);
+      this->everestData.magZ1 = static_cast<float>(m.magZ);
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 void EverestTask::initialize1(systemState& state) {

@@ -63,6 +63,8 @@ void EverestTask::Extract(const Command& cm) {
   switch(msgType) {
     case DataBrokerMessageTypes::IMU_DATA: {
       IMUData imu = DataBroker::ExtractData<IMUData>(cm);
+      SOAR_PRINT("Everest::Extract - IMU_DATA received id=%d gyro=(%d,%d,%d) accel=(%d,%d,%d)\n",
+                 imu.id, imu.gyro.x, imu.gyro.y, imu.gyro.z, imu.accel.x, imu.accel.y, imu.accel.z);
       IMUData_Everest iev{};
       float ts = static_cast<float>(xTaskGetTickCount() * portTICK_PERIOD_MS);
       iev.time = ts;
@@ -81,6 +83,7 @@ void EverestTask::Extract(const Command& cm) {
     }
     case DataBrokerMessageTypes::BARO_DATA: {
       BaroData b = DataBroker::ExtractData<BaroData>(cm);
+      SOAR_PRINT("Everest::Extract - BARO_DATA received id=%d pressure=%u temp=%d\n", b.id, b.pressure, b.temp);
       BarosData bd{};
       bd.time = static_cast<float>(xTaskGetTickCount() * portTICK_PERIOD_MS);
       bd.pressure = b.pressure;
@@ -91,12 +94,14 @@ void EverestTask::Extract(const Command& cm) {
     }
     case DataBrokerMessageTypes::GPS_DATA: {
       GPSData g = DataBroker::ExtractData<GPSData>(cm);
+      SOAR_PRINT("Everest::Extract - GPS_DATA received altitude=%d\n", g.antennaAltitude_.altitude_);
       GPS_Measurements(static_cast<float>(g.antennaAltitude_.altitude_));
       availableMeasurements[4] = 1;
       break;
     }
     case DataBrokerMessageTypes::MAG_DATA: {
       MagData m = DataBroker::ExtractData<MagData>(cm);
+      SOAR_PRINT("Everest::Extract - MAG_DATA received (%d,%d,%d)\n", m.magX, m.magY, m.magZ);
       // Assign to imu1 mag fields by default; tasks can set as needed
       this->everestData.magX1 = static_cast<float>(m.magX);
       this->everestData.magY1 = static_cast<float>(m.magY);

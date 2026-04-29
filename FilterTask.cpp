@@ -116,6 +116,8 @@ void filterTask::Run(void * pvParams)
         // If a command arrived, handle it (but do NOT run the filter block here unless scheduled)
         if (res) {
             if (cm.GetCommand() == DATA_BROKER_COMMAND) {
+                DataBrokerMessageTypes mt = DataBroker::getMessageType(cm);
+                SOAR_PRINT("filterTask - Received DataBroker message: %s\n", DataBrokerMessageType::ToString(mt).c_str());
                 everest.Extract(cm);
                 cm.Reset();
             } else {

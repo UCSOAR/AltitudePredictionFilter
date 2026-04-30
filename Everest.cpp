@@ -59,6 +59,20 @@ EverestTask& EverestTask::getEverest() {
 
 // Extract data from a DataBroker command and update measurements
 void EverestTask::Extract(const Command& cm) {
+  // Periodically refresh which measurements are "available" by checking
+  // how long since the last sample from each publisher. This keeps
+  // `availableMeasurements` up to date even if no new DataBroker messages
+  // arrive for a short while.
+  uint32_t nowMs = static_cast<uint32_t>(xTaskGetTickCount() * portTICK_PERIOD_MS);
+  if ((nowMs - lastAvailableRefreshMs) >= AVAILABLE_MEAS_REFRESH_MS) {
+    for (int i = 0; i < 5; ++i) {
+      uint32_t last = lastSampleTimeMs[i];
+      // mark available if we have a recent sample (within refresh window)
+      availableMeasurements[i] = ((nowMs > last) && ((nowMs - last) <= AVAILABLE_MEAS_REFRESH_MS)) ? 1 : 0;
+    }
+    lastAvailableRefreshMs = nowMs;
+  }
+
   auto msgType = DataBroker::getMessageType(cm);
   switch(msgType) {
     case DataBrokerMessageTypes::IMU_DATA: {
@@ -66,7 +80,7 @@ void EverestTask::Extract(const Command& cm) {
       SOAR_PRINT("Everest::Extract - IMU_DATA received id=%d gyro=(%d,%d,%d) accel=(%d,%d,%d)\n",
                  imu.id, imu.gyro.x, imu.gyro.y, imu.gyro.z, imu.accel.x, imu.accel.y, imu.accel.z);
       IMUData_Everest iev{};
-      float ts = static_cast<float>(xTaskGetTickCount() * portTICK_PERIOD_MS);
+      float ts = static_cast<float>(nowMs);
       iev.time = ts;
       iev.gyroX = static_cast<float>(imu.gyro.x);
       iev.gyroY = static_cast<float>(imu.gyro.y);
@@ -77,19 +91,19 @@ void EverestTask::Extract(const Command& cm) {
       iev.magX = 0.0f;
       iev.magY = 0.0f;
       iev.magZ = 0.0f;
-      if (imu.id == 0) { IMU1_Measurements(iev); availableMeasurements[0] = 1; }
-      else { IMU2_Measurements(iev); availableMeasurements[1] = 1; }
+      if (imu.id == 0) { IMU1_Measurements(iev); availableMeasurements[0] = 1; lastSampleTimeMs[0] = nowMs; }
+      else { IMU2_Measurements(iev); availableMeasurements[1] = 1; lastSampleTimeMs[1] = nowMs; }
       break;
     }
     case DataBrokerMessageTypes::BARO_DATA: {
       BaroData b = DataBroker::ExtractData<BaroData>(cm);
       SOAR_PRINT("Everest::Extract - BARO_DATA received id=%d pressure=%u temp=%d\n", b.id, b.pressure, b.temp);
       BarosData bd{};
-      bd.time = static_cast<float>(xTaskGetTickCount() * portTICK_PERIOD_MS);
+      bd.time = static_cast<float>(nowMs);
       bd.pressure = b.pressure;
       bd.altitude = 0;
-      if (b.id == 0) { Baro1_Measurements(bd); availableMeasurements[2] = 1; }
-      else { Baro2_Measurements(bd); availableMeasurements[3] = 1; }
+      if (b.id == 0) { Baro1_Measurements(bd); availableMeasurements[2] = 1; lastSampleTimeMs[2] = nowMs; }
+      else { Baro2_Measurements(bd); availableMeasurements[3] = 1; lastSampleTimeMs[3] = nowMs; }
       break;
     }
     case DataBrokerMessageTypes::GPS_DATA: {
@@ -97,6 +111,7 @@ void EverestTask::Extract(const Command& cm) {
       SOAR_PRINT("Everest::Extract - GPS_DATA received altitude=%d\n", g.antennaAltitude_.altitude_);
       GPS_Measurements(static_cast<float>(g.antennaAltitude_.altitude_));
       availableMeasurements[4] = 1;
+      lastSampleTimeMs[4] = nowMs;
       break;
     }
     case DataBrokerMessageTypes::MAG_DATA: {

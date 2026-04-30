@@ -16,7 +16,7 @@
 /************************************
  * INCLUDES
  ************************************/
-#include "filterTask.hpp"
+#include <FilterTask.hpp>
 #include "SystemDefines.hpp"
 #include "DataBroker.hpp"
 #include "SensorDataTypes.hpp"
@@ -45,18 +45,18 @@
 /**
  * @brief Constructor for filterTask
  */
-filterTask::filterTask() : Task(TASK_FILTER_QUEUE_DEPTH_OBJS), refreshMs_(20)
+FilterTask::FilterTask() : Task(TASK_FILTER_QUEUE_DEPTH_OBJS), refreshMs_(20)
 {
 }
 
-void filterTask::SetRefreshMs(uint32_t ms)
+void FilterTask::SetRefreshMs(uint32_t ms)
 {
     taskENTER_CRITICAL();
     refreshMs_ = ms;
     taskEXIT_CRITICAL();
 }
 
-uint32_t filterTask::GetRefreshMs()
+uint32_t FilterTask::GetRefreshMs()
 {
     taskENTER_CRITICAL();
     uint32_t v = refreshMs_;
@@ -68,20 +68,20 @@ uint32_t filterTask::GetRefreshMs()
  * @brief Initialize the filterTask
  *        Do not modify this function aside from adding the task name
  */
-void filterTask::InitTask()
+void FilterTask::InitTask()
 {
     // Make sure the task is not already initialized
-    SOAR_ASSERT(rtTaskHandle == nullptr, "Cannot initialize filterTask task twice");
+    SOAR_ASSERT(rtTaskHandle == nullptr, "Cannot initialize FilterTask task twice");
 
     BaseType_t rtValue =
-        xTaskCreate((TaskFunction_t)filterTask::RunTask,
-            (const char*)"filterTask",
+        xTaskCreate((TaskFunction_t)FilterTask::RunTask,
+            (const char*)"FilterTask",
             (uint16_t)TASK_FILTER_STACK_DEPTH_WORDS,
 			(void*)this,
             (UBaseType_t)TASK_FILTER_STACK_DEPTH_WORDS,
 			(TaskHandle_t*)&rtTaskHandle);
 
-    SOAR_ASSERT(rtValue == pdPASS, "filterTask::InitTask() - xTaskCreate() failed");
+    SOAR_ASSERT(rtValue == pdPASS, "FilterTask::InitTask() - xTaskCreate() failed");
     // Subscribe to sensor data so this task receives DataBroker messages
     DataBroker::Subscribe<IMUData>(this);
     DataBroker::Subscribe<BaroData>(this);
@@ -93,7 +93,7 @@ void filterTask::InitTask()
  * @brief Instance Run loop for the Task, runs on scheduler start as long as the task is initialized.
  * @param pvParams RTOS Passed void parameters, contains a pointer to the object instance, should not be used
  */
-void filterTask::Run(void * pvParams)
+void FilterTask::Run(void * pvParams)
 {
     // Get singleton instance of EverestTask to process incoming data
     EverestTask &everest = EverestTask::getEverest();
@@ -159,7 +159,7 @@ void filterTask::Run(void * pvParams)
  * @brief Handles a command
  * @param cm Command reference to handle
  */
-void filterTask::HandleCommand(Command& cm)
+void FilterTask::HandleCommand(Command& cm)
 {
     switch (cm.GetCommand()) {
 

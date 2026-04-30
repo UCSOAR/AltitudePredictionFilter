@@ -25,11 +25,11 @@
 /************************************
  * CLASS DEFINITIONS
  ************************************/
-class filterTask : public Task
+class FilterTask : public Task
 {
 public:
-    static filterTask& Inst() {
-        static filterTask inst;
+    static FilterTask& Inst() {
+        static FilterTask inst;
         return inst;
     }
 
@@ -39,15 +39,15 @@ public:
     uint32_t GetRefreshMs();
 
 protected:
-    static void RunTask(void* pvParams) { filterTask::Inst().Run(pvParams); } // Static Task Interface, passes control to the instance Run();
+    static void RunTask(void* pvParams) { FilterTask::Inst().Run(pvParams); } // Static Task Interface, passes control to the instance Run();
     void Run(void * pvParams); // Main run code
     void HandleCommand(Command& cm);
 
 private:
     // Private Functions
-    filterTask();        // Private constructor
-    filterTask(const filterTask&);                        // Prevent copy-construction
-    filterTask& operator=(const filterTask&);            // Prevent assignment
+    FilterTask();        // Private constructor
+    FilterTask(const FilterTask&);                        // Prevent copy-construction
+    FilterTask& operator=(const FilterTask&);            // Prevent assignment
     // Refresh interval in milliseconds used for the periodic filter step
     uint32_t refreshMs_;
 };

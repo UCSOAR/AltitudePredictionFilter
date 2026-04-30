@@ -27,6 +27,10 @@
 #define REFRESH_RATE (3)  // replace this with actual sample rate
 #define RATE_BARO (3)
 #define CALIBRATION_TIME (20)
+// How often (ms) to refresh `availableMeasurements` from latest sample times
+#ifndef AVAILABLE_MEAS_REFRESH_MS
+#define AVAILABLE_MEAS_REFRESH_MS 500
+#endif
 
 /* Macros/Enums
    ------------------------------------------------------------*/
@@ -243,6 +247,11 @@ class EverestTask {
   void updateDeltaTime(float currentTime);
 
   std::vector<int> availableMeasurements = {0, 0, 0, 0, 0};
+
+  // last sample times (ms since scheduler start) for IMU1, IMU2, BARO1, BARO2, GPS
+  uint32_t lastSampleTimeMs[5] = {0, 0, 0, 0, 0};
+  // last time we refreshed `availableMeasurements` (ms)
+  uint32_t lastAvailableRefreshMs = 0;
 
   EverestData everestData{};
 

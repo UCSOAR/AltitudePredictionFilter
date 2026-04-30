@@ -51,6 +51,10 @@ int counter = 0;
 int isAfterApogee = 0;
 int predictionCounter = 0;
 
+AirbrakeController airbrakeController_;
+bool isAfterBurnout = false;
+int  airbrakeLevel_ = 0;
+
 using namespace Eigen;
 
 #ifdef LOGON
@@ -343,9 +347,34 @@ void HALO::stateUpdate() {
     }
 
   } else {
-    // check if the rocket is before apogee
-    isAfterApogee =
-        this->apogeeDetection(Measurement{X0[0], X0[1], X0[2], this->time});
+    // check rocket state with filter values
+	WindowStats ws = this->computeWindowStats(
+	Measurement{X0[0], X0[1], X0[2], this->time});
+
+	if (!isAfterBurnout) {
+		isAfterBurnout = this->burnoutDetection(ws);
+		if (isAfterBurnout) {
+			// [CANBUS DAQ] request switch from burn → coast state
+		}
+	}
+
+	if (isAfterBurnout && !isAfterApogee) {
+
+		// ---- Airbrake control ----------------------------------------
+		airbrakeLevel_ = airbrakeController_.update(
+			X0,
+			this->listOfGainsSigmaPoints[0].first,   // prevGain1 sigma-pt 0
+			this->listOfGainsSigmaPoints[0].second,  // prevGain2 sigma-pt 0
+			this->lastNearestVectors_                 // cached from dynamicModel
+		);
+		// [CANBUS DAQ] airbrakeLevel_ is published inside airbrakeController_.update()
+		// ---------------------------------------------------------------
+
+		isAfterApogee = this->apogeeDetection(ws);
+		if (isAfterApogee) {
+			// [CANBUS DAQ] request switch to after-apogee state
+		}
+	}
   }
 
   this->KinematicsHalo.altitudeStore = X0(0);
@@ -1562,6 +1591,45 @@ void HALO::createScenarios(HALO* halo) {
   this->scenarios.clear();
   this->scenarios.push_back(scenario1);
   this->scenarios.push_back(scenario2);
+
+
+	 // --- Airbrake scenarios (one Scenario set per level 1-10) ---
+	 // Each airbrakeSim<N>Before/After follows the same structure as
+	 // beforeApogeeSim1 / afterApogeeSim1 but represents flight with
+	 // brakes deployed at that level. Populated in Data.cpp/initAllSimData().
+
+	 std::vector<std::vector<Scenario>> brakeSets;
+	 brakeSets.reserve(AIRBRAKE_LEVELS);
+
+	 // level 1 → lowest drag, level 10 → maximum drag
+	 for (int lvl = 0; lvl < AIRBRAKE_LEVELS; lvl++) {
+		 Scenario brakeScenario = Scenario{
+			 airbrakeBeforeSim[lvl],   // ptr to before-apogee sim for level lvl+1
+			 airbrakeAfterSim[lvl],    // ptr to after-apogee sim for level lvl+1
+			 lvl + 1
+		 };
+		 brakeScenario.createTree();
+		 brakeSets.push_back({brakeScenario});
+	 }
+
+	 // Deployment windows — extracted from each airbrake sim:
+	 // for level L find the state {alt, vel, accel} at the latest time-step
+	 // where deploying brakes still converges to TARGET_APOGEE.
+	 // Fill these in from your sim post-processing script.
+	 std::array<AirbrakeDeploymentWindow, AIRBRAKE_LEVELS> windows = {{
+		 {4500.0f, 280.0f, -5.0f},   // level 1  — gentlest, widest window
+		 {4200.0f, 265.0f, -6.0f},   // level 2
+		 {3900.0f, 250.0f, -7.0f},   // level 3
+		 {3600.0f, 235.0f, -8.0f},   // level 4
+		 {3300.0f, 218.0f, -9.0f},   // level 5
+		 {3000.0f, 200.0f,-10.0f},   // level 6
+		 {2700.0f, 180.0f,-11.0f},   // level 7
+		 {2400.0f, 158.0f,-12.0f},   // level 8
+		 {2100.0f, 133.0f,-13.0f},   // level 9
+		 {1800.0f, 105.0f,-14.0f},   // level 10 — most aggressive, tightest window
+	 }};
+
+	 airbrakeController_.init(brakeSets, windows);
 
 #ifdef TIMERON
 

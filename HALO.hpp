@@ -1,6 +1,7 @@
 #ifndef HALO_HPP
 #define HALO_HPP
 
+#include <AirbrakeController.hpp>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -138,20 +139,19 @@ struct Scenario {
     std::vector<std::vector<float>> afterVectorofVectors;
 
     beforeVectorofVectors.reserve(BeforeList->size());
-  afterVectorofVectors.reserve(AfterList->size());
+    afterVectorofVectors.reserve(AfterList->size());
 
     for (int i = 0; i < BeforeList->size(); i++) {
-	  // Use (*BeforeList)[i] to access the vector the pointer points to
-	  std::vector<float> vect = {(*BeforeList)[i][0], (*BeforeList)[i][1],
-								 (*BeforeList)[i][2]};
-	  beforeVectorofVectors.push_back(vect);
-	}
+      std::vector<float> vect = {(*BeforeList)[i][0], (*BeforeList)[i][1],
+                                 (*BeforeList)[i][2]};
+      beforeVectorofVectors.push_back(vect);
+    }
 
-	for (int i = 0; i < AfterList->size(); i++) {
-	  std::vector<float> vect = {(*AfterList)[i][0], (*AfterList)[i][1],
-								 (*AfterList)[i][2]};
-	  afterVectorofVectors.push_back(vect);
-	}
+    for (int i = 0; i < AfterList->size(); i++) {
+      std::vector<float> vect = {(*AfterList)[i][0], (*AfterList)[i][1],
+                                 (*AfterList)[i][2]};
+      afterVectorofVectors.push_back(vect);
+    }
 
     treeBefore = KDTree(beforeVectorofVectors);
     treeAfter = KDTree(afterVectorofVectors);
@@ -385,15 +385,17 @@ class HALO {
   VectorXf X_in;
   VectorXf X_pred;
 
-  // use REFRESH_RATE here somehow
   float timeStep = 1.0f / 3.0f;
 
   std::vector<float> prevGain1 = {0.5, 0.5, 0.5};
   std::vector<float> prevGain2 = {0.5, 0.5, 0.5};
 
   float altitudeAccumulator = 0;
-
   float maxAltitude = 0;
+
+  // ---------------------------------------------------------------------------
+  // Shared confidence helpers — used by both detectors
+  // ---------------------------------------------------------------------------
 
   float calculateConfidence(float current, float previous, float variance) {
     if (current > maxAltitude) {
@@ -406,8 +408,6 @@ class HALO {
       altitudeAccumulator += difference;
     }
 
-    // override since altitude has consistently been going down in the range of
-    // the variance
     if (altitudeAccumulator >= variance) {
       return 1;
     }
@@ -416,12 +416,9 @@ class HALO {
   }
 
   float calculateVelocityConfidence(float currentVelo, float varianceVelo) {
-    // velocity should be < 0 for apogee
-    // range
     if (currentVelo > varianceVelo) {
       return 0;
     }
-
     return 1 - std::abs((currentVelo) / (2 * std::abs(varianceVelo)));
   }
 
@@ -436,26 +433,57 @@ class HALO {
       return 0;
     }
 
-    float confidence = 1 - (difference / (2 * varianceAcc));
-
-    return confidence;
+    return 1 - (difference / (2 * varianceAcc));
   }
 
-  bool apogeeDetection(const Measurement &currentMeasurement) {
-    updateBuffer(currentMeasurement);
+  // ---------------------------------------------------------------------------
+  // WindowStats — computed ONCE per cycle via computeWindowStats(),
+  // then passed into both detectors so nothing is recalculated twice.
+  // ---------------------------------------------------------------------------
+  struct WindowStats {
+    float avgAltitude;
+    float avgVelocity;
+    float avgAcceleration;
+    float sqrtP_altitude;
+    float sqrtP_velocity;
+    float sqrtP_acceleration;
+    bool  windowFull;
+  };
 
-    float avgAltitude = altitudeSum / buffer.size();
-    float avgVelocity = velocitySum / buffer.size();
-    float avgAcceleration = accelerationSum / buffer.size();
+  // Call once per filter cycle. Owns the single updateBuffer() call.
+  WindowStats computeWindowStats(const Measurement &m) {
+    updateBuffer(m);
 
-    // Square root the P values to get std deviation
-    float sqrtP_altitude = std::sqrt(this->P(0, 0));
-    float sqrtP_velocity = std::sqrt(this->P(1, 1));
-    float sqrtP_acceleration = std::sqrt(this->P(2, 2));
+    WindowStats s{};
+    s.windowFull = (buffer.size() >= static_cast<size_t>(windowSize));
+    if (!s.windowFull) return s;
 
-    if (buffer.size() < windowSize) {
-      return false;
-    }
+    float n           = static_cast<float>(buffer.size());
+    s.avgAltitude     = altitudeSum     / n;
+    s.avgVelocity     = velocitySum     / n;
+    s.avgAcceleration = accelerationSum / n;
+
+    s.sqrtP_altitude     = std::sqrt(this->P(0, 0));
+    s.sqrtP_velocity     = std::sqrt(this->P(1, 1));
+    s.sqrtP_acceleration = std::sqrt(this->P(2, 2));
+
+    return s;
+  }
+
+  // ---------------------------------------------------------------------------
+  // apogeeDetection — UNCHANGED from original, now receives pre-computed stats
+  // so it no longer calls updateBuffer() itself.
+  // ---------------------------------------------------------------------------
+  bool apogeeDetection(const WindowStats &s) {
+    if (!s.windowFull) return false;
+
+    float avgAltitude     = s.avgAltitude;
+    float avgVelocity     = s.avgVelocity;
+    float avgAcceleration = s.avgAcceleration;
+
+    float sqrtP_altitude     = s.sqrtP_altitude;
+    float sqrtP_velocity     = s.sqrtP_velocity;
+    float sqrtP_acceleration = s.sqrtP_acceleration;
 
     if (prevAvgAltitude == 0.0) {
       prevAvgAltitude = avgAltitude;
@@ -470,26 +498,18 @@ class HALO {
       velocityConfidence =
           calculateVelocityConfidence(avgVelocity, sqrtP_velocity);
 
-      // if infinity, set to 1
       if (std::isinf(velocityConfidence)) {
         velocityConfidence = 0.0;
       }
     }
+
     float accelerationConfidence =
         calculateAccelerationConfidence(avgAcceleration, sqrtP_acceleration);
 
     // cap confidence at 1
-    if (altitudeConfidence > 1) {
-      altitudeConfidence = 1;
-    }
-
-    if (velocityConfidence > 1) {
-      velocityConfidence = 1;
-    }
-
-    if (accelerationConfidence > 1) {
-      accelerationConfidence = 1;
-    }
+    if (altitudeConfidence > 1)     altitudeConfidence = 1;
+    if (velocityConfidence > 1)     velocityConfidence = 1;
+    if (accelerationConfidence > 1) accelerationConfidence = 1;
 
     // prevent misfires
     if (altitudeConfidence == 0 && velocityConfidence == 0) {
@@ -501,86 +521,156 @@ class HALO {
          accelerationConfidence * 0.4);
 
 #if defined(LOGON) || defined(LOGMETRICS)
-    // write to file confidence values
-    FILE *file = fopen("testSuite/results/confidence.txt",
-                       "a+");  // Open the file for writing
+    FILE *file = fopen("testSuite/results/confidence.txt", "a+");
     if (!file) {
       fprintf(stderr, "Error opening confidence.txt...exiting\n");
       exit(1);
     }
-
     fprintf(file, "%f,%f,%f,%f\n", altitudeConfidence, velocityConfidence,
             accelerationConfidence, totalConfidence);
-
     fclose(file);
-
 #endif
-
-    // if (totalConfidence >= 1) {
-    //   return true;
-    // }
 
     if (totalConfidence >= 1) {
       hitOne = true;
     }
 
-    // Update the maximum average confidence
     if (totalConfidence > maxAvgConfidence) {
       maxAvgConfidence = totalConfidence;
       return false;
     }
 
-    // if we've hit one and its decreasing then trigger
-    // if confidence drops below 1 or is 1 trigger
     if (hitOne) {
       if (totalConfidence < maxAvgConfidence) {
         return true;
       }
     }
 
-    // if we haven't hit one and it dips then trigger
     if (maxAvgConfidence > 0.7 && totalConfidence <= (maxAvgConfidence * 0.8)) {
       return true;
     }
 
-    prevAvgAltitude = avgAltitude;
-    prevAvgVelocity = avgVelocity;
+    prevAvgAltitude     = avgAltitude;
+    prevAvgVelocity     = avgVelocity;
     prevAvgAcceleration = avgAcceleration;
 
     return false;
   }
 
+  // ---------------------------------------------------------------------------
+  // burnoutDetection — receives pre-computed stats, no buffer/Kalman work.
+  //
+  // Physics:
+  //   During burn  : accel large & positive (thrust >> drag)
+  //   At burnout   : accel collapses toward 0 (thrust cuts off)
+  //   After burnout: accel goes negative (drag + gravity)
+  //   Velocity     : still positive and near peak — NOT yet decelerating
+  // ---------------------------------------------------------------------------
+  bool burnoutDetection(const WindowStats &s) {
+    if (!s.windowFull)     return false;
+    if (burnoutDetected_)  return true;   // latch
+
+    // 1. Acceleration — primary signal, collapses toward 0 at burnout
+    float accelMag = std::fabs(s.avgAcceleration);
+    float accelerationConfidence = (s.sqrtP_acceleration > 0.0f)
+        ? std::min(1.0f, 1.0f - accelMag / s.sqrtP_acceleration)
+        : 0.0f;
+    if (accelerationConfidence < 0.0f) accelerationConfidence = 0.0f;
+
+    // 2. Velocity — still large & positive during burnout
+    float velocityConfidence = (s.avgVelocity > 0.0f)
+        ? std::min(1.0f, s.avgVelocity / (s.sqrtP_velocity + 1e-6f))
+        : 0.0f;
+
+    // 3. Jerk — sharpness of the accel drop distinguishes burnout from drift
+    float jerkConfidence = 0.0f;
+    if (prevAvgAccelBurnout_ != 0.0f && s.sqrtP_acceleration > 0.0f) {
+      float drop = prevAvgAccelBurnout_ - s.avgAcceleration;
+      if (drop > 0.0f)
+        jerkConfidence = std::min(1.0f, drop / s.sqrtP_acceleration);
+    }
+
+    // Misfire guard — same pattern as apogeeDetection
+    if (accelerationConfidence == 0.0f && velocityConfidence == 0.0f) {
+      jerkConfidence = 0.0f;
+    }
+
+    float totalConfidence = accelerationConfidence * 0.6f
+                          + velocityConfidence      * 0.3f
+                          + jerkConfidence          * 0.3f;
+
+#if defined(LOGON) || defined(LOGMETRICS)
+    if (FILE *f = fopen("testSuite/results/burnout_confidence.txt", "a+")) {
+      fprintf(f, "%f,%f,%f,%f\n",
+              accelerationConfidence, velocityConfidence,
+              jerkConfidence, totalConfidence);
+      fclose(f);
+    }
+#endif
+
+    // Trigger logic — identical pattern to apogeeDetection
+    if (totalConfidence >= 1.0f) burnHitPeak_ = true;
+
+    if (totalConfidence > maxAvgConfBurnout_) {
+      maxAvgConfBurnout_   = totalConfidence;
+      prevAvgAccelBurnout_ = s.avgAcceleration;
+      prevAvgVelBurnout_   = s.avgVelocity;
+      return false;
+    }
+
+    if (burnHitPeak_ && totalConfidence < maxAvgConfBurnout_) {
+      burnoutDetected_ = true;
+      return true;
+    }
+
+    if (maxAvgConfBurnout_ > 0.7f &&
+        totalConfidence <= (maxAvgConfBurnout_ * 0.8f)) {
+      burnoutDetected_ = true;
+      return true;
+    }
+
+    prevAvgAccelBurnout_ = s.avgAcceleration;
+    prevAvgVelBurnout_   = s.avgVelocity;
+    return false;
+  }
+
   // from empirical observations window of 10 is best
-  // detected highest apogee with relatively
-  // best confidence values
   int windowSize = 10;
 
- private:
   void updateBuffer(const Measurement &currentMeasurement) {
-    if (buffer.size() == windowSize) {
+    if (buffer.size() == static_cast<size_t>(windowSize)) {
       const Measurement &oldest = buffer.front();
-      altitudeSum -= oldest.altitude;
-      velocitySum -= oldest.velocity;
+      altitudeSum     -= oldest.altitude;
+      velocitySum     -= oldest.velocity;
       accelerationSum -= oldest.acceleration;
       buffer.pop_front();
     }
 
     buffer.push_back(currentMeasurement);
-    altitudeSum += currentMeasurement.altitude;
-    velocitySum += currentMeasurement.velocity;
+    altitudeSum     += currentMeasurement.altitude;
+    velocitySum     += currentMeasurement.velocity;
     accelerationSum += currentMeasurement.acceleration;
   }
 
   std::deque<Measurement> buffer;
-  float altitudeSum;
-  float velocitySum;
-  float accelerationSum;
-  float prevAvgAltitude = 0.0;
-  float prevAvgVelocity = 0.0;
-  float prevAvgAcceleration = 0.0;
-  float maxAvgConfidence = 0.0;
-  bool hitOne = false;
-  bool wait = false;
+  float altitudeSum     = 0.0f;
+  float velocitySum     = 0.0f;
+  float accelerationSum = 0.0f;
+
+  // Apogee detection state
+  float prevAvgAltitude     = 0.0f;
+  float prevAvgVelocity     = 0.0f;
+  float prevAvgAcceleration = 0.0f;
+  float maxAvgConfidence    = 0.0f;
+  bool  hitOne              = false;
+  bool  wait                = false;
+
+  // Burnout detection state
+  bool  burnoutDetected_   = false;
+  bool  burnHitPeak_       = false;
+  float maxAvgConfBurnout_ = 0.0f;
+  float prevAvgAccelBurnout_ = 0.0f;
+  float prevAvgVelBurnout_   = 0.0f;
 
  protected:
   MatrixXf sigmaPoints;
@@ -593,10 +683,10 @@ class HALO {
   MatrixXf WeightsUKF;
   VectorXf WeightsForSigmaPoints;
 
-  MatrixXf F;  // state to next state transition matrix
-  MatrixXf H;  // state to measurement matrix
-  MatrixXf R;  // measurement noise covariance matrix
-  MatrixXf K;  // Kalman gain matrix
+  MatrixXf F;
+  MatrixXf H;
+  MatrixXf R;
+  MatrixXf K;
 
   kinematicsHalo KinematicsHalo;
 

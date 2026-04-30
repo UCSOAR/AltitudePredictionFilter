@@ -23,7 +23,7 @@ bool hasGPS        = true;
 bool hasIMU1       = true;
 bool hasIMU2       = true;
 bool hasMag        = true;
-bool hasBaro       = false;
+bool hasBaro       = true;
 
 float stationaryTime = 0.0f;
 float everest_time   = 0.0f;   // used only in PC test path
@@ -127,41 +127,41 @@ void publishSensorData(uint32_t nowMs, int i, int stationary)
         switch (sensorThisCycle) {
             case 0:
                 if (hasIMU1) {
-                    SOAR_PRINT("run_everest [t=%ums] Publishing IMU1 accel=(%d,%d,%d) gyro=(%d,%d,%d)\n",
-                               nowMs,
-                               imu1.accel.x, imu1.accel.y, imu1.accel.z,
-                               imu1.gyro.x,  imu1.gyro.y,  imu1.gyro.z);
+//                    SOAR_PRINT("run_everest [t=%ums] Publishing IMU1 accel=(%d,%d,%d) gyro=(%d,%d,%d)\n",
+//                               nowMs,
+//                               imu1.accel.x, imu1.accel.y, imu1.accel.z,
+//                               imu1.gyro.x,  imu1.gyro.y,  imu1.gyro.z);
                     DataBroker::Publish<IMUData>(&imu1);
                 }
                 sensorThisCycle++;
                 break;
             case 1:
                 if (hasIMU2) {
-                    SOAR_PRINT("run_everest [t=%ums] Publishing IMU2 accel=(%d,%d,%d) gyro=(%d,%d,%d)\n",
-                               nowMs,
-                               imu2.accel.x, imu2.accel.y, imu2.accel.z,
-                               imu2.gyro.x,  imu2.gyro.y,  imu2.gyro.z);
+//                    SOAR_PRINT("run_everest [t=%ums] Publishing IMU2 accel=(%d,%d,%d) gyro=(%d,%d,%d)\n",
+//                               nowMs,
+//                               imu2.accel.x, imu2.accel.y, imu2.accel.z,
+//                               imu2.gyro.x,  imu2.gyro.y,  imu2.gyro.z);
                     DataBroker::Publish<IMUData>(&imu2);
                 }
                 sensorThisCycle++;
                 break;
             case 2:
                 if (hasBaro) {
-                    SOAR_PRINT("run_everest [t=%ums] Publishing BARO1 pressure=%u\n", nowMs, baro1.pressure);
+//                    SOAR_PRINT("run_everest [t=%ums] Publishing BARO1 pressure=%u\n", nowMs, baro1.pressure);
                     DataBroker::Publish<BaroData>(&baro1);
                 }
                 sensorThisCycle++;
                 break;
             case 3:
                 if (hasBaro) {
-                    SOAR_PRINT("run_everest [t=%ums] Publishing BARO2 pressure=%u\n", nowMs, baro2.pressure);
+//                    SOAR_PRINT("run_everest [t=%ums] Publishing BARO2 pressure=%u\n", nowMs, baro2.pressure);
                     DataBroker::Publish<BaroData>(&baro2);
                 }
                 sensorThisCycle++;
                 break;
             case 4:
                 if (hasGPS) {
-                    SOAR_PRINT("run_everest [t=%ums] Publishing GPS altitude=%d\n", nowMs, gps.antennaAltitude_.altitude_);
+//                    SOAR_PRINT("run_everest [t=%ums] Publishing GPS altitude=%d\n", nowMs, gps.antennaAltitude_.altitude_);
                     DataBroker::Publish<GPSData>(&gps);
                 }
                 sensorThisCycle = 0;

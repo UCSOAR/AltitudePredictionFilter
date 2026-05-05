@@ -353,9 +353,6 @@ void HALO::stateUpdate() {
 
     if (!isAfterBurnout) {
       isAfterBurnout = this->burnoutDetection(ws);
-      if (isAfterBurnout) {
-        // [CANBUS DAQ] request switch from burn → coast state
-      }
     }
 
     if (isAfterBurnout && !isAfterApogee) {

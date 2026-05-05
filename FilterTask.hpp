@@ -17,10 +17,33 @@
 /************************************
  * MACROS AND DEFINES
  ************************************/
+#define CMD_SET_FILTER_STATE      0x10
+#define CMD_REQUEST_FILTER_STATE  0x11
+#define CMD_FILTER_STATE          0x12
 
 /************************************
  * TYPEDEFS
  ************************************/
+enum class FilterEvent : uint8_t {
+    NONE = 0,
+    LAUNCH_DETECTED,
+    BURNOUT_DETECTED,
+    ENABLE_AIRBRAKE,
+    APOGEE_DETECTED,
+    RESET,
+
+    // CAN requests
+    CAN_SET_STATE,
+    CAN_REQUEST_STATE
+};
+
+enum class FilterState : uint8_t {
+    IDLE = 0,
+    BOOST,
+    BURNOUT_DETECTED,
+    AIRBRAKE_CONTROL,
+    APOGEE_DETECTED
+};
 
 /************************************
  * CLASS DEFINITIONS
@@ -50,6 +73,24 @@ private:
     FilterTask& operator=(const FilterTask&);            // Prevent assignment
     // Refresh interval in milliseconds used for the periodic filter step
     uint32_t refreshMs_;
+
+    // STATE MACHINE
+    FilterState state_;
+    FilterState requestedState_;   // from CAN
+    bool stateOverride_;           // allow external override
+
+    void ProcessState();
+    void HandleEvent(FilterEvent evt);
+    void TransitionTo(FilterState newState);
+
+    // CAN helpers
+    void SendStateCAN(FilterState state);
+    void HandleCANCommand(Command& cm);
+
+    void RequestFilterState(FilterState newState)
+    {
+        this->TransitionTo(newState);
+    }
 };
 
 /************************************

@@ -1,6 +1,6 @@
+#include <StandardSims.hpp>
 #include "HALO.hpp"
 #include <fstream>
-#include "Data.hpp"
 #include <map>
 
 // #define LOGON
@@ -348,33 +348,30 @@ void HALO::stateUpdate() {
 
   } else {
     // check rocket state with filter values
-	WindowStats ws = this->computeWindowStats(
-	Measurement{X0[0], X0[1], X0[2], this->time});
+    WindowStats ws = this->computeWindowStats(
+    Measurement{X0[0], X0[1], X0[2], this->time});
 
-	if (!isAfterBurnout) {
-		isAfterBurnout = this->burnoutDetection(ws);
-		if (isAfterBurnout) {
-			// [CANBUS DAQ] request switch from burn → coast state
-		}
-	}
+    if (!isAfterBurnout) {
+      isAfterBurnout = this->burnoutDetection(ws);
+      if (isAfterBurnout) {
+        // [CANBUS DAQ] request switch from burn → coast state
+      }
+    }
 
-	if (isAfterBurnout && !isAfterApogee) {
+    if (isAfterBurnout && !isAfterApogee) {
 
-		// ---- Airbrake control ----------------------------------------
-		airbrakeLevel_ = airbrakeController_.update(
-			X0,
-			this->listOfGainsSigmaPoints[0].first,   // prevGain1 sigma-pt 0
-			this->listOfGainsSigmaPoints[0].second,  // prevGain2 sigma-pt 0
-			this->lastNearestVectors_                 // cached from dynamicModel
-		);
-		// [CANBUS DAQ] airbrakeLevel_ is published inside airbrakeController_.update()
-		// ---------------------------------------------------------------
+      // ---- Airbrake control ----------------------------------------
+      airbrakeLevel_ = airbrakeController_.calculate_level(
+        this->prevGain1, this->prevGain2, this->scenario_index_1, this->scenario_index_2, (uint32_t)ws.avgAltitude
+      );
+      // [CANBUS DAQ] airbrakeLevel_ published to CANBUS for airbrake actuation
+      // ---------------------------------------------------------------
 
-		isAfterApogee = this->apogeeDetection(ws);
-		if (isAfterApogee) {
-			// [CANBUS DAQ] request switch to after-apogee state
-		}
-	}
+      isAfterApogee = this->apogeeDetection(ws);
+      if (isAfterApogee) {
+        // [CANBUS DAQ] request switch to after-apogee state
+      }
+    }
   }
 
   this->KinematicsHalo.altitudeStore = X0(0);
@@ -782,11 +779,19 @@ VectorXf HALO::predictNStates(int n) {
       }
 
     } else {
-      apogee = this->apogeeDetection(
-          Measurement{calculation(0), calculation(1), calculation(2),
-                      this->time + (float)i * timeStep});
+      WindowStats ws_pred{};
+      ws_pred.windowFull         = true;   // forward prediction — treat as full
+      ws_pred.avgAltitude        = calculation(0);
+      ws_pred.avgVelocity        = calculation(1);
+      ws_pred.avgAcceleration    = calculation(2);
+      ws_pred.sqrtP_altitude     = std::sqrt(this->P(0, 0));
+      ws_pred.sqrtP_velocity     = std::sqrt(this->P(1, 1));
+      ws_pred.sqrtP_acceleration = std::sqrt(this->P(2, 2));
+      apogee = this->apogeeDetection(ws_pred);
     }
-
+// NOTE: We do NOT call computeWindowStats() here because that would
+// push the prediction values into the real sliding buffer. We build
+// WindowStats manually with windowFull=true to bypass the buffer check.
     calculation = this->dynamicModelOnce(
         calculation, firstTimeForPoint, prevGain1, prevGain2,
         scenariosGainsList, counterSigmaPoint, scenarios);
@@ -1476,6 +1481,8 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
   std::vector<std::vector<float>> nearestVectors =
       nearestVectorsWithIndex.second;
 
+  this->lastNearestVectors_ = nearestVectors; // cache for airbrake controller
+
   int scenario1Index = nearestVectorsWithIndex.first[0];
   int scenario2Index = nearestVectorsWithIndex.first[1];
 
@@ -1576,60 +1583,23 @@ void HALO::createScenarios(HALO* halo) {
   scenario1.createTree();
   Scenario scenario2 = Scenario{beforeApogeeSim2, afterApogeeSim2, 2};
   scenario2.createTree();
-
   // TODO: add more as there are more
   // Scenario scenario3 = Scenario{sim3, sim3, 3};
   // scenario3.createTree();
-  // Scenario scenario4 = Scenario{sim4, sim4, 4};
-  // scenario4.createTree();
-  // Scenario scenario5 = Scenario{sim5, sim5, 5};
-  // scenario5.createTree();
-  // Scenario scenario6 = Scenario{sim6, sim6, 6};
-  // scenario6.createTree();
 
   // TODO: add them here as well {scenario3, scenario4, scenario5, scenario6}
   this->scenarios.clear();
   this->scenarios.push_back(scenario1);
   this->scenarios.push_back(scenario2);
 
+  // lookup for apogee extrapolation
+  std::vector<float> apogees;
+  apogees.reserve(2);
 
-	 // --- Airbrake scenarios (one Scenario set per level 1-10) ---
-	 // Each airbrakeSim<N>Before/After follows the same structure as
-	 // beforeApogeeSim1 / afterApogeeSim1 but represents flight with
-	 // brakes deployed at that level. Populated in Data.cpp/initAllSimData().
+  apogees.push_back(beforeApogeeSim1[0][-1]);
+  apogees.push_back(beforeApogeeSim2[0][-1]);
 
-	 std::vector<std::vector<Scenario>> brakeSets;
-	 brakeSets.reserve(AIRBRAKE_LEVELS);
-
-	 // level 1 → lowest drag, level 10 → maximum drag
-	 for (int lvl = 0; lvl < AIRBRAKE_LEVELS; lvl++) {
-		 Scenario brakeScenario = Scenario{
-			 airbrakeBeforeSim[lvl],   // ptr to before-apogee sim for level lvl+1
-			 airbrakeAfterSim[lvl],    // ptr to after-apogee sim for level lvl+1
-			 lvl + 1
-		 };
-		 brakeScenario.createTree();
-		 brakeSets.push_back({brakeScenario});
-	 }
-
-	 // Deployment windows — extracted from each airbrake sim:
-	 // for level L find the state {alt, vel, accel} at the latest time-step
-	 // where deploying brakes still converges to TARGET_APOGEE.
-	 // Fill these in from your sim post-processing script.
-	 std::array<AirbrakeDeploymentWindow, AIRBRAKE_LEVELS> windows = {{
-		 {4500.0f, 280.0f, -5.0f},   // level 1  — gentlest, widest window
-		 {4200.0f, 265.0f, -6.0f},   // level 2
-		 {3900.0f, 250.0f, -7.0f},   // level 3
-		 {3600.0f, 235.0f, -8.0f},   // level 4
-		 {3300.0f, 218.0f, -9.0f},   // level 5
-		 {3000.0f, 200.0f,-10.0f},   // level 6
-		 {2700.0f, 180.0f,-11.0f},   // level 7
-		 {2400.0f, 158.0f,-12.0f},   // level 8
-		 {2100.0f, 133.0f,-13.0f},   // level 9
-		 {1800.0f, 105.0f,-14.0f},   // level 10 — most aggressive, tightest window
-	 }};
-
-	 airbrakeController_.init(brakeSets, windows);
+  this->airbrakeController_.init(apogees);
 
 #ifdef TIMERON
 

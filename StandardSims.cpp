@@ -1,7 +1,7 @@
 
+#include <StandardSims.hpp>
 #include <vector>
 
-#include "Data.hpp"
 
 std::vector<std::vector<float>>* beforeApogeeSim1 = nullptr;
 std::vector<std::vector<float>>* afterApogeeSim1 = nullptr;

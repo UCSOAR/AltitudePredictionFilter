@@ -41,16 +41,6 @@ static FILE* everestGains = NULL;
 FILE* haloFile;
 FILE* everestFile;
 
-void EverestTask::setFilterState(FILTER_STATE filterState) {
-	if (this->filterState < filterState) {
-		this->filterState = filterState;
-	}
-}
-
-FILTER_STATE EverestTask::getFilterState() {
-	return filterState;
-}
-
 // singleton accessor
 EverestTask& EverestTask::getEverest() {
   static EverestTask inst;
@@ -142,155 +132,6 @@ Infusion* EverestTask::ExternalInitialize() {
   initialize1(state);
   return &madgwick;
 }
-
-#ifdef TESTING_BUILD
-int EverestTask::openFiles() {
-  // Define the directory path
-  std::string directoryPath = "testSuite/results";
-
-  // Create the directory if it doesn't exist
-  if (_mkdir("testSuite") == -1) {
-    if (errno != EEXIST) {
-      std::cerr << "Error creating directory: testSuite" << std::endl;
-      return 1;
-    }
-  }
-
-  if (_mkdir(directoryPath.c_str()) == -1) {
-    if (errno != EEXIST) {
-      std::cerr << "Error creating directory: " << directoryPath << std::endl;
-      return 1;
-    }
-  }
-
-  // File names
-  std::vector<std::string> fileNames = {"gains.txt",
-                                        "predictedValues.txt",
-                                        "log.txt",
-                                        "nearestScenarios.txt",
-                                        "nearestScenariosFormatted.txt",
-                                        "sigmaPoints.txt",
-                                        "sigmaPoints1.txt",
-                                        "sigmaPoints2.txt",
-                                        "sigmaPoints3.txt",
-                                        "sigmaPoints4.txt",
-                                        "sigmaPoints5.txt",
-                                        "sigmaPoints6.txt",
-                                        "predictnalt.txt",
-                                        "kalmangains.txt",
-                                        "everestgains.txt",
-                                        "NIS.txt"};
-
-  // Deleting files
-  for (size_t i = 0; i < fileNames.size(); ++i) {
-    std::string filePath = directoryPath + "/" + fileNames[i];
-    if (std::remove(filePath.c_str()) == 0) {
-    } else {
-      std::string msg = "Error deleting " + fileNames[i];
-      std::perror(msg.c_str());
-    }
-  }
-
-  // Creating and writing to files
-  std::vector<std::pair<std::string, std::string>> filesToCreate = {
-      std::make_pair("predictedValues.txt",
-                     "s1_alt,s1_velo,s1_acc,s2_alt,s2_velo,s2_acc,s3_alt,s3_"
-                     "velo,s3_acc,s4_alt,s4_velo,s4_acc,s5_alt,s5_velo,s5_acc,"
-                     "s6_alt,s6_velo,s6_acc\n"),
-      std::make_pair(
-          "gains.txt",
-          "sigmaPoint1->gain_v1[0],[1],[2],s1->gain_vector2[0],[1],[2]...\n"),
-      std::make_pair("log.txt", ""),
-      std::make_pair("sigmaPoints.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints1.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints2.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints3.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints4.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints5.txt", "alt,velo,acc\n"),
-      std::make_pair("sigmaPoints6.txt", "alt,velo,acc\n"),
-      std::make_pair("nearestScenarios.txt",
-                     "lowestDistance,secondLowestDistance,firstScenario,"
-                     "SecondScenario\n"),
-      std::make_pair("nearestScenariosFormatted.txt",
-                     "Header_formatted_scenarios\n"),
-      std::make_pair(
-          "predictnalt.txt",
-          "time,predicted_alt,predicted_vel,predicted_acc,prediction\n"),
-      std::make_pair("kalmangains.txt", "time,alt,velo,acc,gps_alt\n"),
-      std::make_pair("everestgains.txt",
-                     "time,gain_IMU,gain_Baro1,gain_Baro2,gainedEstimate\n"),
-      std::make_pair("nis.txt", "time,nis\n")};
-
-  for (size_t i = 0; i < filesToCreate.size(); ++i) {
-    std::string filePath = directoryPath + "/" + filesToCreate[i].first;
-    FILE* file = fopen(filePath.c_str(), "a+");
-    if (file) {
-      fputs(filesToCreate[i].second.c_str(), file);
-      fclose(file);
-    } else {
-      fprintf(stderr, "Error opening %s...exiting\n",
-              filesToCreate[i].first.c_str());
-      exit(1);
-    }
-  }
-
-  // Deleting HALO.txt
-  std::string filePath = directoryPath + "/HALO.txt";
-  if (std::remove(filePath.c_str()) == 0) {
-  } else {
-    std::perror("Error deleting HALO.txt");
-  }
-
-  // deleting infusion.txt
-  filePath = directoryPath + "/infusion.txt";
-  if (std::remove(filePath.c_str()) == 0) {
-  } else {
-    std::perror("Error deleting infusion.txt");
-  }
-
-  haloFile = fopen((directoryPath + "/HALO.txt").c_str(),
-                   "a+");  // Open the file for writing
-  if (!haloFile) {
-    fprintf(stderr, "Error opening HALO.txt...exiting\n");
-    exit(1);
-  }
-  fprintf(haloFile,
-          "Time,Everest_Alt,Everest_Velo,Everest_Accel,Halo_Alt,Halo_Velo,Halo_"
-          "Accel\n");
-
-  // Open infusion.txt
-  everestFile = fopen((directoryPath + "/infusion.txt").c_str(),
-                      "a+");  // Open the file for writing
-  if (!everestFile) {
-    fprintf(stderr, "Error opening infusion.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(everestFile,
-          "timestamp,roll,pitch,yaw,accelerationError,accelerometerIgnored,"
-          "accelerationRecoveryTrigger,magneticError,magnetometerIgnored,"
-          "magneticRecoveryTrigger,initialising,angularRateRecovery,"
-          "accelerationRecovery,magneticRecovery,earth.axis.z\n");
-
-  // delete confidence.txt
-  filePath = directoryPath + "/confidence.txt";
-  if (std::remove(filePath.c_str()) == 0) {
-  } else {
-    std::perror("Error deleting confidence.txt");
-  }
-
-  // creating confidence.txt
-  FILE* file = fopen((directoryPath + "/confidence.txt").c_str(),
-                     "a+");  // Open the file for writing
-  if (!file) {
-    fprintf(stderr, "Error opening confidence.txt...exiting\n");
-    exit(1);
-  }
-
-  return 0;
-}
-
-#endif
 
 /**
  * To run:  g++ Infusion.cpp EverestTask.cpp -o Everest
@@ -428,23 +269,6 @@ void EverestTask::MadgwickWrapper(IMUData_Everest data) {
 
   internalStates = infusion->madAhrsGetInternalStates(infusion->getMadAhrs());
   flags = infusion->madAhrsGetFlags(infusion->getMadAhrs());
-
-#if defined(LOGON) || defined(LOGMETRICS)
-  // write to file
-  fprintf(everestFile, "%f,", timestamp);
-
-  fprintf(everestFile, "%f,%f,%f,", euler.angle.roll, euler.angle.pitch,
-          euler.angle.yaw);
-
-  fprintf(everestFile, "%f,%d,%.0f,%.0f,%d,%.0f,%d,%d,%d,%d,%f",
-          internalStates.accelerationError, internalStates.accelerometerIgnored,
-          internalStates.accelerationRecoveryTrigger,
-          internalStates.magneticError, internalStates.magnetometerIgnored,
-          internalStates.magneticRecoveryTrigger, flags.initialising,
-          flags.angularRateRecovery, flags.accelerationRecovery,
-          flags.magneticRecovery, earth.axis.z);
-  fprintf(everestFile, "\n");
-#endif
 
   this->state.earthAcceleration = earth.axis.z;
 
@@ -1022,15 +846,6 @@ void EverestTask::recalculateGain(float estimate) {
     // SOAR_PRINT("New Gain Baro3: %f\n", this->state.gain_Baro3);
     // SOAR_PRINT("New Gain Real Baro: %f\n\n", this->state.gain_Real_Baro);
   }
-
-#ifdef LOGMETRICS
-  if (everestGains == NULL)
-    everestGains = fopen("testSuite/results/everestgains.txt", "a+");
-  fprintf(everestGains, "%.6f,%.6f,%.6f,%.6f,%.6f\n", everestData.timeIMU1,
-          this->state.gain_IMU, this->state.gain_Baro1, this->state.gain_Baro2,
-          gainedEstimate);
-  fflush(everestGains);
-#endif
 }
 
 /**
@@ -1220,10 +1035,10 @@ int EverestTask::findAlignment(IMUData_Everest& imu1, IMUData_Everest& imu2) {
  */
 void EverestTask::tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
                        const BarosData& baro1, const BarosData& baro2) {
-  // average pressures
 
   filterState = FILTER_STATE::TAREING;
 
+  // average pressures
   if (baro1.pressure != 0) {
     sum += convertToAltitude(baro1.pressure);
     numberOfSamples++;
@@ -1436,20 +1251,12 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData) {
   std::vector<float> haloData = {0, 0, 0};
 
   if (filterState >= FILTER_STATE::TARED) {
-#if defined(LOGON) || defined(LOGMETRICS)
-    fprintf(haloFile, "%f,%f,%f,%f,", timeEverest, eAltitude, eVelocity,
-            eAccelerationZ);
-#endif
-
     // TODO: Shouldn't everestTime be the source of truth?  At some point we
     // should decide. Update HALO
     haloData = halo.Halo_Input(&halo, haloInitialized, eAccelerationZ,
                                eVelocity, eAltitude, everestData.altitudeGPS,
                                timeEverest, deltaTime);
-
-#if defined(LOGON) || defined(LOGMETRICS)
-    fprintf(haloFile, "%f,%f,%f\n", haloData[0], haloData[1], haloData[2]);
-#endif
+    SOAR_PRINT("%f,%f,%f\n", haloData[0], haloData[1], haloData[2]);
   }
 
   // Update HALO

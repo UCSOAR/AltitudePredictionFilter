@@ -171,34 +171,6 @@ class HALO {
   std::vector<std::vector<int>> scenariosGainsList = {{0, 0}, {0, 0}, {0, 0},
                                                       {0, 0}, {0, 0}, {0, 0}};
 
-  std::chrono::duration<float> updateTime;
-  std::chrono::duration<float> predictTime;
-  std::chrono::duration<float> triangulationTime;
-  std::chrono::duration<float> dynamicModelTime;
-  std::chrono::duration<float> nearestScenariosTime;
-  std::chrono::duration<float> KDTreeTime;
-  std::chrono::duration<float> euclideanTime;
-  std::chrono::duration<float> twoDistancesTime;
-  std::chrono::duration<float> vectorsTime;
-  std::chrono::duration<float> push_backTime;
-  std::chrono::duration<float> loopScenariosTime;
-  std::chrono::duration<float> emplaceBackTime;
-  std::chrono::duration<float> getListsTime;
-  std::chrono::duration<float> othersTime;
-  std::chrono::duration<float> PpredictionTime;
-  std::chrono::duration<float> projErrorTime;
-  std::chrono::duration<float> sPointTime;
-  std::chrono::duration<float> preMeanTime;
-  std::chrono::duration<float> predictLoopTime;
-  std::chrono::duration<float> endPredictLoopTime;
-  std::chrono::duration<float> getScenarioTime;
-  std::chrono::duration<float> treeCreationTime;
-
-  // timers for the forward predict phase
-  std::chrono::duration<float> predictNStatesTime;
-  std::chrono::duration<float> predictNStates_getScenarioTime;
-  std::chrono::duration<float> predictNStates_nearestScenariosTime;
-
   void initializeHALOWithQR(float initialAlt, HALO *halo, MatrixXf &Q,
                             MatrixXf &R0);
 
@@ -342,17 +314,6 @@ class HALO {
         (altitudeConfidence * 0.5 + velocityConfidence * 0.7 +
          accelerationConfidence * 0.4);
 
-#if defined(LOGON) || defined(LOGMETRICS)
-    FILE *file = fopen("testSuite/results/confidence.txt", "a+");
-    if (!file) {
-      fprintf(stderr, "Error opening confidence.txt...exiting\n");
-      exit(1);
-    }
-    fprintf(file, "%f,%f,%f,%f\n", altitudeConfidence, velocityConfidence,
-            accelerationConfidence, totalConfidence);
-    fclose(file);
-#endif
-
     if (totalConfidence >= 1) {
       hitOne = true;
     }
@@ -420,15 +381,6 @@ class HALO {
     float totalConfidence = accelerationConfidence * 0.6f
                           + velocityConfidence      * 0.3f
                           + jerkConfidence          * 0.3f;
-
-#if defined(LOGON) || defined(LOGMETRICS)
-    if (FILE *f = fopen("testSuite/results/burnout_confidence.txt", "a+")) {
-      fprintf(f, "%f,%f,%f,%f\n",
-              accelerationConfidence, velocityConfidence,
-              jerkConfidence, totalConfidence);
-      fclose(f);
-    }
-#endif
 
     // Trigger logic — identical pattern to apogeeDetection
     if (totalConfidence >= 1.0f) burnHitPeak_ = true;

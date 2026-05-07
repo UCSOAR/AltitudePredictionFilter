@@ -182,9 +182,13 @@ void FilterTask::ProcessState()
 
     switch (state_)
     {
-        case FilterState::IDLE:
+        case FilterState::TARE:
             // wait for launch detection (DAQ trigger)
             break;
+
+        case FilterState::LAUNCH:
+			// wait for launch detection (DAQ trigger)
+			break;
 
         case FilterState::BOOST:
             // monitor acceleration / velocity
@@ -214,6 +218,10 @@ void FilterTask::HandleEvent(FilterEvent evt)
 {
     switch (evt)
     {
+    	case FilterEvent::TARE_INITIATED:
+    		TransitionTo(FilterState::TARE);
+    	case FilterEvent::LAUNCH_COMMAND:
+    		TransitionTo(FilterState::LAUNCH);
         case FilterEvent::LAUNCH_DETECTED:
             TransitionTo(FilterState::BOOST);
             break;

@@ -26,6 +26,8 @@
  ************************************/
 enum class FilterEvent : uint8_t {
     NONE = 0,
+    TARE_INITIATED,
+	LAUNCH_COMMAND,
     LAUNCH_DETECTED,
     BURNOUT_DETECTED,
     ENABLE_AIRBRAKE,
@@ -38,7 +40,8 @@ enum class FilterEvent : uint8_t {
 };
 
 enum class FilterState : uint8_t {
-    IDLE = 0,
+    TARE = 0,
+    LAUNCH,
     BOOST,
     BURNOUT_DETECTED,
     AIRBRAKE_CONTROL,

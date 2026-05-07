@@ -69,43 +69,6 @@ static FILE* kalmangains = NULL;
 #endif
 
 void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
-#ifdef LOGON
-
-  // remove the file if it exists
-  std::string filePath = directoryPath + "/resetGainsFile.txt";
-  if (std::remove(filePath.c_str()) == 0) {
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  resetGainsFile = fopen((directoryPath + "/resetGainsFile.txt").c_str(),
-                         "a+");  // Open the file for writing
-  if (!resetGainsFile) {
-    fprintf(stderr, "Error opening resetGainsFile.txt...exiting\n");
-    exit(1);
-  }
-#endif
-
-#if defined(LOGON) || defined(LOGMETRICS)
-  // deleting P.txt
-  std::string filePath2 = directoryPath + "/P.txt";
-  if (std::remove(filePath2.c_str()) == 0) {
-  } else {
-    std::perror("Error deleting file");
-  }
-
-  // create P.txt
-  FILE* file = fopen((directoryPath + "/P.txt").c_str(),
-                     "a+");  // Open the file for writing
-  if (!file) {
-    fprintf(stderr, "Error opening P.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(file, "time,P00,P01,P02,P10,P11,P12,P20,P21,P22\n");
-  fclose(file);
-#endif
-
   // Initial Guess
   this->X0 = X0;
   this->P = P0;
@@ -144,12 +107,6 @@ void HALO::init(VectorXf& X0, MatrixXf& P0, MatrixXf Q_input, MatrixXf& R0) {
 
 // Update Step-------------------------------------
 void HALO::stateUpdate() {
-  std::chrono::high_resolution_clock::time_point stateUpdateTime;
-
-#ifdef TIMERON
-  stateUpdateTime = std::chrono::high_resolution_clock::now();
-#endif
-
   // Observation dimensions is the dimension of our observation vector. At the
   // moment, it is the 3 values from Everest and 1 GPS altitude.
   MatrixXf observedValues(OBSERVATION_DIMENSIONS, 7);
@@ -206,40 +163,6 @@ void HALO::stateUpdate() {
   K.setZero();
   K = Pxz * Pz.inverse();
 
-  SOAR_PRINT("  Pxz:\n");
-  for (int i = 0; i < Pxz.rows(); i++) {
-    for (int j = 0; j < Pxz.cols(); j++) {
-      SOAR_PRINT("Pxz(%d,%d) = %f  ", i, j, K(i, j));
-    }
-    SOAR_PRINT("\n");
-  }
-
-  SOAR_PRINT("Kalman Gain K:\n");
-  for (int i = 0; i < K.rows(); i++) {
-    for (int j = 0; j < K.cols(); j++) {
-      SOAR_PRINT("K(%d,%d) = %f  ", i, j, K(i, j));
-    }
-    SOAR_PRINT("\n");
-  }
-
-#if defined(LOGON) || defined(LOGMETRICS)
-
-  if (kalmangains == NULL) {
-    kalmangains = fopen((directoryPath + "/kalmangains.txt").c_str(), "a+");
-  }
-
-  if (!kalmangains) {
-    perror("Error opening kalmangains.txt");
-    fprintf(stderr, "Errno: %d\n", errno);
-    exit(1);
-  }
-
-  for (int rows = 0; rows < 3; rows++) {
-    fprintf(kalmangains, "%f,%f,%f,%f,%f\n", time, K(rows, 0), K(rows, 1),
-            K(rows, 2), K(rows, 3));
-  }
-#endif
-
   bool kZero = false;
 
   for (int row = 0; row < 3; row++) {
@@ -247,40 +170,9 @@ void HALO::stateUpdate() {
       if (std::isnan(K(row, col))) {
         kZero = true;
         K(row, col) = 0;
-
-#ifdef TESTING_BUILD
-        FILE* log = fopen("log.txt", "a+");  // Open the file for appending or
-                                             // create it if it doesn't exist
-
-        if (!log) {
-          fprintf(stderr, "Error opening log.txt...exiting\n");
-          exit(1);
-        }
-
-        fprintf(log, "At time %f s NAN detected in the Kalman Gain, ",
-                this->time);
-
-        fclose(log);
-#endif
       }
     }
   }
-
-#ifdef TESTING_BUILD
-  if (kZero) {
-    FILE* log = fopen(
-        "log.txt",
-        "a+");  // Open the file for appending or create it if it doesn't exist
-
-    if (!log) {
-      fprintf(stderr, "Error opening log.txt...exiting\n");
-      exit(1);
-    }
-
-    fprintf(log, "\n");
-    fclose(log);
-  }
-#endif
 
   VectorXf difference(OBSERVATION_DIMENSIONS, 1);
   difference.setZero();
@@ -292,55 +184,16 @@ void HALO::stateUpdate() {
 
   float nis = (difference.transpose() * Pz.inverse() * difference)(0, 0);
 
-#if defined(LOGON) || defined(LOGMETRICS)
-  // Log NIS to file
-  FILE* nisFile = fopen((directoryPath + "/nis.txt").c_str(), "a+");
-  if (nisFile) {
-    fprintf(nisFile, "%f,%f\n", time, nis);
-    fclose(nisFile);
-  } else {
-    perror("Error opening nis.txt");
-  }
-#endif
-
   X0 = this->Xprediction + K * difference;
 
   if (std::isnan(X0(0)) || std::isnan(X0(1)) || std::isnan(X0(2))) {
-#ifdef TESTING_BUILD
-    FILE* log = fopen(
-        "log.txt",
-        "a+");  // Open the file for appending or create it if it doesn't exist
-
-    if (!log) {
-      fprintf(stderr, "Error opening log.txt...exiting\n");
-      exit(1);
-    }
-
-    fprintf(log,
-            "At time %f s NAN detected in the state update, defaulting to "
-            "Prediction as Estimation\n",
-            this->time);
-
-    fclose(log);
-#endif
     // default to prediction
     X0 = this->Xprediction;
   }
 
   // check and update before apogee bool
   if (isAfterApogee == 1) {
-#ifdef TIMERON
-    std::chrono::high_resolution_clock::time_point getScenario =
-        std::chrono::high_resolution_clock::now();
-#endif
-
     std::vector<Scenario>* scenarios = this->getScenarios();
-
-#ifdef TIMERON
-    this->getScenarioTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - getScenario);
-#endif
 
     for (int i = 0; i < scenarios->size(); i++) {
       scenarios->at(i).setIsBeforeApogee(false);
@@ -377,47 +230,10 @@ void HALO::stateUpdate() {
   // when variations in the estimate are small then its good
   MatrixXf P1(3, 3);
   P1.setZero();
-
   P1 = Pprediction - (K * Pz * K.transpose());
-
   this->P = P1;
 
-#if defined(LOGON) || defined(LOGMETRICS)
-  // write diagonal of P to file
-  FILE* file = fopen((directoryPath + "/P.txt").c_str(), "a+");
-  if (!file) {
-    fprintf(stderr, "Error opening P.txt...exiting\n");
-    exit(1);
-  }
-  fprintf(file, "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", time, P1(0, 0), P1(0, 1),
-          P1(0, 2), P1(1, 0), P1(1, 1), P1(1, 2), P1(2, 0), P1(2, 1), P1(2, 2));
-
-  fclose(file);
-
-#endif
-
-  std::chrono::high_resolution_clock::time_point predictTimer;
-  std::chrono::high_resolution_clock::time_point endUpdateTime;
-
-#ifdef TIMERON
-
-  endUpdateTime = std::chrono::high_resolution_clock::now();
-
-  this->updateTime += std::chrono::duration_cast<std::chrono::duration<float>>(
-      std::chrono::high_resolution_clock::now() - stateUpdateTime);
-
-  predictTimer = std::chrono::high_resolution_clock::now();
-
-#endif
-
   calculateSigmaPoints();
-
-#ifdef TIMERON
-
-  this->predictTime += std::chrono::duration_cast<std::chrono::duration<float>>(
-      std::chrono::high_resolution_clock::now() - predictTimer);
-
-#endif
 }
 
 // ------------------------------------------------
@@ -426,30 +242,7 @@ void HALO::stateUpdate() {
 void HALO::calculateSigmaPoints() {
   float mutliplier = 3;  // N - lambda
 
-  std::chrono::high_resolution_clock::time_point tTime;
-
-#ifdef TIMERON
-
-  tTime = std::chrono::high_resolution_clock::now();
-
-#endif
-
   MatrixXf L(((mutliplier)*P).llt().matrixL());
-
-#ifdef TIMERON
-
-  this->triangulationTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - tTime);
-
-#endif
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point startSPoint =
-      std::chrono::high_resolution_clock::now();
-
-#endif
 
   // Initialize sigma points matrix
   MatrixXf sigmaPoints(3, 7);
@@ -467,169 +260,19 @@ void HALO::calculateSigmaPoints() {
     sigmaPoints.col(j) = X0 - L.col(j - this->N1 - 1);
   }
 
-#ifdef TIMERON
-
-  this->sPointTime += std::chrono::duration_cast<std::chrono::duration<float>>(
-      std::chrono::high_resolution_clock::now() - startSPoint);
-
-#endif
-
-#ifdef LOGON
-
-  FILE* file = fopen((directoryPath + "/gains.txt").c_str(), "a+");
-  if (!file) {
-    fprintf(stderr, "Error opening gains.txt...exiting\n");
-    exit(1);
-  }
-
-  FILE* sigmaPointsFile =
-      fopen((directoryPath + "/sigmaPoints.txt").c_str(), "a+");
-  if (!sigmaPointsFile) {
-    fprintf(stderr, "Error opening sigmaPoints.txt...exiting\n");
-    exit(1);
-  }
-
-  FILE* sigmaPointsFile1 =
-      fopen((directoryPath + "/sigmaPoints1.txt").c_str(), "a+");
-  if (!sigmaPointsFile1) {
-    fprintf(stderr, "Error opening sigmaPoints1.txt...exiting\n");
-    exit(1);
-  }
-
-  FILE* sigmaPointsFile2 =
-      fopen((directoryPath + "/sigmaPoints2.txt").c_str(), "a+");
-  if (!sigmaPointsFile2) {
-    fprintf(stderr, "Error opening sigmaPoints2.txt...exiting\n");
-    exit(1);
-  }
-
-  FILE* sigmaPointsFile3 =
-      fopen((directoryPath + "/sigmaPoints3.txt").c_str(), "a+");
-  if (!sigmaPointsFile3) {
-    fprintf(stderr, "Error opening sigmaPoints3.txt...exiting\n");
-    exit(1);
-  }
-
-  FILE* sigmaPointsFile4 =
-      fopen((directoryPath + "/sigmaPoints4.txt").c_str(), "a+");
-  if (!sigmaPointsFile4) {
-    fprintf(stderr, "Error opening sigmaPoints4.txt...exiting\n");
-    exit(1);
-  }
-
-  FILE* sigmaPointsFile5 =
-      fopen((directoryPath + "/sigmaPoints5.txt").c_str(), "a+");
-  if (!sigmaPointsFile5) {
-    fprintf(stderr, "Error opening sigmaPoints5.txt...exiting\n");
-    exit(1);
-  }
-
-  FILE* sigmaPointsFile6 =
-      fopen((directoryPath + "/sigmaPoints6.txt").c_str(), "a+");
-  if (!sigmaPointsFile6) {
-    fprintf(stderr, "Error opening sigmaPoints6.txt...exiting\n");
-    exit(1);
-  }
-
-#endif
-
   // propagate sigma points through the dynamic model
   for (int i = 0; i < (2 * this->N1) + 1; i++) {
-#ifdef TIMERON
-
-    std::chrono::high_resolution_clock::time_point startPredictLoop =
-        std::chrono::high_resolution_clock::now();
-
-#endif
-
     // load variables
     VectorXf column = sigmaPoints.col(i);
     this->firstTimeForPoint = firstTime[i];
     this->prevGain1 = this->listOfGainsSigmaPoints[i].first;
     this->prevGain2 = this->listOfGainsSigmaPoints[i].second;
 
-#ifdef TIMERON
-
-    this->predictLoopTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - startPredictLoop);
-
-#endif
-
-    std::chrono::high_resolution_clock::time_point dynamicTime;
-
-#ifdef TIMERON
-
-    dynamicTime = std::chrono::high_resolution_clock::now();
-
-#endif
-
     sigmaPoints.col(i) = dynamicModel(column);
-
-#ifdef TIMERON
-
-    this->dynamicModelTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - dynamicTime);
-
-#endif
-
-#ifdef TIMERON
-
-    std::chrono::high_resolution_clock::time_point endPredictLoop =
-        std::chrono::high_resolution_clock::now();
-
-#endif
 
     this->listOfGainsSigmaPoints[i] = {this->prevGain1, this->prevGain2};
     this->firstTime[i] = this->firstTimeForPoint;
-#ifdef LOGON
-    fprintf(file, " ");
-#endif
-
-#ifdef TIMERON
-    this->endPredictLoopTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - endPredictLoop);
-#endif
   }
-
-#ifdef LOGON
-
-  fprintf(file, "\n");
-
-  fprintf(sigmaPointsFile, "%f,%f,%f\n", sigmaPoints(0, 0), sigmaPoints(1, 0),
-          sigmaPoints(2, 0));
-  fprintf(sigmaPointsFile1, "%f,%f,%f\n", sigmaPoints(0, 1), sigmaPoints(1, 1),
-          sigmaPoints(2, 1));
-  fprintf(sigmaPointsFile2, "%f,%f,%f\n", sigmaPoints(0, 2), sigmaPoints(1, 2),
-          sigmaPoints(2, 2));
-  fprintf(sigmaPointsFile3, "%f,%f,%f\n", sigmaPoints(0, 3), sigmaPoints(1, 3),
-          sigmaPoints(2, 3));
-  fprintf(sigmaPointsFile4, "%f,%f,%f\n", sigmaPoints(0, 4), sigmaPoints(1, 4),
-          sigmaPoints(2, 4));
-  fprintf(sigmaPointsFile5, "%f,%f,%f\n", sigmaPoints(0, 5), sigmaPoints(1, 5),
-          sigmaPoints(2, 5));
-  fprintf(sigmaPointsFile6, "%f,%f,%f\n", sigmaPoints(0, 6), sigmaPoints(1, 6),
-          sigmaPoints(2, 6));
-
-  fclose(file);
-  fclose(sigmaPointsFile);
-  fclose(sigmaPointsFile1);
-  fclose(sigmaPointsFile2);
-  fclose(sigmaPointsFile3);
-  fclose(sigmaPointsFile4);
-  fclose(sigmaPointsFile5);
-  fclose(sigmaPointsFile6);
-
-#endif
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point preMeanStart =
-      std::chrono::high_resolution_clock::now();
-
-#endif
 
   // calculate the mean and covariance of the sigma points
   VectorXf xPreMean(3, 1);
@@ -641,21 +284,7 @@ void HALO::calculateSigmaPoints() {
     xPreMean(row) = sum00;
   }
 
-#ifdef TIMERON
-
-  this->preMeanTime += std::chrono::duration_cast<std::chrono::duration<float>>(
-      std::chrono::high_resolution_clock::now() - preMeanStart);
-
-#endif
-
   this->Xprediction = xPreMean;
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point projErrorStart =
-      std::chrono::high_resolution_clock::now();
-
-#endif
 
   MatrixXf projError(3, 7);
   projError.setZero(3, 7);
@@ -668,22 +297,8 @@ void HALO::calculateSigmaPoints() {
 
   this->projectError = projError;
 
-#ifdef TIMERON
-
-  this->projErrorTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - projErrorStart);
-#endif
-
   MatrixXf Pprediction(3, 3);
   Pprediction.setZero(3, 3);
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point pPredictionStart =
-      std::chrono::high_resolution_clock::now();
-
-#endif
 
   Pprediction =
       projError * WeightsForSigmaPoints.asDiagonal() * projError.transpose() +
@@ -691,23 +306,10 @@ void HALO::calculateSigmaPoints() {
 
   this->Pprediction = Pprediction;
 
-#ifdef TIMERON
-
-  this->PpredictionTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - pPredictionStart);
-
-#endif
-
   this->sigPoints = sigmaPoints;
 }
 
 VectorXf HALO::predictNStates(int n) {
-#ifdef TIMERON
-  std::chrono::high_resolution_clock::time_point predictNStates_start =
-      std::chrono::high_resolution_clock::now();
-#endif
-
   // values to be referenced
   int firstTimeForPoint_storage = 1;
   std::vector<float> prevGain1_storage = {0.5, 0.5, 0.5};
@@ -732,29 +334,7 @@ VectorXf HALO::predictNStates(int n) {
       scenariosGainsList_storage;
   int& counterSigmaPoint = counterSigmaPoint_storage;
 
-#ifdef TIMERON
-  std::chrono::high_resolution_clock::time_point predictNStates_getScenario =
-      std::chrono::high_resolution_clock::now();
-#endif
-
   std::vector<Scenario> scenarios = *this->getScenarios();
-
-#ifdef TIMERON
-  this->predictNStates_getScenarioTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() -
-          predictNStates_getScenario);
-#endif
-
-#if defined(LOGON) || defined(LOGMETRICS)
-  if (predictnalt == nullptr) {
-    predictnalt = fopen((directoryPath + "/predictnalt.txt").c_str(), "a+");
-    if (!predictnalt) {
-      fprintf(stderr, "Error opening predictnalt.txt...exiting\n");
-      exit(1);
-    }
-  }
-#endif
 
   predictionCounter++;
 
@@ -762,11 +342,6 @@ VectorXf HALO::predictNStates(int n) {
   VectorXf calculation =
       this->dynamicModelOnce(this->X0, firstTimeForPoint, prevGain1, prevGain2,
                              scenariosGainsList, counterSigmaPoint, scenarios);
-
-#if defined(LOGON) || defined(LOGMETRICS)
-  fprintf(predictnalt, "%f,%f,%f,%f,%d\n", this->time, calculation(0),
-          calculation(1), calculation(2), predictionCounter);
-#endif
 
   bool apogee = false;
   for (int i = 1; i < n; i++) {
@@ -792,18 +367,7 @@ VectorXf HALO::predictNStates(int n) {
     calculation = this->dynamicModelOnce(
         calculation, firstTimeForPoint, prevGain1, prevGain2,
         scenariosGainsList, counterSigmaPoint, scenarios);
-
-#if defined(LOGON) || defined(LOGMETRICS)
-    fprintf(predictnalt, "%f,%f,%f,%f,%d\n", this->time + (float)i * timeStep,
-            calculation(0), calculation(1), calculation(2), predictionCounter);
-#endif
   }
-
-#ifdef TIMERON
-  this->predictNStatesTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - predictNStates_start);
-#endif
 
   return calculation;
 }
@@ -837,38 +401,9 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
   float minDistance = std::numeric_limits<float>::max();
   int i = 0;
 
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point loopScenariosStart =
-      std::chrono::high_resolution_clock::now();
-
-#endif
-
   for (size_t s = 0; s < scenarios->size(); s++) {
-#ifdef TIMERON
-
-    std::chrono::high_resolution_clock::time_point getListsStart =
-        std::chrono::high_resolution_clock::now();
-
-#endif
-
     i = 0;
     int lowestDistanceIndex = 0;
-
-#ifdef TIMERON
-
-    this->getListsTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - getListsStart);
-
-#endif
-
-#ifdef TIMERON
-
-    std::chrono::high_resolution_clock::time_point othersTimeStart =
-        std::chrono::high_resolution_clock::now();
-
-#endif
 
     minDistance = std::numeric_limits<float>::max();
 
@@ -877,90 +412,18 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
     std::vector<float> measurementVec = {measurement(0), measurement(1),
                                          measurement(2)};
 
-#ifdef TIMERON
-
-    this->othersTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - othersTimeStart);
-
-#endif
-
-#ifdef TIMERON
-
-    std::chrono::high_resolution_clock::time_point KDTreeTimeStart =
-        std::chrono::high_resolution_clock::now();
-
-#endif
-
     vect = (scenarios->at(s)).nearestKDTree(measurementVec);
-
-    /*std::cout << "Time: " << this->time << " {";
-    for (auto& f : vect.first) std::cout << f << " ";
-    std::cout << "}, " << vect.second << "\n";*/
-
-#ifdef TIMERON
-
-    this->KDTreeTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - KDTreeTimeStart);
-
-#endif
-
-#ifdef TIMERON
-
-    std::chrono::high_resolution_clock::time_point euclideanStart =
-        std::chrono::high_resolution_clock::now();
-
-#endif
 
     minDistance = euclideanDistance(vect.first, measurement);
 
     int currentLowestDistanceIndex = static_cast<int>(vect.second);
-
-#ifdef TIMERON
-
-    this->euclideanTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - euclideanStart);
-
-#endif
-
-#ifdef TIMERON
-
-    std::chrono::high_resolution_clock::time_point emplace_BackStart =
-        std::chrono::high_resolution_clock::now();
-
-#endif
 
     // pass index of scenario / struct
     std::pair<float, std::pair<int, int>> vector = {
         minDistance,
         {currentLowestDistanceIndex, (((scenarios->at(s)).name) - 1)}};
     distances.push_back(vector);
-
-#ifdef TIMERON
-
-    this->emplaceBackTime +=
-        std::chrono::duration_cast<std::chrono::duration<float>>(
-            std::chrono::high_resolution_clock::now() - emplace_BackStart);
-
-#endif
   }
-
-#ifdef TIMERON
-
-  this->loopScenariosTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - loopScenariosStart);
-
-#endif
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point startTime =
-      std::chrono::high_resolution_clock::now();
-
-#endif
 
   float lowestDistance = std::numeric_limits<float>::max();
   int lowestDistanceIndex = 0;
@@ -979,57 +442,6 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
       secondLowestDistanceIndex = s;
     }
   }
-
-#ifdef TIMERON
-
-  this->twoDistancesTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - startTime);
-
-#endif
-
-#ifdef LOGON
-
-  FILE* nearestScenariosFile =
-      fopen((directoryPath + "/nearestScenarios.txt").c_str(), "a+");
-  if (!nearestScenariosFile) {
-    fprintf(stderr, "Error opening nearestScenarios.txt...exiting\n");
-    exit(1);
-  }
-
-  FILE* nearestScenariosFormattedFile =
-      fopen((directoryPath + "/nearestScenariosFormatted.txt").c_str(), "a+");
-  if (!nearestScenariosFormattedFile) {
-    fprintf(stderr, "Error opening nearestScenariosFormatted.txt...exiting\n");
-    fprintf(stderr, "%d\n", errno);
-    exit(1);
-  }
-
-  fprintf(nearestScenariosFile, "%f,%f,", lowestDistance, secondLowestDistance);
-  fprintf(nearestScenariosFile, "%d,%d\n", lowestDistanceIndex,
-          secondLowestDistanceIndex);
-
-  fprintf(nearestScenariosFormattedFile,
-          "For Meas(%f,%f,%f) lowest(%f),secondL(%f),", measurement[0],
-          measurement[1], measurement[2], lowestDistance, secondLowestDistance);
-  fprintf(nearestScenariosFormattedFile, "lowestName(%d),secondLN(%d)\n",
-          distances[lowestDistanceIndex].second.second,
-          distances[secondLowestDistanceIndex].second.second);
-  fprintf(nearestScenariosFormattedFile, "list: %f,%f,%f,%f,%f,%f\n",
-          distances[0].first, distances[1].first, distances[2].first,
-          distances[3].first, distances[4].first, distances[5].first);
-
-  fclose(nearestScenariosFile);
-  fclose(nearestScenariosFormattedFile);
-
-#endif
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point startVectors =
-      std::chrono::high_resolution_clock::now();
-
-#endif
 
   // find current vector (by index) and future vector (by time)
   int indexFirst = distances[lowestDistanceIndex].second.first;
@@ -1055,54 +467,11 @@ HALO::findNearestScenarios(std::vector<Scenario>* scenarios,
   std::vector<float> futureVector2 =
       scenario2->evaluateVectorAtTime(nextTimeStep2);
 
-#ifdef TIMERON
-
-  this->vectorsTime += std::chrono::duration_cast<std::chrono::duration<float>>(
-      std::chrono::high_resolution_clock::now() - startVectors);
-
-#endif
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point push_backStart =
-      std::chrono::high_resolution_clock::now();
-
-#endif
-
   std::vector<std::vector<float>> nearestVectors;
   nearestVectors.push_back(currentVector1);
   nearestVectors.push_back(futureVector1);
   nearestVectors.push_back(currentVector2);
   nearestVectors.push_back(futureVector2);
-
-#ifdef TIMERON
-
-  this->push_backTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - push_backStart);
-
-#endif
-
-#ifdef LOGON
-
-  FILE* file3 = fopen((directoryPath + "/predictedValues.txt").c_str(), "a+");
-  if (!file3) {
-    fprintf(stderr, "Error opening predictedValues.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(file3, "%f,%f,%f,%f,", currentVector1[0], currentVector1[1],
-          currentVector1[2], currentVector1[3]);
-  fprintf(file3, "%f,%f,%f,%f,", futureVector1[0], futureVector1[1],
-          futureVector1[2], futureVector1[3]);
-  fprintf(file3, "%f,%f,%f,%f,", currentVector2[0], currentVector2[1],
-          currentVector2[2], currentVector2[3]);
-  fprintf(file3, "%f,%f,%f,%f\n", futureVector2[0], futureVector2[1],
-          futureVector2[2], futureVector2[3]);
-
-  fclose(file3);
-
-#endif
 
   std::pair<std::vector<int>, std::vector<std::vector<float>>>
       nearestVectorsWithIndices = {std::make_pair(
@@ -1198,38 +567,10 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
   }
 
   if (this->firstTimeForPoint == 1) {
-#ifdef LOGON
-    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
-    if (!file) {
-      fprintf(stderr, "Error opening log.txt...exiting\n");
-      exit(1);
-    }
-
-    fprintf(file, "First time for point (%f, %f, %f)\n", X_in(0), X_in(1),
-            X_in(2));
-
-    fclose(file);
-#endif
-
     this->prevGain1 = gainV1;
     this->prevGain2 = gainV2;
     this->firstTimeForPoint = 0;
   }
-
-#ifdef LOGON
-
-  FILE* gainsFile = fopen((directoryPath + "/gains.txt").c_str(), "a+");
-  if (!gainsFile) {
-    fprintf(stderr, "Error opening gains.txt...exiting\n");
-    exit(1);
-  }
-
-  fprintf(gainsFile, "%f, %f, %f,", gainV1[0], gainV1[1], gainV1[2]);
-  fprintf(gainsFile, "%f, %f, %f\n", gainV2[0], gainV2[1], gainV2[2]);
-
-  fclose(gainsFile);
-
-#endif
 
   // check if scenario indices are the same
   // if not reset the gains
@@ -1237,17 +578,8 @@ VectorXf HALO::predictNextValues(std::vector<std::vector<float>>& vectors,
       this->scenariosGainsList[this->counterSigmaPoint][1] != scenario2Index) {
     this->prevGain1 = {0.5, 0.5, 0.5};
     this->prevGain2 = {0.5, 0.5, 0.5};
-
-// write to resetGainsFile.txt, already opened
-#ifdef LOGON
-    fprintf(resetGainsFile, "%d\n", 6);
-#endif
   } else {
 // not resetting gains, scenarios are the same from prior iteration
-#ifdef LOGON
-    // write to resetGainsFile.txt, already opened
-    fprintf(resetGainsFile, "%d\n", -1);
-#endif
   }
 
   // interpolate between the two scenarios to get predicted values
@@ -1421,38 +753,12 @@ void HALO::setStateVector(float filteredAcc, float filteredVelo,
 VectorXf HALO::dynamicModel(VectorXf& X) {
   VectorXf Xprediction(3, 1);
 
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point getScenario =
-      std::chrono::high_resolution_clock::now();
-
-#endif
-
   // for every scenario get lists and find nearest 2 vectors to the current
   // state
   std::vector<Scenario>* scenarios = this->getScenarios();
 
-#ifdef TIMERON
-
-  this->getScenarioTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - getScenario);
-
-#endif
-
   // check if X is nan, if so default to static integration
   if (std::isnan(X(0)) || std::isnan(X(1)) || std::isnan(X(2))) {
-#ifdef TESTING_BUILD
-    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
-    if (!file) {
-      fprintf(stderr, "Error opening log.txt...exiting\n");
-      exit(1);
-    }
-    fprintf(file, "At %f X is nan, defaulting to static integration\n",
-            this->time);
-    fclose(file);
-#endif
-
     SOAR_PRINT("X is nan, defaulting to static integration\n");
 
     float finalVelocity = X(1) + X(0) * getDeltaTime();
@@ -1465,13 +771,6 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
     return Xprediction;
   }
 
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point nearestVectorsStart =
-      std::chrono::high_resolution_clock::now();
-
-#endif
-
   std::pair<std::vector<int>, std::vector<std::vector<float>>>
       nearestVectorsWithIndex = this->findNearestScenarios(scenarios, X);
 
@@ -1482,14 +781,6 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
 
   int scenario1Index = nearestVectorsWithIndex.first[0];
   int scenario2Index = nearestVectorsWithIndex.first[1];
-
-#ifdef TIMERON
-
-  this->nearestScenariosTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() - nearestVectorsStart);
-
-#endif
 
   Xprediction =
       predictNextValues(nearestVectors, X, scenario1Index, scenario2Index);
@@ -1511,16 +802,6 @@ VectorXf HALO::dynamicModelOnce(
   // check if X is nan, if so default to static integration
 
   if (std::isnan(X(0)) || std::isnan(X(1)) || std::isnan(X(2))) {
-#ifdef TESTING_BUILD
-    FILE* file = fopen((directoryPath + "/log.txt").c_str(), "a+");
-    if (!file) {
-      fprintf(stderr, "Error opening log.txt...exiting\n");
-      exit(1);
-    }
-    fprintf(file, "At %f X is nan, defaulting to static integration\n",
-            this->time);
-    fclose(file);
-#endif
     SOAR_PRINT("X is nan, defaulting to static integration\n");
 
     float finalVelocity = X(1) + X(0) * getDeltaTime();
@@ -1533,22 +814,8 @@ VectorXf HALO::dynamicModelOnce(
     return Xprediction;
   }
 
-
-#ifdef TIMERON
-  std::chrono::high_resolution_clock::time_point
-      predictNStates_nearestVectorsStart =
-          std::chrono::high_resolution_clock::now();
-#endif
-
   std::pair<std::vector<int>, std::vector<std::vector<float>>>
       nearestVectorsWithIndex = this->findNearestScenarios(&scenarios, X);
-
-#ifdef TIMERON
-  this->predictNStates_nearestScenariosTime +=
-      std::chrono::duration_cast<std::chrono::duration<float>>(
-          std::chrono::high_resolution_clock::now() -
-          predictNStates_nearestVectorsStart);
-#endif
 
   std::vector<std::vector<float>> nearestVectors =
       nearestVectorsWithIndex.second;
@@ -1567,13 +834,6 @@ VectorXf HALO::dynamicModelOnce(
  * @brief Create scenarios for HALO
  */
 void HALO::createScenarios(HALO* halo) {
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point treeCreation =
-      std::chrono::high_resolution_clock::now();
-
-#endif
-
   initAllSimData();
 
   Scenario scenario1 = Scenario{beforeApogeeSim1, afterApogeeSim1, 1};
@@ -1597,19 +857,6 @@ void HALO::createScenarios(HALO* halo) {
   apogees.push_back(beforeApogeeSim2[0][-1]);
 
   this->airbrakeController_.init(apogees);
-
-#ifdef TIMERON
-
-  std::chrono::high_resolution_clock::time_point treeCreationEnd =
-      std::chrono::high_resolution_clock::now();
-
-  std::chrono::duration<float> treeCreationTime =
-      std::chrono::duration_cast<std::chrono::duration<float>>(treeCreationEnd -
-                                                               treeCreation);
-
-  halo->treeCreationTime = treeCreationTime;
-
-#endif
 
 }
 
@@ -1679,74 +926,6 @@ std::vector<float> HALO::Halo_Input(HALO* haloPointer, bool isInitialized,
 
     // X0 = {eAltitude, eVelocity, eAccelerationZ};
     unitedStates = {haloPointer->X0[0], haloPointer->X0[1], haloPointer->X0[2]};
-  }
-
-  if (counter == 524) {
-#ifdef TIMERON
-    std::cout << "Update time:\t\t\t\t\t\t\t\t\t\t"
-              << haloPointer->updateTime.count() << std::endl;
-    std::cout << "Predict time:\t\t\t\t\t\t\t\t\t\t"
-              << haloPointer->predictTime.count() << std::endl;
-
-    std::cout << "\tTriangulationTime:\t\t\t\t\t\t\t"
-              << haloPointer->triangulationTime.count() << std::endl;
-    std::cout << "\tdModeltime:\t\t\t\t\t\t\t\t"
-              << haloPointer->dynamicModelTime.count() << std::endl;
-
-    std::cout << "\t\tgetScenarioTime:\t\t\t\t\t"
-              << haloPointer->getScenarioTime.count() << std::endl;
-    std::cout << "\t\tpPredictionTime:\t\t\t\t\t"
-              << haloPointer->PpredictionTime.count() << std::endl;
-    std::cout << "\t\tprojErrorTime:\t\t\t\t\t\t"
-              << haloPointer->projErrorTime.count() << std::endl;
-    std::cout << "\t\tpreMeanTime:\t\t\t\t\t\t"
-              << haloPointer->preMeanTime.count() << std::endl;
-    std::cout << "\t\tsPointTime:\t\t\t\t\t\t"
-              << haloPointer->sPointTime.count() << std::endl;
-    std::cout << "\t\tpredictLoopTime:\t\t\t\t\t"
-              << haloPointer->predictLoopTime.count() << std::endl;
-    std::cout << "\t\tendPredictLoopTime:\t\t\t\t\t"
-              << haloPointer->endPredictLoopTime.count() << std::endl;
-    std::cout << "\t\tnearestScenariosTime:\t\t\t\t\t"
-              << haloPointer->nearestScenariosTime.count() << std::endl;
-
-    std::cout << "\t\t\t->loopScenariosTime:\t\t\t"
-              << haloPointer->loopScenariosTime.count() << std::endl;
-    std::cout << "\t\t\t\t->getListsTime:\t\t"
-              << haloPointer->getListsTime.count() << std::endl;
-    std::cout << "\t\t\t\t->othersTime:\t\t" << haloPointer->othersTime.count()
-              << std::endl;
-    std::cout << "\t\t\t\t->KDTreeTime:\t\t" << haloPointer->KDTreeTime.count()
-              << std::endl;
-    std::cout << "\t\t\t\t->twoDistancesTime:\t"
-              << haloPointer->twoDistancesTime.count() << std::endl;
-    std::cout << "\t\t\t\t->emplaceBackTime:\t"
-              << haloPointer->emplaceBackTime.count() << std::endl;
-
-    std::cout << "\t\t\t->vectorsTime:\t\t\t\t"
-              << haloPointer->vectorsTime.count() << std::endl;
-    std::cout << "\t\t\t->push_backTime:\t\t\t"
-              << haloPointer->push_backTime.count() << std::endl;
-
-    std::cout << "\t\t\t->->treeCreationTime:\t\t\t\t"
-              << (haloPointer->treeCreationTime).count() << std::endl;
-
-    // profiling for prediction step
-    std::cout << "\t\tpredictNStatesTime:\t\t\t\t\t"
-              << haloPointer->predictNStatesTime.count() << std::endl;
-    std::cout << "\t\t\t->predictNStates_getScenarioTime:\t\t\t\t"
-              << haloPointer->predictNStates_getScenarioTime.count()
-              << std::endl;
-    std::cout << "\t\t\t->predictNStates_nearestScenariosTime:\t\t\t\t"
-              << haloPointer->predictNStates_nearestScenariosTime.count()
-              << std::endl;
-
-#endif
-
-#ifdef LOGMETRICS
-    fclose(predictnalt);
-    fclose(kalmangains);
-#endif
   }
 
   counter++;

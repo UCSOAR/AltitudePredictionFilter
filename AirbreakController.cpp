@@ -36,24 +36,28 @@ int AirbrakeController::calculate_level(
 {
     // Step 1:Check Projected Apogee > Target
     uint32_t alt_projected = this->apogees[scenario_index_1] * gain_1 + this->apogees[scenario_index_2] * gain_2;
-    int curr_lvl = 0;
+    int curr_lvl_local = 0;
     uint32_t curr_alt_airbrakes = TARGET_APOGEE_M + 1;
     uint32_t prev_alt_airbrakes = 0.0f;
 
     // find next 1k checkpoint (1500 -> 2k)
-    uint32_t checkpoint_alt = curr_alt % 1000 + 1;
+    uint32_t checkpoint_alt = (curr_alt % 1000) + 1;
 
     if (alt_projected > TARGET_APOGEE_M){
         while(curr_alt_airbrakes > TARGET_APOGEE_M){
             prev_alt_airbrakes = curr_alt_airbrakes;
-            curr_alt_airbrakes = this->airbrake_lut[scenario_index_1][checkpoint_alt][curr_lvl] * gain_1 + this->airbrake_lut[scenario_index_2][checkpoint_alt][curr_lvl] + gain_2;
+            curr_alt_airbrakes = this->airbrake_lut[scenario_index_1][checkpoint_alt][curr_lvl_local] * gain_1 + this->airbrake_lut[scenario_index_2][checkpoint_alt][curr_lvl_local] + gain_2;
+            curr_lvl_local += 1;
         }
         // altitude_airbrakes can be undershot (5.3k at lvl 2 = z - 1, 4.7k at lvl = 3 = z <---)
         if (TARGET_APOGEE_M  - curr_alt_airbrakes > prev_alt_airbrakes - TARGET_APOGEE_M){
             // use z - 1 since it has smaller diff
-            return curr_lvl - 1;
-        }else{
-            return curr_lvl;
+        	curr_lvl_local = curr_lvl_local - 1;
+        } // else use curr_lvl_local
+
+        if (curr_lvl_local != this->currentLevel_){
+        	this->currentLevel_ = curr_lvl_local;
+        	// TODO: alert level change
         }
     }
 }

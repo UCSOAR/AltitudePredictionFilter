@@ -77,23 +77,6 @@ private:
     // Refresh interval in milliseconds used for the periodic filter step
     uint32_t refreshMs_;
 
-    // STATE MACHINE
-    FilterState state_;
-    FilterState requestedState_;   // from CAN
-    bool stateOverride_;           // allow external override
-
-    void ProcessState();
-    void HandleEvent(FilterEvent evt);
-    void TransitionTo(FilterState newState);
-
-    // CAN helpers
-    void SendStateCAN(FilterState state);
-    void HandleCANCommand(Command& cm);
-
-    void RequestFilterState(FilterState newState)
-    {
-        this->TransitionTo(newState);
-    }
 };
 
 /************************************

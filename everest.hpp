@@ -7,7 +7,6 @@
 
 #include "infusion.hpp"
 #include "KDTree.hpp"
-#include "FilterState.hpp"
 #include "HALO.hpp"
 #include "Command.hpp"
 #include <stdio.h>
@@ -129,8 +128,6 @@ typedef struct {
 
 class EverestTask {
  public:
-  void setFilterState(FILTER_STATE filterState);
-  FILTER_STATE getFilterState();
 
   void IMU_Update(const IMUData_Everest& imu1, const IMUData_Everest& imu2);
 
@@ -278,7 +275,6 @@ class EverestTask {
   float getFinalAltitude();
 
  protected:
-  FILTER_STATE filterState = FILTER_STATE::PRE_START;
   IMUData_Everest internalIMU_1, internalIMU_2;
 
   // our accelerometers are already normalized.

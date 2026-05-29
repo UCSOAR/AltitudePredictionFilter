@@ -101,7 +101,6 @@ void FilterTask::Run(void * pvParams)
     // track last run time so the filter block executes only at the configured refresh rate
     TickType_t lastRunTick = xTaskGetTickCount();
     while (1) {
-        ProcessState();
 
         /* Calculate time until next scheduled filter run */
         uint32_t refresh = GetRefreshMs();
@@ -119,7 +118,7 @@ void FilterTask::Run(void * pvParams)
         if (res) {
             if (cm.GetCommand() == DATA_BROKER_COMMAND) {
                 DataBrokerMessageTypes mt = DataBroker::getMessageType(cm);
-                SOAR_PRINT("filterTask - Received DataBroker message: %s\n", DataBrokerMessageType::ToString(mt).c_str());
+                // SOAR_PRINT("filterTask - Received DataBroker message: %s\n", DataBrokerMessageType::ToString(mt).c_str());
                 everest.Extract(cm);
                 cm.Reset();
             } else {
@@ -164,7 +163,6 @@ void FilterTask::Run(void * pvParams)
 void FilterTask::HandleCommand(Command& cm)
 {
     // listen to CAN commands for state
-    HandleCANCommand(cm);
     switch (cm.GetCommand()) {
 
     default:
@@ -174,106 +172,4 @@ void FilterTask::HandleCommand(Command& cm)
 
     //No matter what we happens, we must reset allocated data
     cm.Reset();
-}
-
-// Check for states
-void FilterTask::ProcessState()
-{
-
-    switch (state_)
-    {
-        case FilterState::TARE:
-            // wait for launch detection (DAQ trigger)
-            break;
-
-        case FilterState::LAUNCH:
-			// wait for launch detection (DAQ trigger)
-			break;
-
-        case FilterState::BOOST:
-            // monitor acceleration / velocity
-            if (this->burnoutDetected) {
-                HandleEvent(FilterEvent::BURNOUT_DETECTED);
-            }
-            break;
-
-        case FilterState::BURNOUT_DETECTED:
-            HandleEvent(FilterEvent::ENABLE_AIRBRAKE);
-            break;
-
-        case FilterState::AIRBRAKE_CONTROL:
-            // run apogee prediction + LUT
-            if (this->apogeeDetected) {
-                HandleEvent(FilterEvent::APOGEE_DETECTED);
-            }
-            break;
-
-        case FilterState::APOGEE_DETECTED:
-            // stop control / finalize
-            break;
-    }
-}
-
-void FilterTask::HandleEvent(FilterEvent evt)
-{
-    switch (evt)
-    {
-    	case FilterEvent::TARE_INITIATED:
-    		TransitionTo(FilterState::TARE);
-    	case FilterEvent::LAUNCH_COMMAND:
-    		TransitionTo(FilterState::LAUNCH);
-        case FilterEvent::LAUNCH_DETECTED:
-            TransitionTo(FilterState::BOOST);
-            break;
-
-        case FilterEvent::BURNOUT_DETECTED:
-            TransitionTo(FilterState::BURNOUT_DETECTED);
-            break;
-
-        case FilterEvent::ENABLE_AIRBRAKE:
-            TransitionTo(FilterState::AIRBRAKE_CONTROL);
-            break;
-
-        case FilterEvent::APOGEE_DETECTED:
-            TransitionTo(FilterState::APOGEE_DETECTED);
-            break;
-
-        case FilterEvent::RESET:
-            TransitionTo(FilterState::IDLE);
-            break;
-
-        default:
-            break;
-    }
-}
-
-void FilterTask::TransitionTo(FilterState newState)
-{
-    if (state_ == newState) return;
-
-    state_ = newState;
-
-    // Notify other boards
-    SendStateCAN(state_);
-
-    SOAR_PRINT("filterTask - Request Transitioned to state: %s\n", FilterStateToString(state_).c_str());
-
-    // Check if CAN requested a state change and if we're now in that state, if not go back to previous state
-}
-
-void FilterTask::HandleCANCommand(Command& cm)
-{
-    switch (cm.id)
-    {
-        case CMD_SET_FILTER_STATE:
-            requestedState_ = static_cast<FilterState>(cm.data[0]);
-            break;
-
-        case CMD_REQUEST_FILTER_STATE:
-            SendStateCAN(state_);
-            break;
-
-        default:
-            break;
-    }
 }

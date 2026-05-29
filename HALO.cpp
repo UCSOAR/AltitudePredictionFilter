@@ -782,6 +782,10 @@ VectorXf HALO::dynamicModel(VectorXf& X) {
   int scenario1Index = nearestVectorsWithIndex.first[0];
   int scenario2Index = nearestVectorsWithIndex.first[1];
 
+  // cache the closest scenario indices for use elsewhere (airbrake controller)
+  this->scenario_index_1 = scenario1Index;
+  this->scenario_index_2 = scenario2Index;
+
   Xprediction =
       predictNextValues(nearestVectors, X, scenario1Index, scenario2Index);
 
@@ -853,8 +857,16 @@ void HALO::createScenarios(HALO* halo) {
   std::vector<float> apogees;
   apogees.reserve(2);
 
-  apogees.push_back(beforeApogeeSim1[0][-1]);
-  apogees.push_back(beforeApogeeSim2[0][-1]);
+  // take the final altitude value from the before-apogee sims (last row, first column)
+  if (beforeApogeeSim1 && !beforeApogeeSim1->empty())
+    apogees.push_back(beforeApogeeSim1->back()[0]);
+  else
+    apogees.push_back(0.0f);
+
+  if (beforeApogeeSim2 && !beforeApogeeSim2->empty())
+    apogees.push_back(beforeApogeeSim2->back()[0]);
+  else
+    apogees.push_back(0.0f);
 
   this->airbrakeController_.init(apogees);
 

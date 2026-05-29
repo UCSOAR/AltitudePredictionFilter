@@ -33,12 +33,15 @@ using namespace Eigen;
 class AirbrakeController {
 public:
 
-    void init();
+    void init(const std::vector<float>& apogees);
 
-    int calculate_level();
+    int calculate_level(const std::vector<float>& gain_1, const std::vector<float>& gain_2,
+    int scenario_index_1, int scenario_index_2,
+    uint32_t curr_alt);
 
 private:
     int  currentLevel_ = 0;
-    std::vector<float>* apogees;
-    uint16_t* airbrake_lut[SIM_COUNT][ALT_LEVELS][BRAKE_LEVELS];
+    std::vector<float> apogees;
+    // pointer to the global LUT declared in AirbrakeSims.hpp
+    uint16_t (*airbrake_sims)[ALT_LEVELS][BRAKE_LEVELS] = nullptr;
 };

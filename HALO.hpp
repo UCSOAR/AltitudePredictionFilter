@@ -158,6 +158,9 @@ class HALO {
   FILE *file;
 
   int scenarioIndex = 0;
+  // indices of the two closest scenarios (cached for use by AirbrakeController)
+  int scenario_index_1 = 0;
+  int scenario_index_2 = 0;
 
   void initializeHALO(float initialAlt, HALO *halo);
 

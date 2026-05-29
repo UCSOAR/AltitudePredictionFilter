@@ -40,6 +40,7 @@ static FILE* everestGains = NULL;
 
 FILE* haloFile;
 FILE* everestFile;
+bool tared = false;
 
 // singleton accessor
 EverestTask& EverestTask::getEverest() {
@@ -67,8 +68,8 @@ void EverestTask::Extract(const Command& cm) {
   switch(msgType) {
     case DataBrokerMessageTypes::IMU_DATA: {
       IMUData imu = DataBroker::ExtractData<IMUData>(cm);
-      SOAR_PRINT("Everest::Extract - IMU_DATA received id=%d gyro=(%d,%d,%d) accel=(%d,%d,%d)\n",
-                 imu.id, imu.gyro.x, imu.gyro.y, imu.gyro.z, imu.accel.x, imu.accel.y, imu.accel.z);
+      // SOAR_PRINT("Everest::Extract - IMU_DATA received id=%d gyro=(%d,%d,%d) accel=(%d,%d,%d)\n",
+      //            imu.id, imu.gyro.x, imu.gyro.y, imu.gyro.z, imu.accel.x, imu.accel.y, imu.accel.z);
       IMUData_Everest iev{};
       float ts = static_cast<float>(nowMs);
       iev.time = ts;
@@ -87,7 +88,7 @@ void EverestTask::Extract(const Command& cm) {
     }
     case DataBrokerMessageTypes::BARO_DATA: {
       BaroData b = DataBroker::ExtractData<BaroData>(cm);
-      SOAR_PRINT("Everest::Extract - BARO_DATA received id=%d pressure=%u temp=%d\n", b.id, b.pressure, b.temp);
+      // SOAR_PRINT("Everest::Extract - BARO_DATA received id=%d pressure=%u temp=%d\n", b.id, b.pressure, b.temp);
       BarosData bd{};
       bd.time = static_cast<float>(nowMs);
       bd.pressure = b.pressure;
@@ -98,7 +99,7 @@ void EverestTask::Extract(const Command& cm) {
     }
     case DataBrokerMessageTypes::GPS_DATA: {
       GPSData g = DataBroker::ExtractData<GPSData>(cm);
-      SOAR_PRINT("Everest::Extract - GPS_DATA received altitude=%d\n", g.antennaAltitude_.altitude_);
+      // SOAR_PRINT("Everest::Extract - GPS_DATA received altitude=%d\n", g.antennaAltitude_.altitude_);
       GPS_Measurements(static_cast<float>(g.antennaAltitude_.altitude_));
       availableMeasurements[4] = 1;
       lastSampleTimeMs[4] = nowMs;
@@ -106,7 +107,7 @@ void EverestTask::Extract(const Command& cm) {
     }
     case DataBrokerMessageTypes::MAG_DATA: {
       MagData m = DataBroker::ExtractData<MagData>(cm);
-      SOAR_PRINT("Everest::Extract - MAG_DATA received (%d,%d,%d)\n", m.magX, m.magY, m.magZ);
+      // SOAR_PRINT("Everest::Extract - MAG_DATA received (%d,%d,%d)\n", m.magX, m.magY, m.magZ);
       // Assign to imu1 mag fields by default; tasks can set as needed
       this->everestData.magX1 = static_cast<float>(m.magX);
       this->everestData.magY1 = static_cast<float>(m.magY);
@@ -1036,8 +1037,6 @@ int EverestTask::findAlignment(IMUData_Everest& imu1, IMUData_Everest& imu2) {
 void EverestTask::tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
                        const BarosData& baro1, const BarosData& baro2) {
 
-  filterState = FILTER_STATE::TAREING;
-
   // average pressures
   if (baro1.pressure != 0) {
     sum += convertToAltitude(baro1.pressure);
@@ -1109,7 +1108,7 @@ void EverestTask::tare(const IMUData_Everest& imu1, const IMUData_Everest& imu2,
                                this->zeroOffsetGyro2[2] / imu2SampleCount};
     }
 
-    filterState = FILTER_STATE::TARED;
+    tared = true;
 
     if (debug == Calibration || debug == ALL) {
       SOAR_PRINT("Tare Initial Altitude: %f\n", this->Kinematics.initialAlt);
@@ -1230,16 +1229,6 @@ float EverestTask::finalWrapper(
 }
 
 /**
- * @brief If filterState is less than TARED, set it.
- */
-void EverestTask::setIsTare(bool isTare) { if (filterState < FILTER_STATE::TARED) filterState = FILTER_STATE::TARED; }
-
-/**
- * @brief Check if filter is at least TARED state or more.
- */
-bool EverestTask::getIsTared() { return filterState >= FILTER_STATE::TARED; }
-
-/**
  * @brief initialized Halo, and passes Everest filtered values to HALO
  */
 std::vector<float> EverestTask::EverestToHalo(EverestData everestData) {
@@ -1250,7 +1239,7 @@ std::vector<float> EverestTask::EverestToHalo(EverestData everestData) {
 
   std::vector<float> haloData = {0, 0, 0};
 
-  if (filterState >= FILTER_STATE::TARED) {
+  if (tared) {
     // TODO: Shouldn't everestTime be the source of truth?  At some point we
     // should decide. Update HALO
     haloData = halo.Halo_Input(&halo, haloInitialized, eAccelerationZ,
@@ -1417,7 +1406,7 @@ void EverestTask::initEverest() {
     this->isAligned = this->findAlignment(imu1, imu2);
   }
 
-  if (filterState < FILTER_STATE::TARED) {
+  if (tared) {
     IMUData_Everest imu1 = {this->everestData.timeIMU1,
                             this->everestData.gyroX1,
                             this->everestData.gyroY1,
@@ -1452,7 +1441,7 @@ void EverestTask::initEverest() {
 
   if (haloInitialized == false) {
     // Done tareing, initialize once
-    if (filterState >= FILTER_STATE::TARED) {
+    if (tared) {
       // Initialize HALO
       halo = HALO();
       // Set initial altitude to 1000 if it is zero (no baros in tareing)

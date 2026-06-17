@@ -33,6 +33,7 @@
 /************************************
  * VARIABLES
  ************************************/
+// (no file-scope variables required)
 
 /************************************
  * FUNCTION DECLARATIONS
@@ -45,7 +46,7 @@
 /**
  * @brief Constructor for filterTask
  */
-FilterTask::FilterTask() : Task(TASK_FILTER_QUEUE_DEPTH_OBJS), refreshMs_(20)
+FilterTask::FilterTask() : Task(TASK_FILTER_QUEUE_DEPTH_OBJS), refreshMs_(500)
 {
 }
 
@@ -77,9 +78,9 @@ void FilterTask::InitTask()
         xTaskCreate((TaskFunction_t)FilterTask::RunTask,
             (const char*)"FilterTask",
             (uint16_t)TASK_FILTER_STACK_DEPTH_WORDS,
-			(void*)this,
-            (UBaseType_t)TASK_FILTER_STACK_DEPTH_WORDS,
-			(TaskHandle_t*)&rtTaskHandle);
+            (void*)this,
+            (UBaseType_t)TASK_FILTER_PRIORITY,
+            (TaskHandle_t*)&rtTaskHandle);
 
     SOAR_ASSERT(rtValue == pdPASS, "FilterTask::InitTask() - xTaskCreate() failed");
     // Subscribe to sensor data so this task receives DataBroker messages
@@ -87,6 +88,7 @@ void FilterTask::InitTask()
     DataBroker::Subscribe<BaroData>(this);
     DataBroker::Subscribe<MagData>(this);
     DataBroker::Subscribe<GPSData>(this);
+    DataBroker::Subscribe<TimeStampData>(this);
 }
 
 /**
@@ -100,6 +102,11 @@ void FilterTask::Run(void * pvParams)
 
     // track last run time so the filter block executes only at the configured refresh rate
     TickType_t lastRunTick = xTaskGetTickCount();
+    uint32_t lastRunMs = static_cast<uint32_t>(lastRunTick * portTICK_PERIOD_MS);
+
+    // store latest timestamp published by LoggingTask (if any)
+    static uint32_t latestLoggedTimestampMs = 0;
+
     while (1) {
 
         /* Calculate time until next scheduled filter run */
@@ -107,8 +114,10 @@ void FilterTask::Run(void * pvParams)
         if (refresh == 0) refresh = 1;
 
         TickType_t now = xTaskGetTickCount();
-        uint32_t elapsedMs = static_cast<uint32_t>((now - lastRunTick) * portTICK_PERIOD_MS);
+        uint32_t timestamp = static_cast<uint32_t>(now * portTICK_PERIOD_MS);
+        uint32_t elapsedMs = timestamp - lastRunMs;
         uint32_t waitMs = (elapsedMs >= refresh) ? 0 : (refresh - elapsedMs);
+//       SOAR_PRINT("filterTask - Elapsed: %u ms, waiting for %u ms until next filter step\n", elapsedMs, waitMs);
 
         // Wait for either a command or the next scheduled run
         Command cm;
@@ -118,8 +127,20 @@ void FilterTask::Run(void * pvParams)
         if (res) {
             if (cm.GetCommand() == DATA_BROKER_COMMAND) {
                 DataBrokerMessageTypes mt = DataBroker::getMessageType(cm);
-                // SOAR_PRINT("filterTask - Received DataBroker message: %s\n", DataBrokerMessageType::ToString(mt).c_str());
-                everest.Extract(cm);
+                if (mt == DataBrokerMessageTypes::TIME_DATA) {
+                    TimeStampData ts = DataBroker::ExtractData<TimeStampData>(cm);
+                    latestLoggedTimestampMs = ts.timestamp_ms;
+                } else {
+                    everest.Extract(cm);
+
+                    // If Everest not initialized yet, drive its tare/initialization
+                    if (everest.everestInitialized == 0) {
+                        // choose authoritative time if available
+                        uint32_t nowMsLocal = latestLoggedTimestampMs != 0 ? latestLoggedTimestampMs : static_cast<uint32_t>(xTaskGetTickCount() * portTICK_PERIOD_MS);
+                        everest.updateDeltaTime(static_cast<float>(nowMsLocal));
+                        everest.initEverest();
+                    }
+                }
                 cm.Reset();
             } else {
                 HandleCommand(cm);
@@ -128,10 +149,11 @@ void FilterTask::Run(void * pvParams)
 
         // After waiting (either due to message or timeout), check if it's time to run the filter step
         now = xTaskGetTickCount();
-        elapsedMs = static_cast<uint32_t>((now - lastRunTick) * portTICK_PERIOD_MS);
+        timestamp = static_cast<uint32_t>(now * portTICK_PERIOD_MS);
+        elapsedMs = timestamp - lastRunMs;
         if (elapsedMs >= refresh) {
-            // Queue/process Everest using current RTOS tick time (ms)
-            float currentTime = static_cast<float>(now * portTICK_PERIOD_MS);
+            // Prefer the authoritative timestamp from LoggingTask if available
+            float currentTime = static_cast<float>(latestLoggedTimestampMs != 0 ? latestLoggedTimestampMs : timestamp);
             std::vector<float> halo = everest.QueueEverest(currentTime);
 
             // If HALO returned a valid state, publish FilterData
@@ -151,7 +173,11 @@ void FilterTask::Run(void * pvParams)
             }
 
             // reset lastRunTick to now so next interval measures from here
-            lastRunTick = now;
+            // Only update when the filter actually produced output (halo non-empty)
+            if (!halo.empty()) {
+                lastRunTick = now;
+                lastRunMs = timestamp;
+            }
         }
     }
 }

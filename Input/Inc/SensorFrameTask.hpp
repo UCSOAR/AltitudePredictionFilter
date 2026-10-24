@@ -12,6 +12,12 @@
 #include "SensorDataTypes.hpp"
 #include "PreProcess.hpp"
 #include "LaunchDetection.hpp"
+#include "StateSelection.hpp"
+#include "../../Process/Inc/Dynamite.hpp"
+#include "../../Estimate/Inc/Ukf.hpp"
+#include "../../Prediction/Inc/ApogeeDetection.hpp"
+#include "../../Prediction/Inc/ApogeePredictor.hpp"
+#include "../../Output/Inc/FilterOutput.hpp"
 /************************************
  * MACROS AND DEFINES
  ************************************/
@@ -35,7 +41,14 @@ enum SENSORFRAME_TASK_COMMANDS
 	SF_CMD_PRINT_FILTER_INIT,	// Prints the UKF initial conditions
 	SF_CMD_PRINT_LAUNCH,		// Prints the launch detection status
 	SF_CMD_PRINT_HELP,			// Lists the APF_ debug commands
-	SF_CMD_TOGGLE_ALT_PRINT		// Toggles printing every source / fused altitude and the launch flag
+	SF_CMD_TOGGLE_ALT_PRINT,	// Toggles printing every source / fused altitude and the launch flag
+	SF_CMD_PRINT_STATE,			// Prints the APF internal state
+	SF_CMD_PRINT_DYNAMITE,		// Prints the dynamite sources, trust weights and Madgwick attitude
+	SF_CMD_PRINT_UKF,			// Prints the UKF state, covariance and scenario match
+	SF_CMD_PRINT_APOGEE,		// Prints the apogee detection status (legacy confidences)
+	SF_CMD_PRINT_PREDICT,		// Prints the apogee / landing prediction and trajectory
+	SF_CMD_PRINT_OUTPUT,		// Prints the last published FilterData
+	SF_CMD_TOGGLE_OUT_PRINT		// Toggles printing every published FilterData
 };
 
 /************************************
@@ -84,8 +97,29 @@ class SensorFrameTask: public Task
 		// Pre-launch calibration / tare stage, receives every SensorFrame
 		PreProcess preProcess;
 
-		// Detection stage, receives every calibrated SensorFrame
+		// Decides which stages run for every frame
+		StateSelection stateSelection;
+
+		// PROCESS stage: Madgwick + baro altitude blended into the Everest measurement
+		Dynamite dynamite;
+
+		// Detection stage, reads the Everest measurement while in DETECTION
 		LaunchDetection launchDetection;
+
+		// ESTIMATE stage: UKF with the simulated flights as process model, runs in LAUNCH
+		Ukf ukf;
+
+		// PREDICTION stage (apogee part): switches the scenario model to post apogee
+		ApogeeDetection apogeeDetection;
+
+		// PREDICTION stage: apogee / trajectory / landing predictor
+		ApogeePredictor apogeePredictor;
+
+		// OUTPUT stage: FilterData for the DataBroker (logged to flash by the LoggingTask)
+		FilterOutput filterOutput;
+
+		// Stages after the tare, dispatched by stateSelection
+		void RunStages(const SensorFrame& calibrated);
 
 		// Latest raw reading from each sensor, indexed by sensor id
 		IMUData imu[2]{};
@@ -121,8 +155,10 @@ class SensorFrameTask: public Task
 		// Debug
 		bool rawPrintEnabled = false;		// Continuous print, toggled with APF_RawStream
 		TickType_t lastRawPrintTick = 0;
-		bool altPrintEnabled = false;		// Continuous print, toggled with APF_AltStream
+		bool altPrintEnabled = false;		// Continuous dynamite + launch print, toggled with APF_AltStream
 		TickType_t lastAltPrintTick = 0;
+		bool outPrintEnabled = false;		// Toggled with APF_OutStream
+		TickType_t lastOutPrintTick = 0;
 };
 
 

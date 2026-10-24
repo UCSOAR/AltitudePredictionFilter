@@ -197,6 +197,8 @@ void PreProcess::PrintFilterInit() const
 			   filterInit.valid, ToMilli(filterInit.groundAltitude),
 			   ToMilli(filterInit.x0[0]), ToMilli(filterInit.x0[1]), ToMilli(filterInit.x0[2]));
 
-	SOAR_PRINT("  P0 diag (x1000)=(%ld,%ld,%ld) Q/R = legacy HALO values (review)\n",
-			   ToMilli(filterInit.P0.m[0][0]), ToMilli(filterInit.P0.m[1][1]), ToMilli(filterInit.P0.m[2][2]));
+	SOAR_PRINT("  P0 diag (x1000)=(%ld,%ld,%ld) Q diag (x1000)=(%ld,%ld,%ld) R diag (x1000)=(%ld,%ld,%ld)\n",
+			   ToMilli(filterInit.P0.m[0][0]), ToMilli(filterInit.P0.m[1][1]), ToMilli(filterInit.P0.m[2][2]),
+			   ToMilli(filterInit.Q.m[0][0]), ToMilli(filterInit.Q.m[1][1]), ToMilli(filterInit.Q.m[2][2]),
+			   ToMilli(filterInit.R.m[0][0]), ToMilli(filterInit.R.m[1][1]), ToMilli(filterInit.R.m[2][2]));
 }

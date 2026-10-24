@@ -26,19 +26,27 @@
  * PRIVATE MACROS AND DEFINES
  ************************************/
 namespace {
-// Q and R copied from HALO::initializeHALO (legacy HALO.cpp), produced by covarianceCalc.py
-// from sim residuals. REVIEW: Q(0,0) = 74777 m^2 is a ~273 m altitude std, which looks
-// far too large; confirm with whoever generated these before flight
-constexpr Mat3 LEGACY_Q = {{
-	{74777.41f, 4458.13f, -2164.91f},
-	{4458.13f,  2413.02f,    -4.52f},
-	{-2164.91f,   -4.52f,   503.78f}
+// Legacy HALO::initializeHALO used (from covarianceCalc.py sim residuals):
+//   Q = {{74777.41, 4458.13, -2164.91}, {4458.13, 2413.02, -4.52}, {-2164.91, -4.52, 503.78}}
+//   R = {{15438.09, 1528.51, 727.68}, {1528.51, 5005.79, -469.20}, {727.68, -469.20, 613.20}}
+// Q(0,0) = 74777 m^2 per step is a ~273 m altitude std, so the legacy filter mostly ignored
+// its model. Replaced by the diagonal starting values below; tune against replayed flights.
+
+// Process noise as spectral densities (per second), the UKF multiplies by dt every step.
+// Acceleration gets the most: the scenario model is least sure at burnout and drogue / main deploy
+constexpr Mat3 DEFAULT_Q = {{
+	{0.1f, 0.0f, 0.0f},		// m^2/s
+	{0.0f, 1.0f, 0.0f},		// (m/s)^2/s
+	{0.0f, 0.0f, 100.0f}	// (m/s^2)^2/s
 }};
 
-constexpr Mat3 LEGACY_R = {{
-	{15438.09f, 1528.51f,   727.68f},
-	{1528.51f,  5005.79f,  -469.20f},
-	{727.68f,   -469.20f,   613.20f}
+// Measurement noise floors for the Everest measurement (alt, vel, acc). The UKF raises the
+// altitude term to the live dynamite sigma when that is larger
+// Tuned with the PC replay (Tools/replay): NIS / NEES near 3 on the Stormfly sims
+constexpr Mat3 DEFAULT_R = {{
+	{0.05f, 0.0f, 0.0f},	// (0.22 m)^2
+	{0.0f, 0.25f, 0.0f},	// (0.5 m/s)^2, the dynamite velocity is smoothed, not measured
+	{0.0f, 0.0f, 0.5f}		// (0.7 m/s^2)^2, IMU vibration in flight
 }};
 
 /**
@@ -105,8 +113,8 @@ FilterInitState FilterInit::Build(const TareResult& tare)
 	init.P0.m[1][1] = P0_VEL_VAR;
 	init.P0.m[2][2] = Floor(accVar, P0_MIN_ACC_VAR);
 
-	init.Q = LEGACY_Q;
-	init.R = LEGACY_R;
+	init.Q = DEFAULT_Q;
+	init.R = DEFAULT_R;
 
 	return init;
 }

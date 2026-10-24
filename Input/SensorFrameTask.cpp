@@ -29,6 +29,7 @@
 #include "PollingTask.hpp"
 #include "Inc/PrintUtils.hpp"
 #include <cstring>
+#include <cmath>
 
 /************************************
  * PRIVATE MACROS AND DEFINES
@@ -52,9 +53,17 @@ bool IsPadState(RocketState state)
 	}
 }
 
+/**
+ * @brief The rocket state says the flight is over, the APF moves LAUNCH -> LANDED
+ */
+bool IsLandedState(RocketState state)
+{
+	return (state == RS_TOUCHDOWN) || (state == RS_RECOVERY);
+}
+
 // Unit conversions from the driver units to SI
 constexpr float MG_TO_MPS2         = 9.80665f / 1000.0f;                  // milli-g -> m/s^2
-constexpr float MDPS_TO_RADPS      = (3.14159265f / 180.0f) / 1000.0f;    // milli-deg/s -> rad/s
+constexpr float DDPS_TO_RADPS      = (3.14159265f / 180.0f) / 10.0f;      // 0.1 deg/s (IMU drivers) -> rad/s
 constexpr float CENTI_DEGC_TO_DEGC = 1.0f / 100.0f;                       // 0.01 degC -> degC
 constexpr float MGAUSS_TO_UT       = 0.1f;                                // milligauss -> microtesla
 
@@ -81,6 +90,13 @@ constexpr ApfCommand APF_COMMANDS[] = {
 	{"APF_Retare",     SF_CMD_RETARE},
 	{"APF_RawStream",  SF_CMD_TOGGLE_RAW_PRINT},
 	{"APF_AltStream",  SF_CMD_TOGGLE_ALT_PRINT},
+	{"APF_State",      SF_CMD_PRINT_STATE},
+	{"APF_Dynamite",   SF_CMD_PRINT_DYNAMITE},
+	{"APF_UKF",        SF_CMD_PRINT_UKF},
+	{"APF_Apogee",     SF_CMD_PRINT_APOGEE},
+	{"APF_Predict",    SF_CMD_PRINT_PREDICT},
+	{"APF_Output",     SF_CMD_PRINT_OUTPUT},
+	{"APF_OutStream",  SF_CMD_TOGGLE_OUT_PRINT},
 	{"APF_Help",       SF_CMD_PRINT_HELP},
 };
 }
@@ -195,6 +211,43 @@ void SensorFrameTask::HandleTaskCommand(uint16_t taskCommand)
 				   altPrintEnabled ? "ON" : "OFF");
 		break;
 
+	case SF_CMD_PRINT_STATE:
+		stateSelection.PrintStatus(xTaskGetTickCount() * portTICK_PERIOD_MS);
+		break;
+
+	case SF_CMD_PRINT_DYNAMITE:
+		if (dynamite.IsInitialized()) {
+			dynamite.PrintStatus();
+		} else {
+			SOAR_PRINT("APF: dynamite starts in DETECTION, tare not done\n");
+		}
+		break;
+
+	case SF_CMD_PRINT_UKF:
+		if (ukf.IsInitialized()) {
+			ukf.PrintStatus();
+		} else {
+			SOAR_PRINT("APF: UKF starts in LAUNCH (state %s)\n", StateSelection::Name(stateSelection.GetState()));
+		}
+		break;
+
+	case SF_CMD_PRINT_APOGEE:
+		apogeeDetection.PrintStatus();
+		break;
+
+	case SF_CMD_PRINT_PREDICT:
+		apogeePredictor.PrintStatus();
+		break;
+
+	case SF_CMD_PRINT_OUTPUT:
+		filterOutput.PrintLast();
+		break;
+
+	case SF_CMD_TOGGLE_OUT_PRINT:
+		outPrintEnabled = !outPrintEnabled;
+		SOAR_PRINT("SensorFrame output print %s (every published FilterData, max 4 Hz)\n", outPrintEnabled ? "ON" : "OFF");
+		break;
+
 	case SF_CMD_RETARE:
 	{
 		// Re-tare is pad only, in flight it would stop calibrated frames and tare on flight data
@@ -204,7 +257,13 @@ void SensorFrameTask::HandleTaskCommand(uint16_t taskCommand)
 			break;
 		}
 		preProcess.Reset();
+		dynamite.Reset();
 		launchDetection.Reset();
+		ukf.Reset();
+		apogeeDetection.Reset();
+		apogeePredictor.Reset();
+		filterOutput.Reset();
+		stateSelection.Reset(xTaskGetTickCount() * portTICK_PERIOD_MS);
 		SOAR_PRINT("SensorFrame: re-tare started\n");
 		break;
 	}
@@ -342,14 +401,14 @@ void SensorFrameTask::ProcessFrame()
 	}
 	lastFrameTick = frameTick;
 
-	// IMUs: accel mg -> m/s^2, gyro mdps -> rad/s, temp already degC
+	// IMUs: accel mg -> m/s^2, gyro 0.1 deg/s -> rad/s, temp already degC
 	for (uint8_t i = 0; i < 2; i++) {
 		frame.imu[i].accel[0] = imu[i].accel.x * MG_TO_MPS2;
 		frame.imu[i].accel[1] = imu[i].accel.y * MG_TO_MPS2;
 		frame.imu[i].accel[2] = imu[i].accel.z * MG_TO_MPS2;
-		frame.imu[i].gyro[0]  = imu[i].gyro.x * MDPS_TO_RADPS;
-		frame.imu[i].gyro[1]  = imu[i].gyro.y * MDPS_TO_RADPS;
-		frame.imu[i].gyro[2]  = imu[i].gyro.z * MDPS_TO_RADPS;
+		frame.imu[i].gyro[0]  = imu[i].gyro.x * DDPS_TO_RADPS;
+		frame.imu[i].gyro[1]  = imu[i].gyro.y * DDPS_TO_RADPS;
+		frame.imu[i].gyro[2]  = imu[i].gyro.z * DDPS_TO_RADPS;
 		frame.imu[i].temp     = static_cast<float>(imu[i].temp);
 	}
 
@@ -383,19 +442,91 @@ void SensorFrameTask::ProcessFrame()
 	if (preProcess.AddFrame(frame, calibrated, IsPadState(rocketState))) {
 		lastCalibrated = calibrated;
 		hasCalibratedFrame = true;
-
-		// Detection stage. The UKF (filter task) will also take the calibrated frame here
-		launchDetection.Update(calibrated, preProcess.GetTareResult());
-
-		// Rate limited so it is safe to leave on at launch poll rates
-		const TickType_t now = xTaskGetTickCount();
-		if (altPrintEnabled && (now - lastAltPrintTick) * portTICK_PERIOD_MS >= RAW_PRINT_MIN_PERIOD_MS) {
-			lastAltPrintTick = now;
-			launchDetection.PrintAltitudes();
-		}
+		RunStages(calibrated);
 	} else {
 		// Tare restarted or blocked: the old calibrated frame no longer matches the tare
 		hasCalibratedFrame = false;
+	}
+
+	stateSelection.Update(preProcess.IsTared(), launchDetection.IsLaunched(),
+						  IsLandedState(rocketState), frame.timestampMs);
+}
+
+/**
+ * @brief Runs the stages of the current APF state on a calibrated frame
+ *        (state transitions diagram, one pass per SensorFrame)
+ */
+void SensorFrameTask::RunStages(const SensorFrame& calibrated)
+{
+	switch (stateSelection.GetState())
+	{
+	case ApfState::PRE_LAUNCH:
+		// Tare finished on this frame, DETECTION starts from the next one
+		break;
+
+	case ApfState::DETECTION:
+		// PROCESS keeps the attitude and pad altitudes current, then Launch Detection
+		dynamite.Update(calibrated, preProcess.GetTareResult(), false);
+		launchDetection.Update(dynamite.GetMeasurement(), calibrated.timestampMs);
+		break;
+
+	case ApfState::LAUNCH:
+	{
+		// PROCESS
+		const EverestMeasurement& everest = dynamite.Update(calibrated, preProcess.GetTareResult(), true);
+
+		// ESTIMATE: start on the first LAUNCH frame, then predict + update every frame
+		if (!ukf.IsInitialized()) {
+			ukf.Init(preProcess.GetFilterInit(), everest);
+			SOAR_PRINT("UKF: started at alt=%ld mm vel=%ld mm/s\n",
+					   ToMilli(everest.altitude), ToMilli(everest.velocity));
+		} else {
+			ukf.Predict(calibrated.dt);
+			ukf.Update(everest);
+		}
+
+		// PREDICTION: apogee detection switches the scenario mode once, the predictor projects ahead
+		const float sd[3] = {std::sqrt(ukf.Variance(0)), std::sqrt(ukf.Variance(1)), std::sqrt(ukf.Variance(2))};
+		if (apogeeDetection.Update(ukf.State(), sd, calibrated.timestampMs)) {
+			ukf.SetAfterApogee(true);
+			dynamite.DistrustBarosUntil(calibrated.timestampMs + DYNAMITE_EJECTION_DISTRUST_MS);
+		}
+		apogeePredictor.Update(ukf, calibrated.timestampMs);
+		break;
+	}
+
+	case ApfState::LANDED:
+	default:
+		// Hold the last estimate
+		break;
+	}
+
+	// OUTPUT: publish (every frame in flight, 1 Hz otherwise). The LoggingTask logs it to flash
+	if (filterOutput.Due(stateSelection.GetState(), calibrated.timestampMs)) {
+		FilterData data = filterOutput.Build(calibrated.timestampMs, stateSelection.GetState(),
+											 preProcess.GetFilterInit().groundAltitude, dynamite, launchDetection,
+											 ukf, apogeeDetection, apogeePredictor);
+		DataBroker::Publish<FilterData>(&data);
+		filterOutput.Published(data);
+
+		const TickType_t tick = xTaskGetTickCount();
+		if (outPrintEnabled && (tick - lastOutPrintTick) * portTICK_PERIOD_MS >= RAW_PRINT_MIN_PERIOD_MS) {
+			lastOutPrintTick = tick;
+			FilterOutput::PrintLine(data);
+		}
+	}
+
+	// Rate limited so it is safe to leave on at launch poll rates
+	const TickType_t now = xTaskGetTickCount();
+	if (altPrintEnabled && stateSelection.GetState() != ApfState::PRE_LAUNCH
+		&& (now - lastAltPrintTick) * portTICK_PERIOD_MS >= RAW_PRINT_MIN_PERIOD_MS) {
+		lastAltPrintTick = now;
+		SOAR_PRINT("%s launch=%d thr=%ld mm ", StateSelection::Name(stateSelection.GetState()),
+				   launchDetection.IsLaunched() ? 1 : 0, ToMilli(launchDetection.GetStatus().threshold));
+		dynamite.PrintLine();
+		if (ukf.IsInitialized()) {
+			ukf.PrintLine();
+		}
 	}
 }
 
@@ -431,7 +562,8 @@ void SensorFrameTask::PrintFrame(const SensorFrame& frame, const char* label) co
 void SensorFrameTask::PrintApfHelp() const
 {
 	SOAR_PRINT("APF commands: APF_Raw APF_Calibrated APF_Tare APF_Alignment APF_FilterInit\n");
-	SOAR_PRINT("  APF_Launch APF_Retare (pad only) APF_RawStream (toggle) APF_AltStream (toggle) APF_Help\n");
+	SOAR_PRINT("  APF_State APF_Dynamite APF_Launch APF_UKF APF_Apogee APF_Predict APF_Output\n");
+	SOAR_PRINT("  APF_Retare (pad only) APF_RawStream APF_AltStream APF_OutStream (toggles) APF_Help\n");
 }
 
 /**
@@ -454,7 +586,7 @@ void SensorFrameTask::PrintRawFrame()
 			   static_cast<long>(mag.magY),
 			   static_cast<long>(mag.magZ));
 
-	SOAR_PRINT("  IMU0 a=(%d,%d,%d)mg g=(%d,%d,%d)mdps T=%dC | IMU1 a=(%d,%d,%d)mg g=(%d,%d,%d)mdps T=%dC\n",
+	SOAR_PRINT("  IMU0 a=(%d,%d,%d)mg g=(%d,%d,%d)x0.1dps T=%dC | IMU1 a=(%d,%d,%d)mg g=(%d,%d,%d)x0.1dps T=%dC\n",
 			   imu[0].accel.x, imu[0].accel.y, imu[0].accel.z,
 			   imu[0].gyro.x, imu[0].gyro.y, imu[0].gyro.z, imu[0].temp,
 			   imu[1].accel.x, imu[1].accel.y, imu[1].accel.z,

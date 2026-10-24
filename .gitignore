@@ -63,3 +63,7 @@ STM32L152-Discovery.elf.launch
 # VS2022
 .vs/
 .vscode/
+
+# Folders
+/Tools
+/testSuite

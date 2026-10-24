@@ -27,8 +27,8 @@ struct Mat3
  * @param groundAltitude Absolute pad altitude (m, standard atmosphere), for reference only
  * @param x0 Initial state [m, m/s, m/s^2]
  * @param P0 Initial state covariance, built from the measured tare noise
- * @param Q  Process noise covariance
- * @param R  Measurement noise covariance
+ * @param Q  Process noise spectral density (per second, the UKF scales it by dt)
+ * @param R  Measurement noise covariance floors (alt, vel, acc)
  */
 struct FilterInitState
 {

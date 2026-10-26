@@ -278,7 +278,9 @@ void Dynamite::Fuse(float dt)
 	// altitude residual. A raw (fused - last) / dt turns 0.2 m of baro jitter into ~10 m/s at 50 Hz
 	if (hasFused && dt > 0.0f) {
 		const float residual = fused - status.predicted;
-		measurement.velocity += feedForwardAcc * dt + (DYNAMITE_VEL_BETA / dt) * residual;
+		const float scaled = DYNAMITE_VEL_BETA * dt / DYNAMITE_VEL_BETA_DT_S;
+		const float beta = (scaled < 1.0f) ? scaled : 1.0f;
+		measurement.velocity += feedForwardAcc * dt + (beta / dt) * residual;
 	} else {
 		measurement.velocity = 0.0f;
 	}

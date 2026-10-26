@@ -27,11 +27,8 @@
  ************************************/
 bool FilterOutput::Due(ApfState state, uint32_t timestampMs)
 {
-	if (state == ApfState::LAUNCH) {
-		lastMs = timestampMs;
-		return true;
-	}
-	if (published == 0 || (timestampMs - lastMs) >= FILTER_OUTPUT_SLOW_PERIOD_MS) {
+	const uint32_t period = (state == ApfState::LAUNCH) ? FILTER_OUTPUT_FLIGHT_PERIOD_MS : FILTER_OUTPUT_SLOW_PERIOD_MS;
+	if (published == 0 || (timestampMs - lastMs) >= period) {
 		lastMs = timestampMs;
 		return true;
 	}

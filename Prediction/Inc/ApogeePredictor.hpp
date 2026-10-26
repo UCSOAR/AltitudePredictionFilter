@@ -74,9 +74,9 @@ class ApogeePredictor
 		 * @brief Steps alt / vel forward with the scenario acceleration until the velocity reaches 0
 		 * @return apogee altitude, timeToApogee set, trajectory filled if not null
 		 */
-		float ProjectApogee(const ScenarioModel& model, float alt, float vel, float& timeToApogee,
+		float ProjectApogee(const ScenarioModel& model, float alt, float vel, float acc0, float& timeToApogee,
 							float* trajectory, uint8_t* trajectoryCount) const;
-		void ProjectLanding(const ScenarioModel& model, float alt, float vel);
+		void ProjectLanding(const ScenarioModel& model, float alt, float vel, float acc0);
 
 		ApogeePrediction prediction{};
 		uint32_t lastRunMs = 0;

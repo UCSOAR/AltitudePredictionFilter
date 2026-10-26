@@ -16,9 +16,9 @@
 
 // Launch when the fused altitude is above max(LAUNCH_ALT_SIGMAS * fused sigma, LAUNCH_ALT_MIN_M)
 // for LAUNCH_CONFIRM_FRAMES frames in a row. The floor stops slow pad pressure drift from triggering
-constexpr float LAUNCH_ALT_SIGMAS = 5.0f;
-constexpr float LAUNCH_ALT_MIN_M = 1.0f;
-constexpr uint8_t LAUNCH_CONFIRM_FRAMES = 3;
+constexpr float LAUNCH_ALT_SIGMAS = 2.0f;
+constexpr float LAUNCH_ALT_MIN_M = 1.0f;	// Was 1 m: an arm's length lift on the bench triggered a launch
+constexpr uint8_t LAUNCH_CONFIRM_FRAMES = 1;
 
 /************************************
  * TYPEDEFS

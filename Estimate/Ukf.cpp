@@ -132,6 +132,10 @@ void Ukf::Init(const FilterInitState& init, const EverestMeasurement& everest)
 		weightMean[i] = 1.0f / (2.0f * (n + lambda));
 		weightCov[i] = weightMean[i];
 	}
+#if APF_SCENARIO_MODEL == APF_SCENARIO_MODEL_LEGACY
+	// Legacy HALO::init: the centre point has weight 0 for the covariance too (no beta term)
+	weightCov[0] = weightMean[0];
+#endif
 
 	Q = init.Q;
 	Rfloor = init.R;
@@ -159,6 +163,9 @@ void Ukf::Reset()
 		}
 	}
 	scenarioModel.SetAfterApogee(false);
+	for (uint8_t s = 0; s < UKF_SIGMA; s++) {
+		legacyMemory[s].Reset();
+	}
 	initialized = false;
 	status = UkfStatus{};
 }
@@ -169,7 +176,8 @@ void Ukf::Reset()
  */
 void Ukf::Propagate(const float in[UKF_N], float dt, float out[UKF_N]) const
 {
-	const ScenarioMatch match = scenarioModel.Match(in[0], in[1]);
+	// Legacy KD-tree search on the sigma point's (altitude, velocity, acceleration)
+	const ScenarioMatch match = scenarioModel.Match(in[0], in[1], in[2]);
 	const float a = match.acceleration;
 
 	out[0] = in[0] + in[1] * dt + 0.5f * a * dt * dt;
@@ -203,9 +211,27 @@ void Ukf::Predict(float dt)
 
 	// Propagate every sigma point through the scenario model
 	float moved[UKF_SIGMA][UKF_N];
+#if APF_SCENARIO_MODEL == APF_SCENARIO_MODEL_LEGACY
+	// Legacy HALO::calculateSigmaPoints -> dynamicModel: each sigma point becomes the blend of its
+	// two closest scenarios dt later, with its own gain memory (reset to 50 / 50 on a pair change)
+	status.gainResets = 0;
+	for (uint8_t s = 0; s < UKF_SIGMA; s++) {
+		const LegacyStep step = scenarioModel.LegacyPredict(sigma[s], dt, legacyMemory[s], true);
+		for (uint8_t j = 0; j < UKF_N; j++) {
+			moved[s][j] = step.state[j];
+		}
+		if (step.gainsReset) {
+			status.gainResets++;
+		}
+	}
+	status.gainResetsTotal += status.gainResets;
+	const float qScale = UKF_LEGACY_Q_STEP_S;	// Once per step, see UKF_LEGACY_Q_STEP_S
+#else
 	for (uint8_t s = 0; s < UKF_SIGMA; s++) {
 		Propagate(sigma[s], dt, moved[s]);
 	}
+	const float qScale = dt;
+#endif
 
 	// Predicted mean
 	float mean[UKF_N] = {0.0f, 0.0f, 0.0f};
@@ -230,7 +256,7 @@ void Ukf::Predict(float dt)
 	}
 	for (uint8_t i = 0; i < UKF_N; i++) {
 		for (uint8_t j = 0; j < UKF_N; j++) {
-			Pp[i][j] += Q.m[i][j] * dt;
+			Pp[i][j] += Q.m[i][j] * qScale;
 		}
 	}
 	Symmetrize(Pp);
@@ -242,7 +268,7 @@ void Ukf::Predict(float dt)
 		}
 	}
 
-	status.scenario = scenarioModel.Match(x[0], x[1]);
+	status.scenario = scenarioModel.Match(x[0], x[1], x[2]);
 }
 
 /**
@@ -309,6 +335,9 @@ void Ukf::Update(const EverestMeasurement& everest)
 
 	M3 K;
 	Multiply(P, Sinv, K);
+	for (uint8_t i = 0; i < UKF_N; i++) {
+		status.gain[i] = K[i][i];
+	}
 
 	// State
 	for (uint8_t i = 0; i < UKF_N; i++) {

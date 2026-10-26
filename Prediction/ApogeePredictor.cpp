@@ -47,21 +47,61 @@ bool ApogeePredictor::Update(const Ukf& ukf, uint32_t timestampMs)
 	if (!prediction.afterApogee) {
 		const float sdVel = std::sqrt(ukf.Variance(1));
 		float tLow = 0.0f, tHigh = 0.0f;
-		prediction.apogeeAltitude = ProjectApogee(model, x[0], x[1], prediction.timeToApogee,
+		prediction.apogeeAltitude = ProjectApogee(model, x[0], x[1], x[2], prediction.timeToApogee,
 												  prediction.trajectory, &prediction.trajectoryCount);
-		prediction.apogeeAltitudeLow = ProjectApogee(model, x[0], x[1] - PREDICT_SIGMAS * sdVel, tLow, nullptr, nullptr);
-		prediction.apogeeAltitudeHigh = ProjectApogee(model, x[0], x[1] + PREDICT_SIGMAS * sdVel, tHigh, nullptr, nullptr);
+		prediction.apogeeAltitudeLow = ProjectApogee(model, x[0], x[1] - PREDICT_SIGMAS * sdVel, x[2], tLow, nullptr, nullptr);
+		prediction.apogeeAltitudeHigh = ProjectApogee(model, x[0], x[1] + PREDICT_SIGMAS * sdVel, x[2], tHigh, nullptr, nullptr);
 		prediction.valid = prediction.timeToApogee < PREDICT_MAX_S;
 	} else {
-		ProjectLanding(model, x[0], x[1]);
+		ProjectLanding(model, x[0], x[1], x[2]);
 		prediction.valid = prediction.timeToLanding < PREDICT_LANDING_MAX_S;
 	}
 	return true;
 }
 
-float ApogeePredictor::ProjectApogee(const ScenarioModel& model, float alt, float vel, float& timeToApogee,
+float ApogeePredictor::ProjectApogee(const ScenarioModel& model, float alt, float vel, float acc0, float& timeToApogee,
 									 float* trajectory, uint8_t* trajectoryCount) const
 {
+#if APF_SCENARIO_MODEL == APF_SCENARIO_MODEL_LEGACY
+	// Legacy HALO::predictNStates: step the state itself through the legacy model, with its own
+	// gain memory starting fresh and no 50 / 50 reset (legacy commented it out there)
+	LegacyGainMemory memory;
+	memory.Reset();
+	float state[3] = {alt, vel, acc0};
+	float t = 0.0f;
+	float nextPoint = 1.0f;
+	if (trajectoryCount) {
+		*trajectoryCount = 0;
+	}
+	while (state[1] > 0.0f && t < PREDICT_MAX_S) {
+		const LegacyStep step = model.LegacyPredict(state, PREDICT_STEP_S, memory, false);
+		if (step.state[1] <= 0.0f) {
+			// Apogee inside this step: stop where the velocity crosses zero
+			const float frac = state[1] / (state[1] - step.state[1]);
+			state[0] += frac * (step.state[0] - state[0]);
+			t += frac * PREDICT_STEP_S;
+			break;
+		}
+		// The scenarios end before apogee (the beforeSimsF2 cases stop a few m/s short): their last
+		// point is as far as they go, take it as the apogee
+		if (step.state[0] == state[0] && step.state[1] == state[1]) {
+			break;
+		}
+		for (uint8_t i = 0; i < 3; i++) {
+			state[i] = step.state[i];
+		}
+		t += PREDICT_STEP_S;
+		if (trajectory && *trajectoryCount < PREDICT_TRAJECTORY_POINTS && t >= nextPoint - 1e-4f) {
+			trajectory[(*trajectoryCount)++] = state[0];
+			nextPoint += 1.0f;
+		}
+	}
+	timeToApogee = t;
+	return state[0];
+#else
+	// The KD-tree matches on (alt, vel, acc): carry the projected acceleration step to step
+	float acc = acc0;
+	auto accel = [&](float a, float v) { return model.Match(a, v, acc).acceleration; };
 	float t = 0.0f;
 	float nextPoint = 1.0f;
 	if (trajectoryCount) {
@@ -70,11 +110,12 @@ float ApogeePredictor::ProjectApogee(const ScenarioModel& model, float alt, floa
 
 	while (vel > 0.0f && t < PREDICT_MAX_S) {
 		// Midpoint step: acceleration from the scenarios at the start and at the half step
-		const float a1 = model.Match(alt, vel).acceleration;
+		const float a1 = accel(alt, vel);
 		const float midVel = vel + 0.5f * a1 * PREDICT_STEP_S;
 		const float midAlt = alt + 0.5f * vel * PREDICT_STEP_S;
-		const float a2 = model.Match(midAlt, midVel).acceleration;
+		const float a2 = accel(midAlt, midVel);
 
+		acc = a2;
 		const float newVel = vel + a2 * PREDICT_STEP_S;
 		if (newVel <= 0.0f) {
 			// Apogee inside this step: stop exactly where the velocity crosses zero
@@ -96,16 +137,50 @@ float ApogeePredictor::ProjectApogee(const ScenarioModel& model, float alt, floa
 
 	timeToApogee = t;
 	return alt;
+#endif
 }
 
-void ApogeePredictor::ProjectLanding(const ScenarioModel& model, float alt, float vel)
+void ApogeePredictor::ProjectLanding(const ScenarioModel& model, float alt, float vel, float acc0)
 {
 	float t = 0.0f;
 	float nextPoint = 1.0f;
 	prediction.trajectoryCount = 0;
+#if APF_SCENARIO_MODEL == APF_SCENARIO_MODEL_LEGACY
+	// Legacy model, as ProjectApogee: the state steps through the after apogee scenarios
+	LegacyGainMemory memory;
+	memory.Reset();
+	float state[3] = {alt, vel, acc0};
+	while (state[0] > 0.0f && t < PREDICT_LANDING_MAX_S) {
+		const LegacyStep step = model.LegacyPredict(state, PREDICT_LANDING_STEP_S, memory, false);
+		if (step.state[0] <= 0.0f) {
+			const float frac = state[0] / (state[0] - step.state[0]);
+			t += frac * PREDICT_LANDING_STEP_S;
+			state[1] += frac * (step.state[1] - state[1]);
+			state[0] = 0.0f;
+			break;
+		}
+		// The scenarios end before the ground (e.g. ascent only cases): nothing left to step through
+		if (step.state[0] == state[0] && step.state[1] == state[1]) {
+			t = PREDICT_LANDING_MAX_S;
+			break;
+		}
+		for (uint8_t i = 0; i < 3; i++) {
+			state[i] = step.state[i];
+		}
+		t += PREDICT_LANDING_STEP_S;
+		while (prediction.trajectoryCount < PREDICT_TRAJECTORY_POINTS && t >= nextPoint - 1e-4f) {
+			prediction.trajectory[prediction.trajectoryCount++] = state[0];
+			nextPoint += 1.0f;
+		}
+	}
+	prediction.timeToLanding = t;
+	prediction.landingVelocity = state[1];
+#else
+	float a_prev = acc0;	// KD-tree matches on (alt, vel, acc): carry the acceleration
 
 	while (alt > 0.0f && t < PREDICT_LANDING_MAX_S) {
-		const float a = model.Match(alt, vel).acceleration;
+		const float a = model.Match(alt, vel, a_prev).acceleration;
+		a_prev = a;
 		const float newVel = vel + a * PREDICT_LANDING_STEP_S;
 		const float newAlt = alt + 0.5f * (vel + newVel) * PREDICT_LANDING_STEP_S;
 		if (newAlt <= 0.0f) {
@@ -127,6 +202,7 @@ void ApogeePredictor::ProjectLanding(const ScenarioModel& model, float alt, floa
 
 	prediction.timeToLanding = t;
 	prediction.landingVelocity = vel;
+#endif
 }
 
 void ApogeePredictor::PrintStatus() const

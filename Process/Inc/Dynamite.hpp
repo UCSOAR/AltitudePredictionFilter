@@ -66,7 +66,9 @@ constexpr float DYNAMITE_EJECTION_GATE_M = 10.0f;			// In that window, a baro th
 // Velocity smoothing (alpha-beta tracker on the fused altitude, IMU accel as feed forward).
 // Each frame the velocity is corrected by DYNAMITE_VEL_BETA * (fused - predicted) / dt.
 // Smaller = smoother but slower to correct, larger = follows the baro noise. Tune at the flight poll rate
-constexpr float DYNAMITE_VEL_BETA = 0.01f;
+constexpr float DYNAMITE_VEL_BETA = 0.01f;			// at the tuning frame time below
+constexpr float DYNAMITE_VEL_BETA_DT_S = 0.025f;	// Beta scales with dt (same time constant, 2.5 s, at any
+												// poll rate): a fixed per-frame beta was 16x too weak at 3 Hz
 
 /************************************
  * TYPEDEFS
@@ -141,6 +143,7 @@ class Dynamite
 		bool IsInitialized() const { return initialized; }
 		const EverestMeasurement& GetMeasurement() const { return measurement; }
 		const DynamiteStatus& GetStatus() const { return status; }
+		const Madgwick& GetMadgwick(uint8_t imu) const { return madgwick[imu]; }
 
 		void PrintStatus() const;
 		void PrintLine() const;		// One line: every source, predicted, fused

@@ -20,6 +20,7 @@
  ************************************/
 #include "Inc/FilterInit.hpp"
 #include "Inc/AxisAlignment.hpp"
+#include "Inc/FilterProfile.hpp"
 #include <cmath>
 
 /************************************
@@ -113,8 +114,30 @@ FilterInitState FilterInit::Build(const TareResult& tare)
 	init.P0.m[1][1] = P0_VEL_VAR;
 	init.P0.m[2][2] = Floor(accVar, P0_MIN_ACC_VAR);
 
+#if APF_COVARIANCE == APF_COVARIANCE_TABER	// Input/Inc/FilterProfile.hpp
+	// Taber profiles: the legacy HALO::initializeHALO matrices from covarianceCalc.py.
+	// Legacy added Q once per 1/3 s step; this UKF adds Q * dt, so Q is scaled by the legacy
+	// rate (3 /s) to add the same amount per step
+	init.Q = {{
+		{74777.41f * 3.0f, 4458.13f * 3.0f, -2164.91f * 3.0f},
+		{4458.13f * 3.0f, 2413.02f * 3.0f, -4.52f * 3.0f},
+		{-2164.91f * 3.0f, -4.52f * 3.0f, 503.78f * 3.0f}
+	}};
+	init.R = {{
+		{15438.09f, 1528.51f, 727.68f},
+		{1528.51f, 5005.79f, -469.20f},
+		{727.68f, -469.20f, 613.20f}
+	}};
+#else
 	init.Q = DEFAULT_Q;
 	init.R = DEFAULT_R;
+#endif
+	for (uint8_t i = 0; i < 3; i++) {
+		for (uint8_t j = 0; j < 3; j++) {
+			init.Q.m[i][j] *= APF_Q_SCALE;	// Input/Inc/FilterProfile.hpp, 1 unless sweeping
+			init.R.m[i][j] *= APF_R_SCALE;
+		}
+	}
 
 	return init;
 }

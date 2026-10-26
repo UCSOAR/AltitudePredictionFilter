@@ -9,13 +9,22 @@
 #define SCENARIODATA_SCENARIODATA_HPP_
 
 #include <stdint.h>
+#include "FilterProfile.hpp"
 
 /************************************
  * MACROS AND DEFINES
  ************************************/
 constexpr float SCENARIO_DT = 0.1f;		// s between rows before apogee
 constexpr float SCENARIO_DESCENT_DT = 1.0f;	// s between rows after apogee
+#if APF_PROFILE == APF_PROFILE_TABER_LEGACY	// Estimate/ScenarioDataTaber.cpp
+constexpr uint8_t SCENARIO_COUNT = 2;
+#elif APF_PROFILE == APF_PROFILE_TABER_SIX	// Estimate/ScenarioDataTaber.cpp
+constexpr uint8_t SCENARIO_COUNT = 6;
+#elif APF_PROFILE == APF_PROFILE_TABER_ALL	// Estimate/ScenarioDataTaber.cpp
+constexpr uint8_t SCENARIO_COUNT = 8;
+#else										// Estimate/ScenarioData.cpp
 constexpr uint8_t SCENARIO_COUNT = 9;
+#endif
 
 /************************************
  * TYPEDEFS

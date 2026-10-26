@@ -19,7 +19,9 @@
 /************************************
  * MACROS AND DEFINES
  ************************************/
-// Publish / log rate: every frame in flight, once a second otherwise (keeps the pad log small)
+// Publish / log rate: 10 Hz in flight, once a second otherwise (keeps the pad log small).
+// Every frame (50 Hz) in flight overloaded LoggingTask on the bench and stalled polling
+constexpr uint32_t FILTER_OUTPUT_FLIGHT_PERIOD_MS = 100;
 constexpr uint32_t FILTER_OUTPUT_SLOW_PERIOD_MS = 1000;
 
 // FilterData::flags

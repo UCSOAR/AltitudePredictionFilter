@@ -139,6 +139,13 @@ void Ukf::Init(const FilterInitState& init, const EverestMeasurement& everest)
 
 	Q = init.Q;
 	Rfloor = init.R;
+#ifdef APF_PC_REPLAY
+	for (uint8_t i = 0; i < UKF_N; i++) {
+		for (uint8_t j = 0; j < UKF_N; j++) {
+			Q.m[i][j] *= std::sqrt(qScale[i] * qScale[j]);
+		}
+	}
+#endif
 
 	// Start where Dynamite says the rocket is at launch detection
 	x[0] = everest.altitude;
@@ -317,7 +324,12 @@ void Ukf::Update(const EverestMeasurement& everest)
 
 	// The model does not fit this flight right now: widen P so the measurement wins
 	status.inflation = 1.0f;
-	if (status.nis > UKF_NIS_GATE) {
+#ifdef APF_PC_REPLAY
+	const bool inflateOn = inflate;
+#else
+	const bool inflateOn = true;
+#endif
+	if (inflateOn && status.nis > UKF_NIS_GATE) {
 		status.inflation = status.nis / static_cast<float>(UKF_N);
 		if (status.inflation > UKF_MAX_INFLATION) {
 			status.inflation = UKF_MAX_INFLATION;
@@ -387,7 +399,25 @@ void Ukf::MeasurementNoise(const EverestMeasurement& everest, float R[UKF_N][UKF
 		}
 	}
 	R[0][0] = MaxF(R[0][0], everest.sigma * everest.sigma);
+#ifdef APF_PC_REPLAY
+	for (uint8_t i = 0; i < UKF_N; i++) {
+		for (uint8_t j = 0; j < UKF_N; j++) {
+			R[i][j] *= std::sqrt(rScale[i] * rScale[j]);
+		}
+	}
+#endif
 }
+
+#ifdef APF_PC_REPLAY
+void Ukf::SetNoiseTuning(const float q[UKF_N], const float r[UKF_N], bool inflateOn)
+{
+	for (uint8_t i = 0; i < UKF_N; i++) {
+		qScale[i] = q[i];
+		rScale[i] = r[i];
+	}
+	inflate = inflateOn;
+}
+#endif
 
 /**
  * @brief P lost positive definiteness (float rounding): restart it from the measurement noise

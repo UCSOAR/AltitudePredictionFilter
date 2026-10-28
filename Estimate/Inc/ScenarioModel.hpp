@@ -81,11 +81,18 @@ struct LegacyStep
  *             per axis) blend their accelerations
  *
  *        NOTE: the KD-trees use std::shared_ptr nodes on the heap (as legacy), one node per
- *        table row, built on the first Match(). Check the heap before flying this
+ *        table row (~56 bytes each on the board). Built by BuildTrees() at task start, or on
+ *        the first Match() if it was never called. Check the heap before flying this
  */
 class ScenarioModel
 {
 	public:
+		/**
+		 * @brief Builds every case's KD-trees now (heap allocations + sorting), so the first
+		 *        Match() in flight does not pay for it. Safe to call more than once
+		 */
+		static void BuildTrees();
+
 		void SetAfterApogee(bool after) { afterApogee = after; }
 		bool IsAfterApogee() const { return afterApogee; }
 

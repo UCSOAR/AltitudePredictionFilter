@@ -20,11 +20,14 @@
 //                             TODO meant to load: 5 at a 1404 m pad + 1 Taber), legacy Q / R
 //   APF_PROFILE_TABER_ALL     every distinct legacy sim together (the 2 above + the 6 above = 8; the 4
 //                             covarianceCalc sims are F2 sims 2-5 again), legacy Q / R
+//   APF_PROFILE_TABER_OWN     only the sims made for Taber (983 m pad): Legacy/Data.cpp 1-2 + F2 sim 6,
+//                             legacy Q / R. F2 sims 1-5 are the 1404 m pad Quasar (SAC) sims
 //   (the Taber sets live in Estimate/ScenarioDataTaber.cpp)
 #define APF_PROFILE_STORMFLY		0
 #define APF_PROFILE_TABER_LEGACY	1
 #define APF_PROFILE_TABER_SIX		2
 #define APF_PROFILE_TABER_ALL		3
+#define APF_PROFILE_TABER_OWN		4
 
 #ifndef APF_PROFILE
 #define APF_PROFILE APF_PROFILE_STORMFLY

@@ -48,7 +48,8 @@ enum SENSORFRAME_TASK_COMMANDS
 	SF_CMD_PRINT_APOGEE,		// Prints the apogee detection status (legacy confidences)
 	SF_CMD_PRINT_PREDICT,		// Prints the apogee / landing prediction and trajectory
 	SF_CMD_PRINT_OUTPUT,		// Prints the last published FilterData
-	SF_CMD_TOGGLE_OUT_PRINT		// Toggles printing every published FilterData
+	SF_CMD_TOGGLE_OUT_PRINT,	// Toggles printing every published FilterData
+	SF_CMD_TOGGLE_LOG_STREAM	// Toggles the CSV log stream (raw + calibrated + filter), saved on the PC by Tools/serial_log
 };
 
 /************************************
@@ -93,6 +94,8 @@ class SensorFrameTask: public Task
 		void PrintRawFrame();
 		void PrintFrame(const SensorFrame& frame, const char* label) const;
 		void PrintApfHelp() const;
+		void PrintLogHeader() const;
+		void PrintLogFrame(const SensorFrame& raw);
 
 		// Pre-launch calibration / tare stage, receives every SensorFrame
 		PreProcess preProcess;
@@ -159,6 +162,9 @@ class SensorFrameTask: public Task
 		TickType_t lastAltPrintTick = 0;
 		bool outPrintEnabled = false;		// Toggled with APF_OutStream
 		TickType_t lastOutPrintTick = 0;
+		bool logStreamEnabled = false;		// CSV log stream, toggled with APF_LogStream
+		TickType_t lastLogTick = 0;
+		uint32_t loggedFrames = 0;
 };
 
 

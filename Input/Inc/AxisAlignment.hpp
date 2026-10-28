@@ -30,9 +30,19 @@ struct AxisMap
 inline constexpr AxisMap IDENTITY = {{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}};
 
 // Mounting of each IMU in the rocket, index = IMU id.
-// TODO: placeholder until mechanical confirms which sensor axis points to the nose.
-// Example: sensor +X toward the nose -> {{{0,1,0},{0,0,1},{1,0,0}}}
+#ifdef APF_PC_REPLAY
+// PC replay / Taber test: the generated flights are already in body axes
 inline constexpr AxisMap IMU_MOUNTING[2] = {IDENTITY, IDENTITY};
+#else
+// DAQLite, measured on the bench (APF_RawStream, board flat then held nose up):
+//   nose (body +Z) = IMU0 +X = IMU1 -Y
+//   board normal (sensor +Z, the same for both IMUs) = body +X, body Y completes the right hand set
+// Nose up both IMUs see gravity on body +Z (10 deg tilt, hand held), flat on body +X,
+// and the two IMUs agree within ~20 mg in both positions
+inline constexpr AxisMap IMU0_DAQLITE = {{{0, 0, 1}, {0, -1, 0}, {1, 0, 0}}};	// LSM6DSO
+inline constexpr AxisMap IMU1_DAQLITE = {{{0, 0, 1}, {-1, 0, 0}, {0, -1, 0}}};	// LSM6DSO32 "A"
+inline constexpr AxisMap IMU_MOUNTING[2] = {IMU0_DAQLITE, IMU1_DAQLITE};
+#endif
 
 // Max angle between body +Z and measured "up" on the pad before the alignment is flagged
 constexpr float PAD_MAX_TILT_DEG = 30.0f;

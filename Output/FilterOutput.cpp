@@ -74,7 +74,9 @@ FilterData FilterOutput::Build(uint32_t timestampMs, ApfState state, float groun
 	if (ds.baroDistrusted) {
 		d.flags |= FILTER_FLAG_BARO_DISTRUSTED;
 	}
-	if (launch.IsLaunched()) {
+	// From the APF state, so it follows whatever decides launch (the board's FlightTask on DAQLite)
+	(void)launch;
+	if (state == ApfState::LAUNCH || state == ApfState::LANDED) {
 		d.flags |= FILTER_FLAG_LAUNCHED;
 	}
 	if (apogee.IsReached()) {

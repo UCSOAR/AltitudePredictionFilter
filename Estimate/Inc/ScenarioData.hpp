@@ -22,6 +22,8 @@ constexpr uint8_t SCENARIO_COUNT = 2;
 constexpr uint8_t SCENARIO_COUNT = 6;
 #elif APF_PROFILE == APF_PROFILE_TABER_ALL	// Estimate/ScenarioDataTaber.cpp
 constexpr uint8_t SCENARIO_COUNT = 8;
+#elif APF_PROFILE == APF_PROFILE_TABER_OWN	// Estimate/ScenarioDataTaber.cpp
+constexpr uint8_t SCENARIO_COUNT = 3;
 #else										// Estimate/ScenarioData.cpp
 constexpr uint8_t SCENARIO_COUNT = 9;
 #endif

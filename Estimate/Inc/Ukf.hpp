@@ -88,6 +88,12 @@ class Ukf
 		// Testing only (leave-one-case-out): the scenario model skips this case, -1 = use all
 		void ExcludeScenario(int8_t index) { scenarioModel.ExcludeCase(index); }
 
+#ifdef APF_PC_REPLAY
+		// Replay tuning only (Tools/apf_gui.py, before Init): scales the Q / R diagonals (off diagonals by
+		// the geometric mean, R after the live dynamite sigma), and turns the NIS inflation on / off
+		void SetNoiseTuning(const float q[UKF_N], const float r[UKF_N], bool inflate);
+#endif
+
 		bool IsInitialized() const { return initialized; }
 		const float* State() const { return x; }
 		float Variance(uint8_t i) const { return P[i][i]; }
@@ -115,6 +121,11 @@ class Ukf
 		ScenarioModel scenarioModel;
 		LegacyGainMemory legacyMemory[UKF_SIGMA];	// Legacy model: one per sigma point
 		UkfStatus status{};
+#ifdef APF_PC_REPLAY
+		float qScale[UKF_N] = {1.0f, 1.0f, 1.0f};
+		float rScale[UKF_N] = {1.0f, 1.0f, 1.0f};
+		bool inflate = true;
+#endif
 };
 
 #endif /* UKF_UKF_HPP_ */

@@ -26,7 +26,7 @@
 
 #include "DataBroker.hpp"
 #include "Task.hpp"
-#include "PollingTask.hpp"
+#include "FlightTask.hpp"
 #include "Inc/PrintUtils.hpp"
 #include <cstring>
 #include <cmath>
@@ -36,29 +36,32 @@
  ************************************/
 namespace {
 /**
- * @brief The tare may only run while the rocket is on the pad, never in flight
+ * @brief The tare may only run while the rocket is on the pad, never in flight.
+ *        This board has no rocket state, FlightTask's GROUND before any flight is the pad
  */
-bool IsPadState(RocketState state)
+bool IsPadState()
 {
-	switch (state)
-	{
-	case RS_PRELAUNCH:
-	case RS_FILL:
-	case RS_ARM:
-	case RS_TEST:
-		return true;
-
-	default:
-		return false;
-	}
+	const FlightTask& flight = FlightTask::Inst();
+	return (flight.GetFlightState() == FlightState::GROUND) && !flight.HasFlown();
 }
 
 /**
- * @brief The rocket state says the flight is over, the APF moves LAUNCH -> LANDED
+ * @brief Launch is decided by the board (FlightTask GROUND -> FLIGHT), the APF moves DETECTION -> LAUNCH.
+ *        Stays true after landing so the APF never falls back to DETECTION
  */
-bool IsLandedState(RocketState state)
+bool IsBoardLaunched()
 {
-	return (state == RS_TOUCHDOWN) || (state == RS_RECOVERY);
+	const FlightTask& flight = FlightTask::Inst();
+	return (flight.GetFlightState() == FlightState::FLIGHT) || flight.HasFlown();
+}
+
+/**
+ * @brief FlightTask is back in GROUND after a flight, the APF moves LAUNCH -> LANDED
+ */
+bool IsLandedState()
+{
+	const FlightTask& flight = FlightTask::Inst();
+	return (flight.GetFlightState() == FlightState::GROUND) && flight.HasFlown();
 }
 
 // Unit conversions from the driver units to SI
@@ -69,6 +72,10 @@ constexpr float MGAUSS_TO_UT       = 0.1f;                                // mil
 
 // Minimum time between raw debug prints so the UART can keep up at launch poll rates
 constexpr uint32_t RAW_PRINT_MIN_PERIOD_MS = 250;
+
+// CSV log stream: max 10 frames/s. One frame is 4 lines (~450 bytes), the debug UART runs at
+// 115200 baud (~11.5 KB/s), so this leaves room for the other prints
+constexpr uint32_t LOG_STREAM_MIN_PERIOD_MS = 100;
 
 /**
  * @brief UART debug commands. Names must stay <= 16 characters (DebugTask buffer)
@@ -97,6 +104,7 @@ constexpr ApfCommand APF_COMMANDS[] = {
 	{"APF_Predict",    SF_CMD_PRINT_PREDICT},
 	{"APF_Output",     SF_CMD_PRINT_OUTPUT},
 	{"APF_OutStream",  SF_CMD_TOGGLE_OUT_PRINT},
+	{"APF_LogStream",  SF_CMD_TOGGLE_LOG_STREAM},
 	{"APF_Help",       SF_CMD_PRINT_HELP},
 };
 }
@@ -144,6 +152,16 @@ void SensorFrameTask::InitTask()
 }
 
 void SensorFrameTask::Run(void * pvParams){
+
+	// Build the scenario KD-trees once at boot (task stack, not the small main stack), not on
+	// the first LAUNCH frame. A heap that is too small now fails on the bench, not in flight
+	const size_t heapBefore = xPortGetFreeHeapSize();
+	const TickType_t buildStart = xTaskGetTickCount();
+	ScenarioModel::BuildTrees();
+	SOAR_PRINT("APF: KD-trees built in %lu ms, heap used %lu B, free %lu B\n",
+			   static_cast<unsigned long>((xTaskGetTickCount() - buildStart) * portTICK_PERIOD_MS),
+			   static_cast<unsigned long>(heapBefore - xPortGetFreeHeapSize()),
+			   static_cast<unsigned long>(xPortGetFreeHeapSize()));
 
     while (1) {
         /* Process commands in blocking mode */
@@ -248,12 +266,22 @@ void SensorFrameTask::HandleTaskCommand(uint16_t taskCommand)
 		SOAR_PRINT("SensorFrame output print %s (every published FilterData, max 4 Hz)\n", outPrintEnabled ? "ON" : "OFF");
 		break;
 
+	case SF_CMD_TOGGLE_LOG_STREAM:
+		logStreamEnabled = !logStreamEnabled;
+		if (logStreamEnabled) {
+			loggedFrames = 0;
+			PrintLogHeader();
+		} else {
+			SOAR_PRINT("LOGEND,%lu\n", static_cast<unsigned long>(loggedFrames));
+		}
+		break;
+
 	case SF_CMD_RETARE:
 	{
 		// Re-tare is pad only, in flight it would stop calibrated frames and tare on flight data
-		const RocketState state = PollingTask::Inst().GetRocketState();
-		if (!IsPadState(state)) {
-			SOAR_PRINT("SensorFrame: re-tare refused, rocket state %d is not a pad state\n", static_cast<int>(state));
+		if (!IsPadState()) {
+			SOAR_PRINT("SensorFrame: re-tare refused, not on the pad (flight state %d, flown %d)\n",
+					   static_cast<int>(FlightTask::Inst().GetFlightState()), FlightTask::Inst().HasFlown() ? 1 : 0);
 			break;
 		}
 		preProcess.Reset();
@@ -305,8 +333,8 @@ void SensorFrameTask::HandleTaskCommand(uint16_t taskCommand)
 		break;
 
 	case SF_CMD_PRINT_LAUNCH:
-		SOAR_PRINT("LaunchDetection:\n");
-		launchDetection.PrintStatus();
+		SOAR_PRINT("Launch is decided by the board FlightTask: launched=%d (APF LaunchDetection disabled)\n",
+				   IsBoardLaunched() ? 1 : 0);
 		break;
 
 	case SF_CMD_PRINT_HELP:
@@ -437,9 +465,8 @@ void SensorFrameTask::ProcessFrame()
 	hasRawFrame = true;
 
 	// PreProcess tares on the first pad frames, then returns calibrated frames
-	const RocketState rocketState = PollingTask::Inst().GetRocketState();
 	SensorFrame calibrated{};
-	if (preProcess.AddFrame(frame, calibrated, IsPadState(rocketState))) {
+	if (preProcess.AddFrame(frame, calibrated, IsPadState())) {
 		lastCalibrated = calibrated;
 		hasCalibratedFrame = true;
 		RunStages(calibrated);
@@ -448,8 +475,13 @@ void SensorFrameTask::ProcessFrame()
 		hasCalibratedFrame = false;
 	}
 
-	stateSelection.Update(preProcess.IsTared(), launchDetection.IsLaunched(),
-						  IsLandedState(rocketState), frame.timestampMs);
+	// Launch comes from the board's FlightTask, not the APF LaunchDetection (disabled in RunStages)
+	stateSelection.Update(preProcess.IsTared(), IsBoardLaunched(),
+						  IsLandedState(), frame.timestampMs);
+
+	if (logStreamEnabled) {
+		PrintLogFrame(frame);
+	}
 }
 
 /**
@@ -465,9 +497,10 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 		break;
 
 	case ApfState::DETECTION:
-		// PROCESS keeps the attitude and pad altitudes current, then Launch Detection
+		// PROCESS keeps the attitude and pad altitudes current until the board detects launch
 		dynamite.Update(calibrated, preProcess.GetTareResult(), false);
-		launchDetection.Update(dynamite.GetMeasurement(), calibrated.timestampMs);
+		// APF launch detection disabled for now, the board's FlightTask decides launch (IsBoardLaunched)
+		// launchDetection.Update(dynamite.GetMeasurement(), calibrated.timestampMs);
 		break;
 
 	case ApfState::LAUNCH:
@@ -521,8 +554,7 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 	if (altPrintEnabled && stateSelection.GetState() != ApfState::PRE_LAUNCH
 		&& (now - lastAltPrintTick) * portTICK_PERIOD_MS >= RAW_PRINT_MIN_PERIOD_MS) {
 		lastAltPrintTick = now;
-		SOAR_PRINT("%s launch=%d thr=%ld mm ", StateSelection::Name(stateSelection.GetState()),
-				   launchDetection.IsLaunched() ? 1 : 0, ToMilli(launchDetection.GetStatus().threshold));
+		SOAR_PRINT("%s launch=%d ", StateSelection::Name(stateSelection.GetState()), IsBoardLaunched() ? 1 : 0);
 		dynamite.PrintLine();
 		if (ukf.IsInitialized()) {
 			ukf.PrintLine();
@@ -563,7 +595,75 @@ void SensorFrameTask::PrintApfHelp() const
 {
 	SOAR_PRINT("APF commands: APF_Raw APF_Calibrated APF_Tare APF_Alignment APF_FilterInit\n");
 	SOAR_PRINT("  APF_State APF_Dynamite APF_Launch APF_UKF APF_Apogee APF_Predict APF_Output\n");
-	SOAR_PRINT("  APF_Retare (pad only) APF_RawStream APF_AltStream APF_OutStream (toggles) APF_Help\n");
+	SOAR_PRINT("  APF_Retare (pad only) APF_RawStream APF_AltStream APF_OutStream APF_LogStream (toggles) APF_Help\n");
+}
+
+/**
+ * @brief Column names of the log stream records. Values are integers in milli SI units
+ *        (SOAR_PRINT has no %f): mm/s2, mrad/s, mdegC, mPa, nT, mm, mm/s, ms.
+ *        Tools/serial_log/apf_log.py joins the records of one frame into one CSV row
+ */
+void SensorFrameTask::PrintLogHeader() const
+{
+	SOAR_PRINT("LOGHDR,LR1,seq,t_ms,imu0_ax,imu0_ay,imu0_az,imu0_gx,imu0_gy,imu0_gz,imu0_T,"
+			   "imu1_ax,imu1_ay,imu1_az,imu1_gx,imu1_gy,imu1_gz,imu1_T\n");
+	SOAR_PRINT("LOGHDR,LR2,seq,baro0_p,baro0_T,baro1_p,baro1_T,mag_x,mag_y,mag_z,valid\n");
+	SOAR_PRINT("LOGHDR,LC,seq,c0_ax,c0_ay,c0_az,c0_gx,c0_gy,c0_gz,c1_ax,c1_ay,c1_az,c1_gx,c1_gy,c1_gz\n");
+	SOAR_PRINT("LOGHDR,LF,seq,state,flags,alt,vel,acc,alt_sd,vel_sd,apogee,t_event,dyn_alt,dyn_vel,dyn_sigma,ground\n");
+}
+
+/**
+ * @brief One frame of the log stream, rate limited to LOG_STREAM_MIN_PERIOD_MS.
+ *        LR1 / LR2 raw (sensor axes), LC calibrated (body axes, only once the tare is done),
+ *        LF filter output (same values FilterOutput publishes) + the dynamite measurement
+ */
+void SensorFrameTask::PrintLogFrame(const SensorFrame& raw)
+{
+	const TickType_t now = xTaskGetTickCount();
+	if ((now - lastLogTick) * portTICK_PERIOD_MS < LOG_STREAM_MIN_PERIOD_MS) {
+		return;
+	}
+	lastLogTick = now;
+	loggedFrames++;
+
+	const unsigned long seq = static_cast<unsigned long>(raw.sequence);
+	const SensorFrameIMU& i0 = raw.imu[0];
+	const SensorFrameIMU& i1 = raw.imu[1];
+	SOAR_PRINT("LR1,%lu,%lu,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n",
+			   seq, static_cast<unsigned long>(raw.timestampMs),
+			   ToMilli(i0.accel[0]), ToMilli(i0.accel[1]), ToMilli(i0.accel[2]),
+			   ToMilli(i0.gyro[0]), ToMilli(i0.gyro[1]), ToMilli(i0.gyro[2]), ToMilli(i0.temp),
+			   ToMilli(i1.accel[0]), ToMilli(i1.accel[1]), ToMilli(i1.accel[2]),
+			   ToMilli(i1.gyro[0]), ToMilli(i1.gyro[1]), ToMilli(i1.gyro[2]), ToMilli(i1.temp));
+
+	SOAR_PRINT("LR2,%lu,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%u\n", seq,
+			   ToMilli(raw.baro[0].pressure), ToMilli(raw.baro[0].temp),
+			   ToMilli(raw.baro[1].pressure), ToMilli(raw.baro[1].temp),
+			   ToMilli(raw.mag[0]), ToMilli(raw.mag[1]), ToMilli(raw.mag[2]),
+			   static_cast<unsigned int>(raw.validMask));
+
+	if (hasCalibratedFrame && lastCalibrated.sequence == raw.sequence) {
+		const SensorFrameIMU& c0 = lastCalibrated.imu[0];
+		const SensorFrameIMU& c1 = lastCalibrated.imu[1];
+		SOAR_PRINT("LC,%lu,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n", seq,
+				   ToMilli(c0.accel[0]), ToMilli(c0.accel[1]), ToMilli(c0.accel[2]),
+				   ToMilli(c0.gyro[0]), ToMilli(c0.gyro[1]), ToMilli(c0.gyro[2]),
+				   ToMilli(c1.accel[0]), ToMilli(c1.accel[1]), ToMilli(c1.accel[2]),
+				   ToMilli(c1.gyro[0]), ToMilli(c1.gyro[1]), ToMilli(c1.gyro[2]));
+	}
+
+	// Filter values exist once the tare is done (PRE_LAUNCH still runs the tare)
+	if (stateSelection.GetState() != ApfState::PRE_LAUNCH) {
+		const FilterData d = filterOutput.Build(raw.timestampMs, stateSelection.GetState(),
+												preProcess.GetFilterInit().groundAltitude, dynamite, launchDetection,
+												ukf, apogeeDetection, apogeePredictor);
+		const EverestMeasurement& ev = dynamite.GetMeasurement();
+		SOAR_PRINT("LF,%lu,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n", seq,
+				   static_cast<unsigned int>(d.apfState), static_cast<unsigned int>(d.flags),
+				   ToMilli(d.altitude), ToMilli(d.velocity), ToMilli(d.acceleration),
+				   ToMilli(d.altitudeStd), ToMilli(d.velocityStd), ToMilli(d.predictedApogee), ToMilli(d.timeToEvent),
+				   ToMilli(ev.altitude), ToMilli(ev.velocity), ToMilli(ev.sigma), ToMilli(d.groundAltitude));
+	}
 }
 
 /**

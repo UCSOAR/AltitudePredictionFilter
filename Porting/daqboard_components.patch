@@ -1,0 +1,225 @@
+diff --git a/.gitignore b/.gitignore
+index df68ce5..56588f7 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,6 +1,7 @@
+ Debug/
+ parsed_output/
+ sensor_log.txt
++AltitudePredictionFilter/
+ 
+ # Object files
+ *.o
+diff --git a/Components/DebugTask.cpp b/Components/DebugTask.cpp
+index 2dcc829..d85a56d 100644
+--- a/Components/DebugTask.cpp
++++ b/Components/DebugTask.cpp
+@@ -18,6 +18,7 @@
+ #include "RPBLogs.hpp"
+ 
+ #include "DAQLogs.hpp"
++#include "SensorFrameTask.hpp"
+ 
+ // External Tasks (to send debug commands to)
+ 
+@@ -199,6 +200,13 @@ void DebugTask::HandleDebugMessage(const char *msg)
+       osDelay(1000);
+     }
+   }
++  else if (strncmp(msg, "APF_", 4) == 0)
++  {
++    // Altitude prediction filter debug commands, handled by the SensorFrameTask
++    if (!SensorFrameTask::HandleApfCommand(msg)) {
++      SOAR_PRINT("Debug, unknown APF command: %s (try APF_Help)\n", msg);
++    }
++  }
+   else
+   {
+     // Single character command, or unknown command
+diff --git a/Components/LoggingModule/LoggingService.cpp b/Components/LoggingModule/LoggingService.cpp
+index d3bcb12..800bdfb 100644
+--- a/Components/LoggingModule/LoggingService.cpp
++++ b/Components/LoggingModule/LoggingService.cpp
+@@ -523,6 +523,24 @@ void LoggingService::ProcessFlashDump()
+ 							   gpsSentence);
+ 				}
+ 			}
++			//parse altitude prediction filter output and print (layout: AltitudePredictionFilter/Output/Inc/FilterLog.hpp)
++			else if (type == LoggingData::FILTER)
++			{
++				int32_t altCm;
++				int16_t velDms, accCms2;
++				uint16_t sdCm, apogeeM;
++				int8_t eventS;
++				memcpy(&altCm, sectorBuf + i + 5, 4);
++				memcpy(&velDms, sectorBuf + i + 9, 2);
++				memcpy(&accCms2, sectorBuf + i + 11, 2);
++				memcpy(&sdCm, sectorBuf + i + 13, 2);
++				memcpy(&apogeeM, sectorBuf + i + 15, 2);
++				memcpy(&eventS, sectorBuf + i + 17, 1);
++
++				SOAR_PRINT("FILTER Timestamp=%lu AltCm=%ld VelDms=%d AccCms2=%d SdCm=%u ApogeeM=%u EventS=%d State=%u Flags=%u\n",
++						   (unsigned long)timestamp, (long)altCm, (int)velDms, (int)accCms2, (unsigned int)sdCm,
++						   (unsigned int)apogeeM, (int)eventS, (unsigned int)sectorBuf[i + 18], (unsigned int)sectorBuf[i + 19]);
++			}
+ 
+ 		}
+ 		/*the dump offset at this point should be 3500, this means sector is full
+diff --git a/Components/LoggingTask/LoggingTask.cpp b/Components/LoggingTask/LoggingTask.cpp
+index f3c3e45..7de0510 100644
+--- a/Components/LoggingTask/LoggingTask.cpp
++++ b/Components/LoggingTask/LoggingTask.cpp
+@@ -26,6 +26,7 @@
+ #include "DataBroker.hpp"
+ #include "Task.hpp"
+ #include "DebugTask.hpp"
++#include "../../AltitudePredictionFilter/Output/Inc/FilterLog.hpp"
+ 
+ /************************************
+  * PRIVATE MACROS AND DEFINES
+@@ -86,6 +87,7 @@ void LoggingTask::InitTask()
+ 	DataBroker::Subscribe<BaroData>(this);
+ 	DataBroker::Subscribe<MagData>(this);
+ 	DataBroker::Subscribe<GPSData>(this);
++	DataBroker::Subscribe<FilterData>(this);
+ 
+ }
+ 
+@@ -282,6 +284,21 @@ void LoggingTask::HandleCommand(Command& cm){
+ 
+ 		break;
+ 	}
++
++	case DataBrokerMessageTypes::FILTER_DATA:
++	{
++		// Altitude prediction filter output, packed into one 20 byte slot (layout in FilterLog.hpp)
++		FilterData data = DataBroker::ExtractData<FilterData>(cm);
++
++		buf[0] = static_cast<uint8_t>(LoggingData::FILTER);
++		memcpy(buf + 1, &data.timestampMs, sizeof(data.timestampMs));	// filter frame time, 4 bytes
++		FilterLog::Pack(data, buf + 5);									// 15 bytes
++
++		LoggingService log(LoggingDest::FLASH_EXTERN, LoggingData::FILTER, buf, 20, LoggingPriority::SECOND);
++		err = log.LogData();
++		break;
++	}
++
+ 	case DataBrokerMessageTypes :: INVALID:
+ 	{
+ 		cm.Reset();
+diff --git a/Components/SystemDefines.hpp b/Components/SystemDefines.hpp
+index 5d34a66..21bc60d 100644
+--- a/Components/SystemDefines.hpp
++++ b/Components/SystemDefines.hpp
+@@ -58,9 +58,15 @@ constexpr uint8_t TASK_DEBUG_QUEUE_DEPTH_OBJS = 10;        // Size of the debug
+ constexpr uint16_t TASK_DEBUG_STACK_DEPTH_WORDS = 512;        // Size of the debug task stack
+ 
+ constexpr uint8_t TASK_LOGGING_PRIORITY = 3;
+-constexpr uint8_t TASK_LOGGING_QUEUE_DEPTH_OBJS = 10;
++constexpr uint8_t TASK_LOGGING_QUEUE_DEPTH_OBJS = 32;	// Was 10: ~6 messages per poll filled it while logging (re)started
+ constexpr uint16_t TASK_LOGGING_QUEUE_DEPTH_WORDS = 512;
+ 
++//SENSORFRAME TASK
++constexpr uint8_t TASK_SENSORFRAME_PRIORITY = 3;         // Priority of the sensorframe task (APF). Was 2: flight critical, must not wait behind logging
++constexpr uint8_t TASK_SENSORFRAME_DEPTH_OBJS = 16;      // Size of the sensorframe task queue
++constexpr uint16_t TASK_SENSORFRAME_DEPTH_WORDS = 1024; // Size of the sensorframe task stack
++
++
+ // FLASH TASK
+ constexpr uint8_t TASK_FLASH_TASK_PRIORITY = 3;         // Priority of the flash task
+ constexpr uint8_t TASK_FLASH_QUEUE_DEPTH_OBJS = 8;      // Size of the flash task queue
+diff --git a/Components/main_system.cpp b/Components/main_system.cpp
+index 39feba1..27e41ba 100644
+--- a/Components/main_system.cpp
++++ b/Components/main_system.cpp
+@@ -21,6 +21,7 @@
+ #include "PollingTask.hpp"
+ #include "main.h"
+ #include "CANTask.hpp"
++#include "SensorFrameTask.hpp"
+ 
+ /* Drivers ------------------------------------------------------------------*/
+ namespace Driver {
+@@ -44,6 +45,7 @@ void run_main() {
+     // PollingTask intializes sensors so no need for separate sensor tasks
+ 	PollingTask::Inst().InitTask();
+ 	CANTask::Inst().InitTask();
++	SensorFrameTask::Inst().InitTask();
+ 
+ //		LSM6DSOTask::Inst().InitTask();
+ //		IMUTask::Inst().InitTask();
+diff --git a/parser.py b/parser.py
+index 1a68e67..48ece30 100644
+--- a/parser.py
++++ b/parser.py
+@@ -26,6 +26,12 @@ gps_one_line_pattern = re.compile(
+     r'^GPS\s+Timestamp=(\d+)\s+Chunks=(\d+)\s+Sentence=(.*)$'
+ )
+ 
++# Altitude prediction filter output (AltitudePredictionFilter/Output/Inc/FilterLog.hpp)
++filter_pattern = re.compile(
++    r'^FILTER\s+Timestamp=(\d+)\s+AltCm=([-\d]+)\s+VelDms=([-\d]+)\s+AccCms2=([-\d]+)\s+'
++    r'SdCm=(\d+)\s+ApogeeM=(\d+)\s+EventS=([-\d]+)\s+State=(\d+)\s+Flags=(\d+)'
++)
++
+ gps_header_pattern = re.compile(
+     r'^GPS\s+Timestamp=(\d+)\s+Chunks=(\d+)$'
+ )
+@@ -38,6 +44,7 @@ imu_rows = []
+ baro_rows = []
+ mag_rows = []
+ gps_rows = []
++filter_rows = []
+ 
+ pending_gps = None
+ 
+@@ -106,6 +113,22 @@ with open(INPUT_FILE, "r", encoding="utf-8", errors="ignore") as f:
+             ])
+             continue
+ 
++        filter_match = filter_pattern.match(line)
++        if filter_match:
++            g = filter_match.groups()
++            filter_rows.append([
++                int(g[0]),                  # timestamp ms
++                int(g[1]) / 100.0,          # altitude m above pad
++                int(g[2]) / 10.0,           # velocity m/s
++                int(g[3]) / 100.0,          # acceleration m/s^2
++                int(g[4]) / 100.0,          # altitude std m
++                int(g[5]),                  # predicted apogee m
++                int(g[6]),                  # s to apogee / landing
++                int(g[7]),                  # APF state (0 PRE_LAUNCH, 1 DETECTION, 2 LAUNCH, 3 LANDED)
++                int(g[8]),                  # flags (FILTER_FLAG_*)
++            ])
++            continue
++
+         gps_one_line_match = gps_one_line_pattern.match(line)
+         if gps_one_line_match:
+             gps_rows.append([
+@@ -134,6 +157,7 @@ imu_rows = sort_rows_by_timestamp(imu_rows, 3)
+ baro_rows = sort_rows_by_timestamp(baro_rows, 3)
+ mag_rows = sort_rows_by_timestamp(mag_rows, 0)
+ gps_rows = sort_rows_by_timestamp(gps_rows, 0)
++filter_rows = sort_rows_by_timestamp(filter_rows, 0)
+ 
+ # ----------------------------
+ # Write CSV files
+@@ -166,11 +190,18 @@ with open(OUTPUT_DIR / "gps_data.csv", "w", newline="") as f:
+     writer.writerow(["timestamp", "chunks", "sentence"])
+     writer.writerows(gps_rows)
+ 
++with open(OUTPUT_DIR / "filter_data.csv", "w", newline="") as f:
++    writer = csv.writer(f)
++    writer.writerow(["timestamp", "altitude_m", "velocity_mps", "acceleration_mps2", "altitude_std_m",
++                     "predicted_apogee_m", "time_to_event_s", "apf_state", "flags"])
++    writer.writerows(filter_rows)
++
+ print("CSV export complete.")
+ print(f"IMU rows:  {len(imu_rows)}")
+ print(f"BARO rows: {len(baro_rows)}")
+ print(f"MAG rows:  {len(mag_rows)}")
+ print(f"GPS rows:  {len(gps_rows)}")
++print(f"FILTER rows: {len(filter_rows)}")
+ 
+ # ----------------------------
+ # Helper functions for plotting

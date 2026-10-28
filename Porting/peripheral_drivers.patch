@@ -1,0 +1,371 @@
+diff --git a/IMU32/LSM6DO32Driver.cpp b/IMU32/LSM6DO32Driver.cpp
+index 004c8b5..bdeab6d 100644
+--- a/IMU32/LSM6DO32Driver.cpp
++++ b/IMU32/LSM6DO32Driver.cpp
+@@ -29,8 +29,10 @@ void LSM6DO32_Driver::Init(SPI_HandleTypeDef *hspi_, GPIO_TypeDef *cs_gpio_, uin
+ 	}
+ 
+ 	SetRegister(LSM6DSO32_REG::CTRL3_C, 0b01000100);
+-	SetRegister(LSM6DSO32_REG::CTRL1_XL, 0b01011100);
+-	SetRegister(LSM6DSO32_REG::CTRL2_G, 0b01010000);
++	// 208 Hz, accel +/-32 g (FS_XL = 01), was +/-16 g: a hot boost clipped both IMUs
++	SetRegister(LSM6DSO32_REG::CTRL1_XL, 0b01010100);
++	// 208 Hz, gyro +/-2000 dps (FS_G = 11)
++	SetRegister(LSM6DSO32_REG::CTRL2_G, 0b01011100);
+ 	SetRegister(LSM6DSO32_REG::FIFO_CTRL4, 0b00000000);
+ 
+ 	CalibrateGyroBias();
+@@ -161,17 +163,19 @@ const IMUData LSM6DO32_Driver::ConvertRawMeasurementToStruct(const uint8_t *buf,
+ 	if (accel)
+ 	{
+ 
+-		out.accel.x = scaleToInt16(rawAx, 488, 1000);
+-		out.accel.y = scaleToInt16(rawAy, 488, 1000);
+-		out.accel.z = scaleToInt16(rawAz, 488, 1000);
++		// mg, +/-32 g range: 0.976 mg/LSB
++		out.accel.x = scaleToInt16(rawAx, 976, 1000);
++		out.accel.y = scaleToInt16(rawAy, 976, 1000);
++		out.accel.z = scaleToInt16(rawAz, 976, 1000);
+ 	}
+ 
+ 	if (gyro)
+ 	{
+-		// Store angular rate as integer mdps.
+-		out.gyro.x = scaleToInt16(rawGx, 875, 100);
+-		out.gyro.y = scaleToInt16(rawGy, 875, 100);
+-		out.gyro.z = scaleToInt16(rawGz, 875, 100);
++		// Store angular rate as integer 0.1 dps (+/-2000 dps range, 70 mdps/LSB = 0.7 x 0.1 dps).
++		// int16 milli-dps clipped at 32.8 dps, far below rocket roll rates
++		out.gyro.x = scaleToInt16(rawGx, 7, 10);
++		out.gyro.y = scaleToInt16(rawGy, 7, 10);
++		out.gyro.z = scaleToInt16(rawGz, 7, 10);
+ 	}
+ 
+ 	if (temp)
+diff --git a/LSM6DSODriver/lsm6dso.cpp b/LSM6DSODriver/lsm6dso.cpp
+index 38b24b9..4f4cc8c 100644
+--- a/LSM6DSODriver/lsm6dso.cpp
++++ b/LSM6DSODriver/lsm6dso.cpp
+@@ -34,10 +34,10 @@ void LSM6DSO_Driver::Init(SPI_HandleTypeDef *hspi_, uint8_t cs_pin_, GPIO_TypeDe
+ 	/*set CTRL3_C reg disable continuous update for predictable reads, as well enable
+ 	 * automatic increment of register addresses with multiple byte reads*/
+ 	setRegister(LSM6DSO_REG::CTRL3_C, 0b01000100);
+-	// set CTRL1_XL reg 208Hz and 2g for Accel
++	// set CTRL1_XL reg 208Hz and 16g for Accel (FS_XL = 01)
+ 	setRegister(LSM6DSO_REG::CTRL1_XL, 0b01010100);
+-	// set CTRL2_G reg 208Hz and 250dps for Gyro
+-	setRegister(LSM6DSO_REG::CTRL2_G, 0b01010000);
++	// set CTRL2_G reg 208Hz and 2000dps for Gyro (FS_G = 11)
++	setRegister(LSM6DSO_REG::CTRL2_G, 0b01011100);
+ 	// bypass FIFO mode
+ 	setRegister(LSM6DSO_REG::FIFO_CTRL_4, 0b00000000);
+ 
+@@ -161,10 +161,11 @@ IMUData LSM6DSO_Driver::bytesToStruct(const uint8_t *raw_bytes, bool accel, bool
+ 
+ 	if (gyro)
+ 	{
+-		// Store angular rate as integer mdps.
+-		out.gyro.x = scaleToInt16(rawGx, 875, 100);
+-		out.gyro.y = scaleToInt16(rawGy, 875, 100);
+-		out.gyro.z = scaleToInt16(rawGz, 875, 100);
++		// Store angular rate as integer 0.1 dps (+/-2000 dps range, 70 mdps/LSB = 0.7 x 0.1 dps).
++		// int16 milli-dps clipped at 32.8 dps, far below rocket roll rates
++		out.gyro.x = scaleToInt16(rawGx, 7, 10);
++		out.gyro.y = scaleToInt16(rawGy, 7, 10);
++		out.gyro.z = scaleToInt16(rawGz, 7, 10);
+ 	}
+ 
+ 	if (temp)
+diff --git a/MS5607Driver/Inc/MS5607Driver.hpp b/MS5607Driver/Inc/MS5607Driver.hpp
+index 638e121..139172d 100644
+--- a/MS5607Driver/Inc/MS5607Driver.hpp
++++ b/MS5607Driver/Inc/MS5607Driver.hpp
+@@ -36,6 +36,16 @@ private:
+ 	uint32_t getTemperatureReading();
+ 	uint32_t getPressureReading();
+ 	void resetBarometer();
++	void loadCalibration();
++
++	// Calibration PROM, read once
++	uint16_t prom[6] = {0, 0, 0, 0, 0, 0};
++	bool promLoaded = false;
++
++	// Temperature is refreshed every BARO_TEMP_EVERY samples
++	static constexpr uint8_t BARO_TEMP_EVERY = 10;
++	uint32_t lastTemperatureReading = 0;
++	uint8_t temperatureCountdown = 0;
+ };
+ 
+ /************************************ * FUNCTION DECLARATIONS ************************************/
+diff --git a/MS5607Driver/MS5607Driver.cpp b/MS5607Driver/MS5607Driver.cpp
+index 06d398f..a431f6d 100644
+--- a/MS5607Driver/MS5607Driver.cpp
++++ b/MS5607Driver/MS5607Driver.cpp
+@@ -10,8 +10,8 @@
+ /************************************ * PRIVATE MACROS AND DEFINES ************************************/
+ /************************************ * VARIABLES ************************************/
+ // Barometer Commands (should not be modified, non-const due to HAL and C++ strictness)
+-static uint8_t ADC_D1_512_CONV_CMD = 0x42;
+-static uint8_t ADC_D2_512_CONV_CMD = 0x52;
++static uint8_t ADC_D1_CONV_CMD = 0x46;   // Pressure, OSR 2048 (4.54 ms max, ~0.02 mbar noise)
++static uint8_t ADC_D2_CONV_CMD = 0x54;   // Temperature, OSR 1024 (2.28 ms max)
+ static uint8_t ADC_READ_CMD = 0x00;
+ static uint8_t PROM_READ_SENS_CMD = 0xA2;
+ static uint8_t PROM_READ_OFF_CMD = 0xA4;
+@@ -59,16 +59,17 @@ BaroData MS5607_Driver::getSample(){
+ 	uint32_t temperatureReading = 0;    // Stores a 24 bit value
+ 	BaroData data;
+ 
+-	// Reset the barometer
+-	resetBarometer();
+-
+-	// Read PROM for calibration coefficients
+-	uint16_t c1Sens = readCalibrationCoefficients(PROM_READ_SENS_CMD);
+-	uint16_t c2Off = readCalibrationCoefficients(PROM_READ_OFF_CMD);
+-	uint16_t c3Tcs = readCalibrationCoefficients(PROM_READ_TCS_CMD);
+-	uint16_t c4Tco = readCalibrationCoefficients(PROM_READ_TCO_CMD);
+-	uint16_t c5Tref = readCalibrationCoefficients(PROM_READ_TREF_CMD);
+-	uint16_t c6Tempsens = readCalibrationCoefficients(PROM_READ_TEMPSENS_CMD);
++	// Reset + read the calibration PROM once: it never changes, and doing it every sample
++	// cost ~8 ms per baro per poll
++	if (!promLoaded) {
++		loadCalibration();
++	}
++	const uint16_t c1Sens = prom[0];
++	const uint16_t c2Off = prom[1];
++	const uint16_t c3Tcs = prom[2];
++	const uint16_t c4Tco = prom[3];
++	const uint16_t c5Tref = prom[4];
++	const uint16_t c6Tempsens = prom[5];
+ 
+ 	/**
+ 	 * Repeatedly read digital pressure and temperature.
+@@ -79,7 +80,14 @@ BaroData MS5607_Driver::getSample(){
+ 	pressureReading = getPressureReading();
+ 
+ 	/* Read Digital Temperature (D2) -------------------------------------*/
+-	temperatureReading = getTemperatureReading();
++	// Temperature only compensates the pressure and changes slowly: refresh it every
++	// BARO_TEMP_EVERY samples, which keeps a poll as fast as before with the higher OSR
++	if (temperatureCountdown == 0 || lastTemperatureReading == 0) {
++		lastTemperatureReading = getTemperatureReading();
++		temperatureCountdown = BARO_TEMP_EVERY;
++	}
++	temperatureCountdown--;
++	temperatureReading = lastTemperatureReading;
+ 
+ 	/* Calculate First-Order Temperature and Parameters ------------------*/
+ 
+@@ -150,6 +158,22 @@ uint16_t MS5607_Driver::readCalibrationCoefficients(uint8_t PROM_READ_CMD)
+     return coefficient;
+ }
+ 
++/**
++ * @brief   Resets the barometer and reads the 6 PROM calibration coefficients (once)
++ */
++void MS5607_Driver::loadCalibration()
++{
++	resetBarometer();
++	prom[0] = readCalibrationCoefficients(PROM_READ_SENS_CMD);
++	prom[1] = readCalibrationCoefficients(PROM_READ_OFF_CMD);
++	prom[2] = readCalibrationCoefficients(PROM_READ_TCS_CMD);
++	prom[3] = readCalibrationCoefficients(PROM_READ_TCO_CMD);
++	prom[4] = readCalibrationCoefficients(PROM_READ_TREF_CMD);
++	prom[5] = readCalibrationCoefficients(PROM_READ_TEMPSENS_CMD);
++	// A blank bus reads 0x0000 / 0xFFFF: try again next sample
++	promLoaded = (prom[0] != 0x0000 && prom[0] != 0xFFFF);
++}
++
+ /**
+  * @brief   This function resets the barometer prior to sampling
+  */
+@@ -172,12 +196,12 @@ uint32_t MS5607_Driver::getPressureReading()
+ 	uint32_t pressureReading = 0;    // Stores a 24 bit value
+ 	uint8_t dataInBuffer;
+ 
+-	// Tell the barometer to convert the pressure to a digital value with an over-sampling ratio of 512
++	// Tell the barometer to convert the pressure to a digital value with an over-sampling ratio of 2048
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_RESET);
+-	HAL_SPI_Transmit(hspi, &ADC_D1_512_CONV_CMD, CMD_SIZE, CMD_TIMEOUT);
++	HAL_SPI_Transmit(hspi, &ADC_D1_CONV_CMD, CMD_SIZE, CMD_TIMEOUT);
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_SET);
+ 
+-	osDelay(2); // 1.17ms max conversion time for an over-sampling ratio of 512
++	osDelay(6); // 4.54 ms max at OSR 2048. osDelay(n) can return after n-1 ticks, so keep a full tick spare
+ 
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_RESET);
+ 
+@@ -209,12 +233,12 @@ uint32_t MS5607_Driver::getTemperatureReading()
+ 	uint32_t temperatureReading = 0;    // Stores a 24 bit value
+ 	uint8_t dataInBuffer;
+ 
+-	// Tell the barometer to convert the temperature to a digital value with an over-sampling ratio of 512
++	// Tell the barometer to convert the temperature to a digital value with an over-sampling ratio of 1024
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_RESET);
+-	HAL_SPI_Transmit(hspi, &ADC_D2_512_CONV_CMD, CMD_SIZE, CMD_TIMEOUT);
++	HAL_SPI_Transmit(hspi, &ADC_D2_CONV_CMD, CMD_SIZE, CMD_TIMEOUT);
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_SET);
+ 
+-	osDelay(2); // 1.17ms max conversion time for an over-sampling ratio of 512
++	osDelay(4); // 2.28 ms max at OSR 1024. osDelay(n) can return after n-1 ticks, so keep a full tick spare
+ 
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_RESET);
+ 
+diff --git a/MS5611Driver/Inc/MS5611Driver.hpp b/MS5611Driver/Inc/MS5611Driver.hpp
+index ef2b2f4..2ed3cda 100644
+--- a/MS5611Driver/Inc/MS5611Driver.hpp
++++ b/MS5611Driver/Inc/MS5611Driver.hpp
+@@ -36,6 +36,16 @@ private:
+ 	uint32_t getTemperatureReading();
+ 	uint32_t getPressureReading();
+ 	void resetBarometer();
++	void loadCalibration();
++
++	// Calibration PROM, read once
++	uint16_t prom[6] = {0, 0, 0, 0, 0, 0};
++	bool promLoaded = false;
++
++	// Temperature is refreshed every BARO_TEMP_EVERY samples
++	static constexpr uint8_t BARO_TEMP_EVERY = 10;
++	uint32_t lastTemperatureReading = 0;
++	uint8_t temperatureCountdown = 0;
+ };
+ 
+ /************************************ * FUNCTION DECLARATIONS ************************************/
+diff --git a/MS5611Driver/MS5611Driver.cpp b/MS5611Driver/MS5611Driver.cpp
+index 7a97291..7308a8b 100644
+--- a/MS5611Driver/MS5611Driver.cpp
++++ b/MS5611Driver/MS5611Driver.cpp
+@@ -12,8 +12,8 @@
+ /************************************ * PRIVATE MACROS AND DEFINES ************************************/
+ /************************************ * VARIABLES ************************************/
+ // Barometer Commands (should not be modified, non-const due to HAL and C++ strictness)
+-static uint8_t ADC_D1_512_CONV_CMD = 0x42;
+-static uint8_t ADC_D2_512_CONV_CMD = 0x52;
++static uint8_t ADC_D1_CONV_CMD = 0x46;   // Pressure, OSR 2048 (4.54 ms max, ~0.02 mbar noise)
++static uint8_t ADC_D2_CONV_CMD = 0x54;   // Temperature, OSR 1024 (2.28 ms max)
+ static uint8_t ADC_READ_CMD = 0x00;
+ static uint8_t PROM_READ_SENS_CMD = 0xA2;
+ static uint8_t PROM_READ_OFF_CMD = 0xA4;
+@@ -86,16 +86,17 @@ BaroData MS5611_Driver::getSample(){
+ 	uint8_t dataInBuffer;
+ 	BaroData data;
+ 
+-	// Reset the barometer
+-	resetBarometer();
+-
+-	// Read PROM for calibration coefficients
+-	uint16_t c1Sens = readCalibrationCoefficients(PROM_READ_SENS_CMD);
+-	uint16_t c2Off = readCalibrationCoefficients(PROM_READ_OFF_CMD);
+-	uint16_t c3Tcs = readCalibrationCoefficients(PROM_READ_TCS_CMD);
+-	uint16_t c4Tco = readCalibrationCoefficients(PROM_READ_TCO_CMD);
+-	uint16_t c5Tref = readCalibrationCoefficients(PROM_READ_TREF_CMD);
+-	uint16_t c6Tempsens = readCalibrationCoefficients(PROM_READ_TEMPSENS_CMD);
++	// Reset + read the calibration PROM once: it never changes, and doing it every sample
++	// cost ~8 ms per baro per poll
++	if (!promLoaded) {
++		loadCalibration();
++	}
++	const uint16_t c1Sens = prom[0];
++	const uint16_t c2Off = prom[1];
++	const uint16_t c3Tcs = prom[2];
++	const uint16_t c4Tco = prom[3];
++	const uint16_t c5Tref = prom[4];
++	const uint16_t c6Tempsens = prom[5];
+ 
+ 	/**
+ 	 * Repeatedly read digital pressure and temperature.
+@@ -106,7 +107,14 @@ BaroData MS5611_Driver::getSample(){
+ 	pressureReading = getPressureReading();
+ 
+ 	/* Read Digital Temperature (D2) -------------------------------------*/
+-	temperatureReading = getTemperatureReading();
++	// Temperature only compensates the pressure and changes slowly: refresh it every
++	// BARO_TEMP_EVERY samples, which keeps a poll as fast as before with the higher OSR
++	if (temperatureCountdown == 0 || lastTemperatureReading == 0) {
++		lastTemperatureReading = getTemperatureReading();
++		temperatureCountdown = BARO_TEMP_EVERY;
++	}
++	temperatureCountdown--;
++	temperatureReading = lastTemperatureReading;
+ 
+ 	/* Calculate First-Order Temperature and Parameters ------------------*/
+ 
+@@ -193,12 +201,12 @@ uint32_t MS5611_Driver::getTemperatureReading()
+ 	uint32_t temperatureReading = 0;    // Stores a 24 bit value
+ 	uint8_t dataInBuffer;
+ 
+-	// Tell the barometer to convert the temperature to a digital value with an over-sampling ratio of 512
++	// Tell the barometer to convert the temperature to a digital value with an over-sampling ratio of 1024
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_RESET);
+-	HAL_SPI_Transmit(hspi, &ADC_D2_512_CONV_CMD, CMD_SIZE, CMD_TIMEOUT);
++	HAL_SPI_Transmit(hspi, &ADC_D2_CONV_CMD, CMD_SIZE, CMD_TIMEOUT);
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_SET);
+ 
+-	osDelay(2); // 1.17ms max conversion time for an over-sampling ratio of 512
++	osDelay(4); // 2.28 ms max at OSR 1024. osDelay(n) can return after n-1 ticks, so keep a full tick spare
+ 
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_RESET);
+ 
+@@ -234,12 +242,12 @@ uint32_t MS5611_Driver::getPressureReading()
+ 	uint32_t pressureReading = 0;    // Stores a 24 bit value
+ 	uint8_t dataInBuffer;
+ 
+-	// Tell the barometer to convert the pressure to a digital value with an over-sampling ratio of 512
++	// Tell the barometer to convert the pressure to a digital value with an over-sampling ratio of 2048
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_RESET);
+-	HAL_SPI_Transmit(hspi, &ADC_D1_512_CONV_CMD, CMD_SIZE, CMD_TIMEOUT);
++	HAL_SPI_Transmit(hspi, &ADC_D1_CONV_CMD, CMD_SIZE, CMD_TIMEOUT);
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_SET);
+ 
+-	osDelay(2); // 1.17ms max conversion time for an over-sampling ratio of 512
++	osDelay(6); // 4.54 ms max at OSR 2048. osDelay(n) can return after n-1 ticks, so keep a full tick spare
+ 
+ 	HAL_GPIO_WritePin(cs_gpio, cs_pin, GPIO_PIN_RESET);
+ 
+@@ -263,6 +271,22 @@ uint32_t MS5611_Driver::getPressureReading()
+ }
+ 
+ 
++/**
++ * @brief   Resets the barometer and reads the 6 PROM calibration coefficients (once)
++ */
++void MS5611_Driver::loadCalibration()
++{
++	resetBarometer();
++	prom[0] = readCalibrationCoefficients(PROM_READ_SENS_CMD);
++	prom[1] = readCalibrationCoefficients(PROM_READ_OFF_CMD);
++	prom[2] = readCalibrationCoefficients(PROM_READ_TCS_CMD);
++	prom[3] = readCalibrationCoefficients(PROM_READ_TCO_CMD);
++	prom[4] = readCalibrationCoefficients(PROM_READ_TREF_CMD);
++	prom[5] = readCalibrationCoefficients(PROM_READ_TEMPSENS_CMD);
++	// A blank bus reads 0x0000 / 0xFFFF: try again next sample
++	promLoaded = (prom[0] != 0x0000 && prom[0] != 0xFFFF);
++}
++
+ /**
+  * @brief   This function resets the barometer prior to sampling
+  */
+diff --git a/PollingTask.cpp b/PollingTask.cpp
+index 17ef8a4..d4d59f1 100644
+--- a/PollingTask.cpp
++++ b/PollingTask.cpp
+@@ -20,7 +20,7 @@ constexpr uint32_t kBoostPollMs = 50;
+ constexpr uint32_t kCoastPollMs = 100;
+ constexpr uint32_t kDescentPollMs = 100;
+ constexpr uint32_t kRecoveryPollMs = 250;
+-constexpr uint32_t kGroundPollMs = 300;
++constexpr uint32_t kGroundPollMs = 20;	// Max rate on the pad so the APF tare / launch detection run at flight rate
+ constexpr uint32_t kCanServicePeriodMs = 20;
+ 
+ 
+@@ -346,8 +346,8 @@ void PollingTask::PollSensors()
+ 	imu32Data = imu32.ConvertRawMeasurementToStruct(data);
+ 	imu32Data.id = 1;
+ 
+-	magnetometer.triggerMeasurement();
+ 	magnetometer.readData(driverData);
++	magnetometer.triggerMeasurement();
+ 
+ 	magData.magX = driverData.scaledX;
+ 	magData.magY = driverData.scaledY;

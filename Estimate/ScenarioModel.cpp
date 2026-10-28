@@ -254,6 +254,12 @@ void AtTime(const ScenarioPoint* rows, uint16_t count, float time, float out[3])
 /************************************
  * FUNCTION DEFINITIONS
  ************************************/
+void ScenarioModel::BuildTrees()
+{
+	// Tree() builds every case / phase on its first call, the trees themselves are unchanged
+	(void)Tree(0, false);
+}
+
 ScenarioMatch ScenarioModel::Match(float altitude, float velocity, float acceleration) const
 {
 	const std::array<float, 3> measurement = {altitude, velocity, acceleration};

@@ -1,0 +1,120 @@
+diff --git a/Components/DataBroker/Inc/Publisher.hpp b/Components/DataBroker/Inc/Publisher.hpp
+index c664c44..7787bdf 100644
+--- a/Components/DataBroker/Inc/Publisher.hpp
++++ b/Components/DataBroker/Inc/Publisher.hpp
+@@ -85,7 +85,9 @@ class Publisher {
+         // copy data to command
+         brokerData.CopyDataToCommand(messsageData, sizeof(T));
+ 
+-        subscriber.getSubscriberQueueHandle()->Send(brokerData);
++        // Never block: a subscriber whose queue is full loses this message, the publisher
++        // (e.g. PollingTask) and the other subscribers carry on at full rate
++        subscriber.getSubscriberQueueHandle()->Send(brokerData, true, 0);
+       }
+     }
+   }
+diff --git a/Components/SystemTypes/SensorDataTypes.hpp b/Components/SystemTypes/SensorDataTypes.hpp
+index 9d5042a..584e8fc 100644
+--- a/Components/SystemTypes/SensorDataTypes.hpp
++++ b/Components/SystemTypes/SensorDataTypes.hpp
+@@ -53,15 +53,34 @@ struct BaroData{
+ 	uint8_t id;
+ };
+ 
++/**
++ * @brief Output of the altitude prediction filter (AltitudePredictionFilter/Output).
++ *        Published on the DataBroker (FILTER_DATA) and logged to flash (LoggingData::FILTER).
++ *        Altitudes are relative to the pad, up is positive
++ * @param timestampMs     Frame time the estimate belongs to
++ * @param altitude        m (UKF in flight, Dynamite before launch)
++ * @param velocity        m/s
++ * @param acceleration    m/s^2, net (gravity removed)
++ * @param altitudeStd     m, 1 sigma
++ * @param velocityStd     m/s, 1 sigma
++ * @param predictedApogee m, 0 when there is no prediction
++ * @param timeToEvent     s to the predicted apogee (before apogee) or landing (after apogee)
++ * @param groundAltitude  m above sea level of the pad (tare)
++ * @param apfState        ApfState (0 PRE_LAUNCH, 1 DETECTION, 2 LAUNCH, 3 LANDED)
++ * @param flags           FILTER_FLAG_* bits (FilterOutput.hpp)
++ */
+ struct FilterData{
+-	uint32_t alt;
+-	uint32_t velo;
+-	uint32_t accel;
+-
+-	uint32_t altPredicted;
+-	uint32_t veloPredicted;
+-	uint32_t accelPredicted;
+-	uint32_t timePredicted;
++	uint32_t timestampMs;
++	float altitude;
++	float velocity;
++	float acceleration;
++	float altitudeStd;
++	float velocityStd;
++	float predictedApogee;
++	float timeToEvent;
++	float groundAltitude;
++	uint8_t apfState;
++	uint8_t flags;
+ };
+ struct MagDriverData{
+ 	uint32_t rawX;
+diff --git a/Core/Inc/Queue.hpp b/Core/Inc/Queue.hpp
+index dd4cd34..897df8f 100644
+--- a/Core/Inc/Queue.hpp
++++ b/Core/Inc/Queue.hpp
+@@ -34,6 +34,7 @@ public:
+ 
+     //Functions
+     bool Send(Command& command, bool reportFull = true);
++    bool Send(Command& command, bool reportFull, uint32_t waitTicks);  // waitTicks = 0: never block, drop if full
+     bool SendFromISR(Command& command);
+ 
+     bool SendToFront(Command& command);
+diff --git a/Core/Queue.cpp b/Core/Queue.cpp
+index c216b07..edebf8e 100644
+--- a/Core/Queue.cpp
++++ b/Core/Queue.cpp
+@@ -9,6 +9,7 @@
+ 
+ #include "SystemDefines.hpp"
+ #include "FreeRTOS.h"
++#include "task.h"
+ 
+ 
+ /**
+@@ -76,10 +77,31 @@ bool Queue::SendToFront(Command& command)
+ */
+ bool Queue::Send(Command& command, bool reportFull)
+ {
+-    if (xQueueSend(rtQueueHandle, &command, DEFAULT_QUEUE_SEND_WAIT_TICKS) == pdPASS)
++    return Send(command, reportFull, DEFAULT_QUEUE_SEND_WAIT_TICKS);
++}
++
++/**
++ * @brief Same as Send(), with the time to wait for space. 0 never blocks: a full queue drops
++ *        the command straight away (DataBroker publishes, so a slow subscriber can't stall the sender)
++*/
++bool Queue::Send(Command& command, bool reportFull, uint32_t waitTicks)
++{
++    if (xQueueSend(rtQueueHandle, &command, waitTicks) == pdPASS)
+         return true;
+ 
+-    if (reportFull) SOAR_PRINT("Could not send data to queue!\n");
++    // Debug: who sent, which queue (depth identifies the receiving task), what was dropped.
++    // Only the first drop and then every 100th is printed, so a full queue can't flood the UART
++    static uint32_t droppedTotal = 0;
++    droppedTotal++;
++    if (reportFull && (droppedTotal == 1 || droppedTotal % 100 == 0)) {
++        SOAR_PRINT("Could not send data to queue! sender=%s queue=0x%08lx used=%u/%u cmd=%u taskCmd=%u size=%u t=%lums dropped=%lu\n",
++                   pcTaskGetName(NULL), (unsigned long)(uintptr_t)rtQueueHandle,
++                   (unsigned)uxQueueMessagesWaiting(rtQueueHandle), (unsigned)queueDepth,
++                   (unsigned)command.GetCommand(), (unsigned)command.GetTaskCommand(),
++                   (unsigned)command.GetDataSize(),
++                   (unsigned long)(xTaskGetTickCount() * portTICK_PERIOD_MS),
++                   (unsigned long)droppedTotal);
++    }
+ 
+     command.Reset();
+ 

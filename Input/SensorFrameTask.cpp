@@ -579,7 +579,7 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 			QueueEvent(FilterLog::EVENT_APOGEE, FilterLog::Round(apogeeDetection.GetStatus().maxAltitude * 100.0f));
 			SaveState(savedPhase, calibrated.timestampMs);
 		}
-		{
+		if (PREDICT_ENABLED) {
 			const uint32_t start = DWT->CYCCNT;
 			apogeePredictor.Update(ukf, calibrated.timestampMs);
 			predictorTime.Add(DWT->CYCCNT - start);

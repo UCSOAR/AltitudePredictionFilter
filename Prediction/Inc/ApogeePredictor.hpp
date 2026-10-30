@@ -14,6 +14,9 @@
  * MACROS AND DEFINES
  ************************************/
 constexpr uint32_t PREDICT_PERIOD_MS = 200;		// Run every 200 ms (5 Hz), not every frame
+// Apogee prediction off: one run takes ~0.7-1.4 s at 400 MHz and starved the UKF (sensor frames dropped).
+// Apogee detection does not use it. Turn back on (IREC) once the predictor is optimized
+constexpr bool PREDICT_ENABLED = false;
 constexpr float PREDICT_STEP_S = 0.1f;			// Projection step (same as the scenario tables)
 constexpr float PREDICT_MAX_S = 60.0f;			// Give up projecting after this long (apogee)
 constexpr float PREDICT_LANDING_MAX_S = 900.0f;	// Landing projection limit

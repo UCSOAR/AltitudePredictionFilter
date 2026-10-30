@@ -276,6 +276,7 @@ void SensorFrameTask::HandleTaskCommand(uint16_t taskCommand)
 
 	case SF_CMD_PRINT_APOGEE:
 		apogeeDetection.PrintStatus();
+		airbrakeCheck.PrintStatus();
 		break;
 
 	case SF_CMD_PRINT_PREDICT:
@@ -583,6 +584,11 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 			apogeePredictor.Update(ukf, calibrated.timestampMs);
 			predictorTime.Add(DWT->CYCCNT - start);
 		}
+		if (airbrakeCheck.Update(apogeePredictor.Get(), ukf.State()[2] < 0.0f, apogeeDetection.HasMoved(),
+								 apogeeDetection.IsReached(), calibrated.timestampMs)) {
+			QueueEvent(airbrakeCheck.GetStatus().flagged ? FilterLog::EVENT_AIRBRAKE_FLAG : FilterLog::EVENT_AIRBRAKE_CHECK,
+					   airbrakeCheck.EventValue());
+		}
 		break;
 	}
 
@@ -644,6 +650,7 @@ void SensorFrameTask::ResetFilter(uint32_t nowMs)
 	ukf.Reset();
 	apogeeDetection.Reset();
 	apogeePredictor.Reset();
+	airbrakeCheck.Reset();
 	filterOutput.Reset();
 	stateSelection.Reset(nowMs);
 	restoredFlight = false;

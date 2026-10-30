@@ -17,6 +17,7 @@
 #include "../../Estimate/Inc/Ukf.hpp"
 #include "../../Prediction/Inc/ApogeeDetection.hpp"
 #include "../../Prediction/Inc/ApogeePredictor.hpp"
+#include "../../Prediction/Inc/AirbrakeCheck.hpp"
 #include "../../Output/Inc/FilterOutput.hpp"
 #include "../../Output/Inc/FilterLog.hpp"
 
@@ -120,6 +121,9 @@ class SensorFrameTask: public Task
 
 		// PREDICTION stage: apogee / trajectory / landing predictor
 		ApogeePredictor apogeePredictor;
+
+		// PREDICTION stage: airbrake level from the predicted apogee (logged only, nothing actuated)
+		AirbrakeCheck airbrakeCheck;
 
 		// OUTPUT stage: FilterData for the DataBroker (logged to flash by the LoggingTask)
 		FilterOutput filterOutput;

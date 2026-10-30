@@ -280,9 +280,24 @@ void Ukf::Predict(float dt)
 		}
 	}
 #ifdef APF_PC_REPLAY
+	burnedOut = burnedOut || (x[2] < 0.0f);
+	status.qPhase = scenarioModel.IsAfterApogee() ? 2 : (burnedOut ? 1 : 0);
+	for (uint8_t i = 0; i < UKF_N; i++) {
+		for (uint8_t j = 0; j < UKF_N; j++) {
+			status.qUsed[i][j] = q.m[i][j];
+		}
+	}
+	// Replay test: the full Q of the flight phase instead (SetQFull)
+	if (qFullOn) {
+		for (uint8_t i = 0; i < UKF_N; i++) {
+			for (uint8_t j = 0; j < UKF_N; j++) {
+				Pp[i][j] += (qFull[status.qPhase][i][j] - q.m[i][j]) * qScale;
+				status.qUsed[i][j] = qFull[status.qPhase][i][j];
+			}
+		}
+	}
 	// Replay test: the Q diagonal of the flight phase instead (SetPhaseQ)
 	if (phaseQOn) {
-		burnedOut = burnedOut || (x[2] < 0.0f);
 		const uint8_t phase = scenarioModel.IsAfterApogee() ? 2 : (burnedOut ? 1 : 0);
 		for (uint8_t i = 0; i < UKF_N; i++) {
 			Pp[i][i] += (phaseQ[phase][i] - q.m[i][i]) * qScale;
@@ -333,6 +348,17 @@ void Ukf::Update(const EverestMeasurement& everest)
 
 	M3 K;
 	Multiply(P, Sinv, K);
+#ifdef APF_PC_REPLAY
+	status.nis = 0.0f;
+	for (uint8_t i = 0; i < UKF_N; i++) {
+		for (uint8_t j = 0; j < UKF_N; j++) {
+			status.S[i][j] = S[i][j];
+			status.R[i][j] = R[i][j];
+			status.K[i][j] = K[i][j];
+			status.nis += status.innovation[i] * Sinv[i][j] * status.innovation[j];
+		}
+	}
+#endif
 	for (uint8_t i = 0; i < UKF_N; i++) {
 		status.gain[i] = K[i][i];
 	}
@@ -416,6 +442,18 @@ void Ukf::SetPhaseQ(const float q[3 * UKF_N])
 		}
 	}
 	phaseQOn = true;
+}
+
+void Ukf::SetQFull(const float q[3 * UKF_N * UKF_N])
+{
+	for (uint8_t p = 0; p < 3; p++) {
+		for (uint8_t i = 0; i < UKF_N; i++) {
+			for (uint8_t j = 0; j < UKF_N; j++) {
+				qFull[p][i][j] = q[(p * UKF_N + i) * UKF_N + j];
+			}
+		}
+	}
+	qFullOn = true;
 }
 
 void Ukf::SetNoiseTuning(const float q[UKF_N], const float r[UKF_N])

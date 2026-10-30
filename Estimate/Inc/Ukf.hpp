@@ -44,6 +44,15 @@ struct UkfStatus
 	uint32_t resets;			// Covariance resets after a failed Cholesky
 	uint8_t gainResets;			// Legacy model: sigma points whose scenario pair changed this predict (blended 50 / 50)
 	uint32_t gainResetsTotal;
+#ifdef APF_PC_REPLAY
+	// Replay diagnostics (Tools/replay/q_validation): last update / predict
+	float S[UKF_N][UKF_N];		// Innovation covariance P- + R
+	float R[UKF_N][UKF_N];		// Effective R (floor, altitude raised to the Dynamite sigma)
+	float K[UKF_N][UKF_N];		// Full Kalman gain
+	float nis;					// innovation^T S^-1 innovation
+	float qUsed[UKF_N][UKF_N];	// Q spectral density added in the last predict
+	uint8_t qPhase;				// 0 boost, 1 coast, 2 descent (SetQFull)
+#endif
 };
 
 /************************************
@@ -91,6 +100,9 @@ class Ukf
 		// Q diagonal per flight phase {boost alt, vel, acc, coast ..., descent ...} as spectral densities,
 		// boost until the UKF acceleration first goes negative, descent after apogee (before Init)
 		void SetPhaseQ(const float q[3 * UKF_N]);
+		// Full Q spectral density per phase {boost 3x3 row major, coast 3x3, descent 3x3} replacing Q / Qafter
+		// as given (no floor), boost until the UKF acceleration first goes negative (before Init)
+		void SetQFull(const float q[3 * UKF_N * UKF_N]);
 #endif
 
 		bool IsInitialized() const { return initialized; }
@@ -131,6 +143,8 @@ class Ukf
 		bool phaseQOn = false;
 		float phaseQ[3][UKF_N] = {};
 		bool burnedOut = false;
+		bool qFullOn = false;
+		float qFull[3][UKF_N][UKF_N] = {};
 #endif
 };
 

@@ -426,7 +426,9 @@ void SensorFrameTask::HandleSensorData(Command& cm)
         }
     }
 
-    if (arrivedMask == ALL_ARRIVED) {
+    // The mag is published last in a poll (PollingTask::LogData), so it closes the frame. Sensors that
+    // are not polled (baro11 / imu32b can be switched off in PollingTask) stay invalid in the frame
+    if (arrivedMask & MAG_BIT) {
     	const uint32_t start = DWT->CYCCNT;
     	ProcessFrame();
     	frameTime.Add(DWT->CYCCNT - start);
@@ -475,8 +477,8 @@ void SensorFrameTask::ProcessFrame()
 	frame.mag[1] = mag.magY * MGAUSS_TO_UT;
 	frame.mag[2] = mag.magZ * MGAUSS_TO_UT;
 
-	// Everything arrived; an all-zero mag means the magnetometer is not delivering data
-	frame.validMask = ALL_ARRIVED;
+	// Valid: what arrived this poll; an all-zero mag means the magnetometer is not delivering data
+	frame.validMask = arrivedMask;
 	if (mag.magX == 0 && mag.magY == 0 && mag.magZ == 0) {
 		frame.validMask &= ~MAG_BIT;
 	}

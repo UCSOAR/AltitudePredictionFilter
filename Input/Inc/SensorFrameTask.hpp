@@ -190,7 +190,7 @@ class SensorFrameTask: public Task
 		static constexpr uint8_t BARO0_BIT = SENSOR_FRAME_VALID_BARO0;
 		static constexpr uint8_t MAG_BIT   = SENSOR_FRAME_VALID_MAG;
 
-		// All five sensors have arrived
+		// All five sensors (a frame is processed with whatever arrived, see HandleDataBrokerCommand)
 		static constexpr uint8_t ALL_ARRIVED = SENSOR_FRAME_VALID_ALL;
 
 		// Timing

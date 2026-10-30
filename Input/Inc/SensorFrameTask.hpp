@@ -18,6 +18,8 @@
 #include "../../Prediction/Inc/ApogeeDetection.hpp"
 #include "../../Prediction/Inc/ApogeePredictor.hpp"
 #include "../../Output/Inc/FilterOutput.hpp"
+#include "../../Output/Inc/FilterLog.hpp"
+
 /************************************
  * MACROS AND DEFINES
  ************************************/
@@ -49,7 +51,8 @@ enum SENSORFRAME_TASK_COMMANDS
 	SF_CMD_PRINT_PREDICT,		// Prints the apogee / landing prediction and trajectory
 	SF_CMD_PRINT_OUTPUT,		// Prints the last published FilterData
 	SF_CMD_TOGGLE_OUT_PRINT,	// Toggles printing every published FilterData
-	SF_CMD_TOGGLE_LOG_STREAM	// Toggles the CSV log stream (raw + calibrated + filter), saved on the PC by Tools/serial_log
+	SF_CMD_TOGGLE_LOG_STREAM,	// Toggles the CSV log stream (raw + calibrated + filter), saved on the PC by Tools/serial_log
+	SF_CMD_PRINT_TIMING			// Prints (and restarts) the frame / UKF / predictor CPU time
 };
 
 /************************************
@@ -123,6 +126,56 @@ class SensorFrameTask: public Task
 
 		// Stages after the tare, dispatched by stateSelection
 		void RunStages(const SensorFrame& calibrated);
+
+		// Power loss / false launch (FilterLog::PersistedState, saved by the LoggingTask in its own sector)
+		void RestoreSavedState();
+		void SaveState(uint8_t phase, uint32_t nowMs);
+		uint8_t BoardPhase() const;
+		void TrackPhaseAndEvents(uint32_t nowMs);
+		void CheckFalseLaunch(uint32_t nowMs);
+
+		void ResetFilter(uint32_t nowMs);			// back to a fresh pad tare (re-tare, false launch)
+		void QueueEvent(uint8_t code, int32_t value);
+
+		static constexpr uint32_t RESTORE_SETTLE_MS = 1500;		// Dynamite settles before the UKF restarts
+		static constexpr uint32_t RESTORED_FLAG_MS = 2000;		// RESTORED flag after the UKF restarts
+		static constexpr uint32_t FLIGHT_SAVE_PERIOD_MS = 1000;	// saved state refresh in flight (max altitude for a missed apogee)
+		static constexpr float MISSED_APOGEE_VEL = -5.0f;		// m/s: already falling when power came back
+		static constexpr float LAUNCH_CONFIRM_ALT_M = 30.0f;	// a board FLIGHT is a launch once it climbs this high
+
+		static constexpr uint32_t CLIP_EVENT_MIN_MS = 1000;
+		static constexpr uint8_t EVENT_QUEUE = 4;
+
+		FilterLog::PersistedState persisted{};
+		uint8_t savedPhase = FilterLog::PHASE_PAD;
+		uint32_t lastSaveMs = 0;
+		bool restoredFlight = false;
+		bool restorePending = false;		// waiting for FlightTask to take the restore
+		uint32_t restoreMs = 0;
+		uint32_t ukfStartMs = 0;
+		bool inFlightSeen = false;			// FlightTask in FLIGHT (false launch check)
+		bool launchConfirmed = false;		// ... and the altitude climbed past LAUNCH_CONFIRM_ALT_M
+
+		ApfState lastApfState = ApfState::PRE_LAUNCH;
+		bool lastBaroDistrust = false;
+		bool lastClip = false;
+		uint32_t lastClipEventMs = 0;
+		uint8_t eventCode[EVENT_QUEUE] = {};
+		int32_t eventValue[EVENT_QUEUE] = {};
+		uint8_t eventCount = 0;
+
+		// CPU time (DWT cycle counter), APF_Timing
+		struct CpuTime {
+			uint32_t calls = 0;
+			uint64_t totalCycles = 0;
+			uint32_t maxCycles = 0;
+			void Add(uint32_t cycles) { calls++; totalCycles += cycles; if (cycles > maxCycles) maxCycles = cycles; }
+		};
+		CpuTime frameTime, ukfTime, predictorTime;
+		uint32_t timingStartMs = 0;
+		void PrintTiming();
+
+
 
 		// Latest raw reading from each sensor, indexed by sensor id
 		IMUData imu[2]{};

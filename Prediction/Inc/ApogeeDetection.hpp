@@ -41,7 +41,9 @@ enum class ApogeeSource : uint8_t
 {
 	NONE = 0,
 	CONFIDENCE,		// Legacy confidence method
-	BACKUP			// Velocity negative for APOGEE_BACKUP_FRAMES
+	BACKUP,			// Velocity negative for APOGEE_BACKUP_FRAMES
+	RESTORED,		// Reached before a power loss (saved state)
+	MISSED			// Power came back on the way down: apogee happened during the outage
 };
 
 struct ApogeeStatus
@@ -89,6 +91,19 @@ class ApogeeDetection
 		bool Update(const float x[3], const float sd[3], uint32_t timestampMs);
 
 		bool IsReached() const { return status.reached; }
+
+		// Power loss: carry the saved max altitude (and apogee) over the reboot
+		void Restore(bool reached, float maxAltitude, uint32_t timestampMs);
+		// Back on the way down after a power loss, apogee not seen: latch it at the saved max, or the
+		// altitude now if that is higher (the save can be up to a save period old)
+		void MarkMissed(float altitudeNow, uint32_t timestampMs)
+		{
+			if (altitudeNow > status.maxAltitude) {
+				status.maxAltitude = altitudeNow;
+				status.maxTimeMs = timestampMs;
+			}
+			Latch(ApogeeSource::MISSED, timestampMs);
+		}
 		const ApogeeStatus& GetStatus() const { return status; }
 		void PrintStatus() const;
 

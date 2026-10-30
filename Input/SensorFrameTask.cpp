@@ -27,7 +27,15 @@
 #include "DataBroker.hpp"
 #include "Task.hpp"
 #include "FlightTask.hpp"
+#include "FlashTask.hpp"
+#include "LoggingService.hpp"
+
+#include "cmsis_os.h"
+#include "stm32h7xx_hal.h"
+
+
 #include "Inc/PrintUtils.hpp"
+
 #include <cstring>
 #include <cmath>
 
@@ -36,13 +44,19 @@
  ************************************/
 namespace {
 /**
+ * @brief FlightTask's hasFlown is set by any GROUND -> FLIGHT, also a false launch (a bump on the pad).
+ *        After a false launch the APF ignores it until a launch really climbs (SensorFrameTask::CheckFalseLaunch)
+ */
+bool flownIgnored = false;
+
+/**
  * @brief The tare may only run while the rocket is on the pad, never in flight.
  *        This board has no rocket state, FlightTask's GROUND before any flight is the pad
  */
 bool IsPadState()
 {
 	const FlightTask& flight = FlightTask::Inst();
-	return (flight.GetFlightState() == FlightState::GROUND) && !flight.HasFlown();
+	return (flight.GetFlightState() == FlightState::GROUND) && (!flight.HasFlown() || flownIgnored);
 }
 
 /**
@@ -52,7 +66,7 @@ bool IsPadState()
 bool IsBoardLaunched()
 {
 	const FlightTask& flight = FlightTask::Inst();
-	return (flight.GetFlightState() == FlightState::FLIGHT) || flight.HasFlown();
+	return (flight.GetFlightState() == FlightState::FLIGHT) || (flight.HasFlown() && !flownIgnored);
 }
 
 /**
@@ -61,7 +75,7 @@ bool IsBoardLaunched()
 bool IsLandedState()
 {
 	const FlightTask& flight = FlightTask::Inst();
-	return (flight.GetFlightState() == FlightState::GROUND) && flight.HasFlown();
+	return (flight.GetFlightState() == FlightState::GROUND) && flight.HasFlown() && !flownIgnored;
 }
 
 // Unit conversions from the driver units to SI
@@ -106,6 +120,7 @@ constexpr ApfCommand APF_COMMANDS[] = {
 	{"APF_OutStream",  SF_CMD_TOGGLE_OUT_PRINT},
 	{"APF_LogStream",  SF_CMD_TOGGLE_LOG_STREAM},
 	{"APF_Help",       SF_CMD_PRINT_HELP},
+	{"APF_Timing",     SF_CMD_PRINT_TIMING},
 };
 }
 
@@ -162,6 +177,16 @@ void SensorFrameTask::Run(void * pvParams){
 			   static_cast<unsigned long>((xTaskGetTickCount() - buildStart) * portTICK_PERIOD_MS),
 			   static_cast<unsigned long>(heapBefore - xPortGetFreeHeapSize()),
 			   static_cast<unsigned long>(xPortGetFreeHeapSize()));
+
+	// Power loss: come back in the saved FLIGHT / LANDED state instead of the pad
+	RestoreSavedState();
+
+	// Cycle counter for APF_Timing (the H7 DWT needs the lock access register written first)
+	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+	DWT->LAR = 0xC5ACCE55;
+	DWT->CYCCNT = 0;
+	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+	timingStartMs = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
     while (1) {
         /* Process commands in blocking mode */
@@ -284,14 +309,7 @@ void SensorFrameTask::HandleTaskCommand(uint16_t taskCommand)
 					   static_cast<int>(FlightTask::Inst().GetFlightState()), FlightTask::Inst().HasFlown() ? 1 : 0);
 			break;
 		}
-		preProcess.Reset();
-		dynamite.Reset();
-		launchDetection.Reset();
-		ukf.Reset();
-		apogeeDetection.Reset();
-		apogeePredictor.Reset();
-		filterOutput.Reset();
-		stateSelection.Reset(xTaskGetTickCount() * portTICK_PERIOD_MS);
+		ResetFilter(xTaskGetTickCount() * portTICK_PERIOD_MS);
 		SOAR_PRINT("SensorFrame: re-tare started\n");
 		break;
 	}
@@ -335,6 +353,10 @@ void SensorFrameTask::HandleTaskCommand(uint16_t taskCommand)
 	case SF_CMD_PRINT_LAUNCH:
 		SOAR_PRINT("Launch is decided by the board FlightTask: launched=%d (APF LaunchDetection disabled)\n",
 				   IsBoardLaunched() ? 1 : 0);
+		break;
+
+	case SF_CMD_PRINT_TIMING:
+		PrintTiming();
 		break;
 
 	case SF_CMD_PRINT_HELP:
@@ -405,7 +427,9 @@ void SensorFrameTask::HandleSensorData(Command& cm)
     }
 
     if (arrivedMask == ALL_ARRIVED) {
+    	const uint32_t start = DWT->CYCCNT;
     	ProcessFrame();
+    	frameTime.Add(DWT->CYCCNT - start);
     	arrivedMask = 0;
     }
 }
@@ -464,6 +488,9 @@ void SensorFrameTask::ProcessFrame()
 	lastRaw = frame;
 	hasRawFrame = true;
 
+	// A board FLIGHT that never climbed ended: back to the pad before this frame is used
+	CheckFalseLaunch(frame.timestampMs);
+
 	// PreProcess tares on the first pad frames, then returns calibrated frames
 	SensorFrame calibrated{};
 	if (preProcess.AddFrame(frame, calibrated, IsPadState())) {
@@ -478,6 +505,9 @@ void SensorFrameTask::ProcessFrame()
 	// Launch comes from the board's FlightTask, not the APF LaunchDetection (disabled in RunStages)
 	stateSelection.Update(preProcess.IsTared(), IsBoardLaunched(),
 						  IsLandedState(), frame.timestampMs);
+
+	TrackPhaseAndEvents(frame.timestampMs);
+
 
 	if (logStreamEnabled) {
 		PrintLogFrame(frame);
@@ -508,14 +538,33 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 		// PROCESS
 		const EverestMeasurement& everest = dynamite.Update(calibrated, preProcess.GetTareResult(), true);
 
-		// ESTIMATE: start on the first LAUNCH frame, then predict + update every frame
+		// ESTIMATE: start on the first LAUNCH frame, then predict + update every frame.
+		// After a power loss in flight Dynamite gets RESTORE_SETTLE_MS first (velocity from the baros)
 		if (!ukf.IsInitialized()) {
+			if (restoredFlight && (calibrated.timestampMs - restoreMs) < RESTORE_SETTLE_MS) {
+				break;
+			}
+			if (restoredFlight && !apogeeDetection.IsReached() && everest.velocity < MISSED_APOGEE_VEL) {
+				// Already falling: apogee happened while the power was off, latch it at the saved max
+				// Best guess of the apogee that happened while off: the last prediction, the saved max or now
+				const float guess = (persisted.predictedApogee > everest.altitude) ? persisted.predictedApogee : everest.altitude;
+				apogeeDetection.MarkMissed(guess, calibrated.timestampMs);
+				dynamite.DistrustBarosUntil(calibrated.timestampMs + DYNAMITE_EJECTION_DISTRUST_MS);
+				QueueEvent(FilterLog::EVENT_APOGEE_MISSED, FilterLog::Round(apogeeDetection.GetStatus().maxAltitude * 100.0f));
+				SaveState(savedPhase, calibrated.timestampMs);
+			}
 			ukf.Init(preProcess.GetFilterInit(), everest);
-			SOAR_PRINT("UKF: started at alt=%ld mm vel=%ld mm/s\n",
-					   ToMilli(everest.altitude), ToMilli(everest.velocity));
+			ukfStartMs = calibrated.timestampMs;
+			if (apogeeDetection.IsReached()) {
+				ukf.SetAfterApogee(true);
+			}
+			SOAR_PRINT("UKF: started at alt=%ld mm vel=%ld mm/s%s\n",
+					   ToMilli(everest.altitude), ToMilli(everest.velocity), restoredFlight ? " (after power loss)" : "");
 		} else {
+			const uint32_t start = DWT->CYCCNT;
 			ukf.Predict(calibrated.dt);
 			ukf.Update(everest);
+			ukfTime.Add(DWT->CYCCNT - start);
 		}
 
 		// PREDICTION: apogee detection switches the scenario mode once, the predictor projects ahead
@@ -523,8 +572,14 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 		if (apogeeDetection.Update(ukf.State(), sd, calibrated.timestampMs)) {
 			ukf.SetAfterApogee(true);
 			dynamite.DistrustBarosUntil(calibrated.timestampMs + DYNAMITE_EJECTION_DISTRUST_MS);
+			QueueEvent(FilterLog::EVENT_APOGEE, FilterLog::Round(apogeeDetection.GetStatus().maxAltitude * 100.0f));
+			SaveState(savedPhase, calibrated.timestampMs);
 		}
-		apogeePredictor.Update(ukf, calibrated.timestampMs);
+		{
+			const uint32_t start = DWT->CYCCNT;
+			apogeePredictor.Update(ukf, calibrated.timestampMs);
+			predictorTime.Add(DWT->CYCCNT - start);
+		}
 		break;
 	}
 
@@ -534,11 +589,24 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 		break;
 	}
 
-	// OUTPUT: publish (every frame in flight, 1 Hz otherwise). The LoggingTask logs it to flash
-	if (filterOutput.Due(stateSelection.GetState(), calibrated.timestampMs)) {
+	// OUTPUT: publish (every frame in flight, 10 Hz otherwise, FilterOutput.hpp). The LoggingTask logs it to flash
+	// A queued flight event is published at once (the LoggingTask writes it through to flash)
+	if (filterOutput.Due(stateSelection.GetState(), calibrated.timestampMs) || eventCount > 0) {
 		FilterData data = filterOutput.Build(calibrated.timestampMs, stateSelection.GetState(),
 											 preProcess.GetFilterInit().groundAltitude, dynamite, launchDetection,
 											 ukf, apogeeDetection, apogeePredictor);
+		if (restoredFlight && (!ukf.IsInitialized() || (calibrated.timestampMs - ukfStartMs) < RESTORED_FLAG_MS)) {
+			data.flags |= FILTER_FLAG_RESTORED;
+		}
+		if (eventCount > 0) {
+			data.event = eventCode[0];
+			data.eventValue = eventValue[0];
+			for (uint8_t i = 1; i < eventCount; i++) {
+				eventCode[i - 1] = eventCode[i];
+				eventValue[i - 1] = eventValue[i];
+			}
+			eventCount--;
+		}
 		DataBroker::Publish<FilterData>(&data);
 		filterOutput.Published(data);
 
@@ -559,6 +627,213 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 		if (ukf.IsInitialized()) {
 			ukf.PrintLine();
 		}
+	}
+}
+
+/**
+ * @brief Back to a fresh pad tare: every stage restarts (APF_Retare, false launch)
+ */
+void SensorFrameTask::ResetFilter(uint32_t nowMs)
+{
+	preProcess.Reset();
+	dynamite.Reset();
+	launchDetection.Reset();
+	ukf.Reset();
+	apogeeDetection.Reset();
+	apogeePredictor.Reset();
+	filterOutput.Reset();
+	stateSelection.Reset(nowMs);
+	restoredFlight = false;
+}
+
+void SensorFrameTask::QueueEvent(uint8_t code, int32_t value)
+{
+	if (eventCount >= EVENT_QUEUE) {
+		return;		// 4 events in one frame period: drop the newest
+	}
+	eventCode[eventCount] = code;
+	eventValue[eventCount] = value;
+	eventCount++;
+}
+
+/**
+ * @brief False launch check (the board's FlightTask is not changed). A board FLIGHT is only a launch
+ *        for the APF once Dynamite's altitude climbs past LAUNCH_CONFIRM_ALT_M. If FlightTask goes back
+ *        to GROUND before that (a bump, ~40 s later with the FlightTask thresholds), the APF throws away
+ *        that "flight", ignores hasFlown and tares again
+ */
+void SensorFrameTask::CheckFalseLaunch(uint32_t nowMs)
+{
+	if (restorePending) {
+		return;		// FlightTask has not taken the restore yet
+	}
+	const bool inFlight = (FlightTask::Inst().GetFlightState() == FlightState::FLIGHT);
+	if (inFlight) {
+		if (!inFlightSeen) {
+			inFlightSeen = true;
+			launchConfirmed = false;
+		}
+		if (!launchConfirmed && dynamite.IsInitialized() && dynamite.GetMeasurement().altitude > LAUNCH_CONFIRM_ALT_M) {
+			launchConfirmed = true;
+			flownIgnored = false;
+			SOAR_PRINT("APF: launch confirmed (altitude above %ld mm)\n", ToMilli(LAUNCH_CONFIRM_ALT_M));
+		}
+		return;
+	}
+	if (inFlightSeen) {
+		inFlightSeen = false;
+		if (!launchConfirmed) {
+			flownIgnored = true;
+			SOAR_PRINT("APF: false launch (never climbed), back to the pad and re-taring\n");
+			ResetFilter(nowMs);
+			lastApfState = ApfState::PRE_LAUNCH;
+			QueueEvent(FilterLog::EVENT_FALSE_LAUNCH, 0);
+		}
+	}
+}
+
+/**
+ * @brief Phase that survives a power loss. FLIGHT only once the launch climbed (CheckFalseLaunch),
+ *        so a bump on the pad can never be saved as a flight
+ */
+uint8_t SensorFrameTask::BoardPhase() const
+{
+	const FlightTask& flight = FlightTask::Inst();
+	if (flight.GetFlightState() == FlightState::FLIGHT) {
+		return launchConfirmed ? FilterLog::PHASE_FLIGHT : FilterLog::PHASE_PAD;
+	}
+	return (flight.HasFlown() && !flownIgnored) ? FilterLog::PHASE_LANDED : FilterLog::PHASE_PAD;
+}
+
+/**
+ * @brief Saves the state (phase, apogee, max altitude, tare) for the next boot.
+ *        Only copied here, the LoggingTask does the flash write
+ */
+void SensorFrameTask::SaveState(uint8_t phase, uint32_t nowMs)
+{
+	static_assert(sizeof(TareResult) <= FilterLog::TARE_BYTES, "TareResult does not fit the saved state");
+	persisted.phase = phase;
+	persisted.apfState = static_cast<uint8_t>(stateSelection.GetState());
+	persisted.apogeeReached = apogeeDetection.IsReached() ? 1 : 0;
+	persisted.maxAltitude = apogeeDetection.GetStatus().maxAltitude;
+	if (ukf.IsInitialized()) {
+		persisted.lastAltitude = ukf.State()[0];
+		persisted.lastVelocity = ukf.State()[1];
+	} else {
+		persisted.lastAltitude = dynamite.GetMeasurement().altitude;
+		persisted.lastVelocity = dynamite.GetMeasurement().velocity;
+	}
+	// Only a new pre-apogee prediction replaces the saved one (the predictor restarts empty after a reboot)
+	const ApogeePrediction& prediction = apogeePredictor.Get();
+	if (prediction.valid && !prediction.afterApogee) {
+		persisted.predictedApogee = prediction.apogeeAltitude;
+	}
+	persisted.tareValid = preProcess.IsTared() ? 1 : 0;
+	if (preProcess.IsTared()) {
+		std::memcpy(persisted.tare, &preProcess.GetTareResult(), sizeof(TareResult));
+	}
+	LoggingService::RequestFlightStateSave(persisted);
+	savedPhase = phase;
+	lastSaveMs = nowMs;
+}
+
+/**
+ * @brief Boot: load the saved state. FLIGHT / LANDED skip the pad (no tare, no launch detection):
+ *        FlightTask is told to restore, the APF takes the saved tare / apogee / max altitude
+ */
+void SensorFrameTask::RestoreSavedState()
+{
+	// FlashTask resets the chip at boot: wait for it (at most 3 s)
+	for (uint16_t i = 0; i < 300 && !FlashTask::Inst().IsFlashInitialized(); i++) {
+		osDelay(10);
+	}
+	FilterLog::PersistedState saved{};
+	const bool found = LoggingService::LoadFlightState(saved);
+	const uint32_t nowMs = xTaskGetTickCount() * portTICK_PERIOD_MS;
+	if (found) {
+		persisted = saved;
+	}
+	persisted.bootCount = (found ? saved.bootCount : 0) + 1;
+	savedPhase = found ? saved.phase : FilterLog::PHASE_PAD;
+
+	if (found && (saved.phase == FilterLog::PHASE_FLIGHT || saved.phase == FilterLog::PHASE_LANDED)) {
+		const bool inFlight = (saved.phase == FilterLog::PHASE_FLIGHT);
+		Command cmd(TASK_SPECIFIC_COMMAND, inFlight ? FlightTask::RESTORE_FLIGHT : FlightTask::RESTORE_LANDED);
+		FlightTask::Inst().GetEventQueue()->Send(cmd);
+
+		if (saved.tareValid) {
+			TareResult tare;
+			std::memcpy(&tare, saved.tare, sizeof(TareResult));
+			preProcess.Restore(tare);
+			if (inFlight) {
+				// Every source starts from the baros (or the saved state), not from the pad zero
+				dynamite.StartInFlight(preProcess.GetTareResult(), saved.lastAltitude, saved.lastVelocity);
+			}
+		} else {
+			SOAR_PRINT("APF: saved state has no tare, the filter cannot run until flight_reset\n");
+		}
+		stateSelection.Restore(inFlight ? ApfState::LAUNCH : ApfState::LANDED, nowMs);
+		lastApfState = stateSelection.GetState();
+		apogeeDetection.Restore(saved.apogeeReached != 0, saved.maxAltitude, nowMs);
+		restoredFlight = inFlight;
+		inFlightSeen = inFlight;
+		launchConfirmed = true;		// a saved FLIGHT / LANDED was a real flight
+		restorePending = true;
+		restoreMs = nowMs;
+		QueueEvent(FilterLog::EVENT_STATE_RESTORED, saved.phase);
+		SOAR_PRINT("APF: power loss recovery, restored %s (apogee %d, max %ld mm, boot %lu)\n",
+				   inFlight ? "FLIGHT" : "LANDED", saved.apogeeReached ? 1 : 0, ToMilli(saved.maxAltitude),
+				   static_cast<unsigned long>(persisted.bootCount));
+	} else {
+		SOAR_PRINT("APF: boot %lu, pad start\n", static_cast<unsigned long>(persisted.bootCount));
+	}
+
+	SaveState(savedPhase, nowMs);		// stores the new boot count
+}
+
+/**
+ * @brief Every frame: save the state on a phase change (and every few s in flight), turn
+ *        APF / Dynamite changes into flight events
+ */
+void SensorFrameTask::TrackPhaseAndEvents(uint32_t nowMs)
+{
+	const uint8_t phase = BoardPhase();
+	// Restored at boot: FlightTask takes its restore command a moment later, until then it still
+	// reads PAD, which must not overwrite the saved FLIGHT / LANDED
+	if (restorePending) {
+		if (phase != savedPhase) {
+			return;
+		}
+		restorePending = false;
+	}
+	if (phase != savedPhase || (phase == FilterLog::PHASE_FLIGHT && (nowMs - lastSaveMs) >= FLIGHT_SAVE_PERIOD_MS)) {
+		SaveState(phase, nowMs);
+	}
+
+	const ApfState state = stateSelection.GetState();
+	if (state != lastApfState) {
+		const float alt = ukf.IsInitialized() ? ukf.State()[0] : dynamite.GetMeasurement().altitude;
+		const int32_t altCm = FilterLog::Round(alt * 100.0f);
+		if (state == ApfState::LAUNCH && lastApfState == ApfState::DETECTION) {
+			QueueEvent(FilterLog::EVENT_LAUNCH, altCm);
+		} else if (state == ApfState::LANDED) {
+			QueueEvent(FilterLog::EVENT_LANDED, altCm);
+		}
+		lastApfState = state;
+	}
+
+	if (dynamite.IsInitialized()) {
+		const DynamiteStatus& ds = dynamite.GetStatus();
+		if (ds.baroDistrusted != lastBaroDistrust) {
+			lastBaroDistrust = ds.baroDistrusted;
+			QueueEvent(ds.baroDistrusted ? FilterLog::EVENT_BARO_DISTRUST_ON : FilterLog::EVENT_BARO_DISTRUST_OFF, 0);
+		}
+		const bool clip = ds.accelClipped[0] || ds.accelClipped[1] || ds.gyroClipped[0] || ds.gyroClipped[1];
+		if (clip && !lastClip && (nowMs - lastClipEventMs) >= CLIP_EVENT_MIN_MS) {
+			lastClipEventMs = nowMs;
+			QueueEvent(FilterLog::EVENT_IMU_CLIP, 0);
+		}
+		lastClip = clip;
 	}
 }
 
@@ -591,11 +866,41 @@ void SensorFrameTask::PrintFrame(const SensorFrame& frame, const char* label) co
 			   ToMilli(frame.mag[0]), ToMilli(frame.mag[1]), ToMilli(frame.mag[2]));
 }
 
+/**
+ * @brief CPU time per call since the last APF_Timing (DWT cycles at SystemCoreClock), then restarts.
+ *        Frame = everything one SensorFrame costs (all stages); the UKF / predictor only run in LAUNCH
+ */
+void SensorFrameTask::PrintTiming()
+{
+	const uint32_t nowMs = xTaskGetTickCount() * portTICK_PERIOD_MS;
+	const uint32_t mhz = SystemCoreClock / 1000000U;
+	auto line = [mhz](const char* name, const CpuTime& t) {
+		const uint32_t meanUs = t.calls ? static_cast<uint32_t>(t.totalCycles / t.calls / mhz) : 0;
+		SOAR_PRINT("  %-10s calls %lu  mean %lu us  max %lu us\n",
+				   name, static_cast<unsigned long>(t.calls), static_cast<unsigned long>(meanUs),
+				   static_cast<unsigned long>(t.maxCycles / mhz));
+	};
+	const uint32_t windowMs = nowMs - timingStartMs;
+	const uint64_t busyUs = frameTime.totalCycles / mhz;
+	SOAR_PRINT("APF timing over %lu ms at %lu MHz, APF busy %lu.%lu%% of the time, dropped frames %lu, state %s\n",
+			   static_cast<unsigned long>(windowMs), static_cast<unsigned long>(mhz),
+			   static_cast<unsigned long>(windowMs ? busyUs / (windowMs * 10U) : 0),
+			   static_cast<unsigned long>(windowMs ? (busyUs / windowMs) % 10U : 0),
+			   static_cast<unsigned long>(droppedFrames), StateSelection::Name(stateSelection.GetState()));
+	line("frame", frameTime);
+	line("UKF", ukfTime);
+	line("predictor", predictorTime);
+	frameTime = CpuTime{};
+	ukfTime = CpuTime{};
+	predictorTime = CpuTime{};
+	timingStartMs = nowMs;
+}
+
 void SensorFrameTask::PrintApfHelp() const
 {
 	SOAR_PRINT("APF commands: APF_Raw APF_Calibrated APF_Tare APF_Alignment APF_FilterInit\n");
 	SOAR_PRINT("  APF_State APF_Dynamite APF_Launch APF_UKF APF_Apogee APF_Predict APF_Output\n");
-	SOAR_PRINT("  APF_Retare (pad only) APF_RawStream APF_AltStream APF_OutStream APF_LogStream (toggles) APF_Help\n");
+	SOAR_PRINT("  APF_Retare (pad only) APF_RawStream APF_AltStream APF_OutStream APF_LogStream (toggles) APF_Timing APF_Help\n");
 }
 
 /**

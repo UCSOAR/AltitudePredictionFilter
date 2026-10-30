@@ -72,8 +72,89 @@ void Dynamite::Reset()
 	baroDistrustUntilMs = 0;
 	initialized = false;
 	hasFused = false;
+	seeding = false;
+	seedCount = 0;
+	seedElapsed = 0.0f;
 	measurement = EverestMeasurement{};
 	status = DynamiteStatus{};
+}
+
+void Dynamite::StartInFlight(const TareResult& tare, float savedAltitude, float savedVelocity)
+{
+	Init(tare);
+	seeding = true;
+	seedCount = 0;
+	seedElapsed = 0.0f;
+	seedFallbackAltitude = savedAltitude;
+	seedFallbackVelocity = savedVelocity;
+	measurement.altitude = savedAltitude;
+	measurement.velocity = savedVelocity;
+	measurement.valid = true;
+}
+
+/**
+ * @brief One seeding frame: collect the mean baro altitude, finish once there are enough samples
+ *        (or DYNAMITE_SEED_MAX_S passed). Until then the output is the latest baro (or the saved state)
+ */
+void Dynamite::SeedFromBaros(float dt)
+{
+	seedElapsed += dt;
+	float sum = 0.0f;
+	uint8_t n = 0;
+	for (uint8_t i = DYN_SRC_BARO0; i <= DYN_SRC_BARO1; i++) {
+		if (status.sourceValid[i]) {
+			sum += status.sourceAltitude[i];
+			n++;
+		}
+	}
+	if (n > 0 && seedCount < DYNAMITE_SEED_SAMPLES) {
+		seedTime[seedCount] = seedElapsed;
+		seedAltitude[seedCount] = sum / n;
+		seedCount++;
+		measurement.altitude = sum / n;
+	}
+	if (seedCount >= DYNAMITE_SEED_SAMPLES || seedElapsed >= DYNAMITE_SEED_MAX_S) {
+		FinishSeed();
+	}
+}
+
+/**
+ * @brief Least squares line through the seed samples: altitude now and velocity. Every source
+ *        (IMU dead reckoning too) starts from there, the alpha-beta velocity starts at the fit slope
+ */
+void Dynamite::FinishSeed()
+{
+	float altitude = seedFallbackAltitude;
+	float velocity = seedFallbackVelocity;
+	if (seedCount >= 2) {
+		float mt = 0.0f, ma = 0.0f;
+		for (uint8_t k = 0; k < seedCount; k++) {
+			mt += seedTime[k];
+			ma += seedAltitude[k];
+		}
+		mt /= seedCount;
+		ma /= seedCount;
+		float sta = 0.0f, stt = 0.0f;
+		for (uint8_t k = 0; k < seedCount; k++) {
+			sta += (seedTime[k] - mt) * (seedAltitude[k] - ma);
+			stt += (seedTime[k] - mt) * (seedTime[k] - mt);
+		}
+		velocity = (stt > 0.0f) ? (sta / stt) : 0.0f;
+		altitude = ma + velocity * (seedTime[seedCount - 1] - mt);
+	} else if (seedCount == 1) {
+		altitude = seedAltitude[0];
+	}
+	for (uint8_t i = 0; i < 2; i++) {
+		imuAltitude[i] = altitude;
+		status.imuVelocity[i] = velocity;
+		imuMovingTime[i] = 0.0f;
+		imuPrevAccel[i] = status.imuAccel[i];
+	}
+	measurement.altitude = altitude;
+	measurement.velocity = velocity;
+	measurement.valid = true;
+	hasFused = true;
+	seeding = false;
 }
 
 const EverestMeasurement& Dynamite::Update(const SensorFrame& calibrated, const TareResult& tare, bool inFlight)
@@ -84,6 +165,13 @@ const EverestMeasurement& Dynamite::Update(const SensorFrame& calibrated, const 
 
 	MeasureBaros(calibrated, tare);
 	MeasureImus(calibrated, tare, inFlight);
+
+	// Restarted in flight: no fusion until the baros gave the starting altitude / velocity
+	if (seeding) {
+		SeedFromBaros(calibrated.dt);
+		return measurement;
+	}
+
 
 	bool anyValid = false;
 	for (uint8_t i = 0; i < DYN_SRC_COUNT; i++) {
@@ -284,9 +372,18 @@ void Dynamite::Fuse(float dt)
 	} else {
 		measurement.velocity = 0.0f;
 	}
+	float spread2 = 0.0f;
+	float pull2 = 0.0f;
+	for (uint8_t i = 0; i < DYN_SRC_COUNT; i++) {
+		const float d = status.sourceAltitude[i] - fused;
+		spread2 += status.weight[i] * d * d;
+		pull2 += status.weight[i] * status.weight[i] * d * d;
+	}
+	measurement.pull = std::sqrt(pull2);
 	measurement.altitude = fused;
 	measurement.acceleration = acceleration;
 	measurement.sigma = std::sqrt(variance);
+	measurement.spread = std::sqrt(spread2);
 	hasFused = true;
 }
 

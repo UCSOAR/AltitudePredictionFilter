@@ -19,10 +19,11 @@
 /************************************
  * MACROS AND DEFINES
  ************************************/
-// Publish / log rate: 10 Hz in flight, once a second otherwise (keeps the pad log small).
-// Every frame (50 Hz) in flight overloaded LoggingTask on the bench and stalled polling
-constexpr uint32_t FILTER_OUTPUT_FLIGHT_PERIOD_MS = 100;
-constexpr uint32_t FILTER_OUTPUT_SLOW_PERIOD_MS = 1000;
+// Publish / log rate: every frame in flight (0 = no limit, one per poll), 10 Hz otherwise.
+// This used to be 10 Hz / 1 Hz because LoggingTask was overloaded; most of that load was the mock
+// GPS sentence logged every poll (6 records), which GpsTask replaced with the real one at ~1 Hz
+constexpr uint32_t FILTER_OUTPUT_FLIGHT_PERIOD_MS = 0;
+constexpr uint32_t FILTER_OUTPUT_SLOW_PERIOD_MS = 100;
 
 // FilterData::flags
 enum FilterFlags : uint8_t
@@ -33,7 +34,7 @@ enum FilterFlags : uint8_t
 	FILTER_FLAG_UKF               = (1U << 3),	// Estimate from the UKF (otherwise Dynamite)
 	FILTER_FLAG_IMU_CLIPPED       = (1U << 4),	// An IMU clipped this frame
 	FILTER_FLAG_BARO_DISTRUSTED   = (1U << 5),	// Baros distrusted this frame (transonic / ejection)
-	FILTER_FLAG_MODEL_MISFIT      = (1U << 6),	// UKF inflated P this frame (flight unlike the sims)
+	FILTER_FLAG_RESTORED          = (1U << 6),	// Restarted in flight after a power loss, estimate still settling
 	FILTER_FLAG_SYNTHETIC_DESCENT = (1U << 7)	// Post apogee scenarios are synthetic (placeholder data)
 };
 

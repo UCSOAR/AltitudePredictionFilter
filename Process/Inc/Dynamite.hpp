@@ -61,6 +61,12 @@ constexpr float DYNAMITE_TRANSONIC_LOW_MPS = 240.0f;
 constexpr float DYNAMITE_TRANSONIC_HIGH_MPS = 410.0f;
 constexpr float DYNAMITE_BARO_DISTRUST_SCALE = 20.0f;
 constexpr uint32_t DYNAMITE_EJECTION_DISTRUST_MS = 3000;	// After apogee detection
+
+// Power loss in flight (StartInFlight): the altitude / velocity come from a line fit over the first
+// baro samples instead of the pad zero. Without it every source starts at 0 m, the baros "disagree"
+// with that by kilometres and lose all trust (~20 s to come back in the Taber power loss test)
+constexpr uint8_t DYNAMITE_SEED_SAMPLES = 25;		// baro frames in the fit (~0.5 s at 50 Hz)
+constexpr float DYNAMITE_SEED_MAX_S = 1.0f;			// fit with what arrived by then (uses the saved state if nothing)
 constexpr float DYNAMITE_EJECTION_GATE_M = 10.0f;			// In that window, a baro this far from the prediction is a spike
 
 // Velocity smoothing (alpha-beta tracker on the fused altitude, IMU accel as feed forward).
@@ -84,6 +90,8 @@ struct EverestMeasurement
 	float velocity;			// m/s, smoothed (alpha-beta tracker on the fused altitude)
 	float acceleration;		// m/s^2, net vertical (earth frame, gravity removed), IMU mean
 	float sigma;			// m, noise of the fused altitude
+	float spread;			// m, trust weighted spread of the sources around the fused altitude (how much they disagree)
+	float pull;				// m, how far the disagreeing sources move the fused altitude: sqrt(sum w^2 d^2)
 };
 
 /**
@@ -130,6 +138,13 @@ class Dynamite
 		void Reset();
 
 		/**
+		 * @brief Power loss: restart in flight. Init, then the first baro frames give the altitude and
+		 *        velocity every source starts from. savedAltitude / savedVelocity (last saved state) are
+		 *        used if no baro is valid in DYNAMITE_SEED_MAX_S
+		 */
+		void StartInFlight(const TareResult& tare, float savedAltitude, float savedVelocity);
+
+		/**
 		 * @param calibrated Calibrated frame (gyro bias removed, body axes)
 		 * @param tare       Finished tare
 		 * @param inFlight   true once launch is detected: the pad zero velocity hold stops
@@ -152,6 +167,9 @@ class Dynamite
 		void MeasureBaros(const SensorFrame& frame, const TareResult& tare);
 		void MeasureImus(const SensorFrame& frame, const TareResult& tare, bool inFlight);
 		void Fuse(float dt);
+		void SeedFromBaros(float dt);
+		void FinishSeed();
+
 
 		Madgwick madgwick[2];
 
@@ -165,6 +183,16 @@ class Dynamite
 
 		bool initialized = false;
 		bool hasFused = false;
+
+		// StartInFlight seeding
+		bool seeding = false;
+		uint8_t seedCount = 0;
+		float seedElapsed = 0.0f;
+		float seedTime[DYNAMITE_SEED_SAMPLES] = {};
+		float seedAltitude[DYNAMITE_SEED_SAMPLES] = {};
+		float seedFallbackAltitude = 0.0f;
+		float seedFallbackVelocity = 0.0f;
+
 
 		EverestMeasurement measurement{};
 		DynamiteStatus status{};

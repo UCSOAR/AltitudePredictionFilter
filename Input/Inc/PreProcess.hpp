@@ -40,6 +40,9 @@ class PreProcess
 		// Restart the tare. Only call this on the pad, frames stop until it finishes
 		void Reset();
 
+		// Power loss in flight / after landing: use the saved pad tare instead of taring again
+		void Restore(const TareResult& saved);
+
 		bool IsTared() const { return tared; }
 		const TareResult& GetTareResult() const { return result; }
 		const FilterInitState& GetFilterInit() const { return filterInit; }

@@ -38,12 +38,10 @@
 #define APF_COVARIANCE_DEFAULT		0	// Input/FilterInit.cpp DEFAULT_Q / DEFAULT_R
 #define APF_COVARIANCE_TABER		1	// Legacy HALO::initializeHALO (covarianceCalc.py)
 
+// The legacy Taber Q / R (covarianceCalc.py) is the default for every profile, the board included.
+// APF_COVARIANCE_DEFAULT (Input/FilterInit.cpp DEFAULT_Q / DEFAULT_R) stays selectable with -DAPF_COVARIANCE=0
 #ifndef APF_COVARIANCE
-#if APF_PROFILE == APF_PROFILE_STORMFLY
-#define APF_COVARIANCE APF_COVARIANCE_DEFAULT
-#else
 #define APF_COVARIANCE APF_COVARIANCE_TABER
-#endif
 #endif
 
 // Q scale (tuning sweeps, Tools/taber/taber_test.py --q-sweep): Q is multiplied by this.

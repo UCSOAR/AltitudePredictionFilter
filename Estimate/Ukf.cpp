@@ -297,52 +297,15 @@ void Ukf::Update(const EverestMeasurement& everest)
 		status.innovation[i] = z[i] - x[i];
 	}
 
-	// S = P + R, and the normalised innovation squared (consistency check that needs no truth)
+	// S = P + R
 	M3 S, Sinv;
-	auto innovationCovariance = [&]() -> bool {
-		for (uint8_t i = 0; i < UKF_N; i++) {
-			for (uint8_t j = 0; j < UKF_N; j++) {
-				S[i][j] = P[i][j] + R[i][j];
-			}
+	for (uint8_t i = 0; i < UKF_N; i++) {
+		for (uint8_t j = 0; j < UKF_N; j++) {
+			S[i][j] = P[i][j] + R[i][j];
 		}
-		return Invert(S, Sinv);
-	};
-	auto nis = [&]() {
-		float n = 0.0f;
-		for (uint8_t i = 0; i < UKF_N; i++) {
-			for (uint8_t j = 0; j < UKF_N; j++) {
-				n += status.innovation[i] * Sinv[i][j] * status.innovation[j];
-			}
-		}
-		return n;
-	};
-
-	if (!innovationCovariance()) {
-		return;
 	}
-	status.nis = nis();
-
-	// The model does not fit this flight right now: widen P so the measurement wins
-	status.inflation = 1.0f;
-#ifdef APF_PC_REPLAY
-	const bool inflateOn = inflate;
-#else
-	const bool inflateOn = true;
-#endif
-	if (inflateOn && status.nis > UKF_NIS_GATE) {
-		status.inflation = status.nis / static_cast<float>(UKF_N);
-		if (status.inflation > UKF_MAX_INFLATION) {
-			status.inflation = UKF_MAX_INFLATION;
-		}
-		for (uint8_t i = 0; i < UKF_N; i++) {
-			for (uint8_t j = 0; j < UKF_N; j++) {
-				P[i][j] *= status.inflation;
-			}
-		}
-		status.inflations++;
-		if (!innovationCovariance()) {
-			return;
-		}
+	if (!Invert(S, Sinv)) {
+		return;
 	}
 
 	M3 K;
@@ -400,6 +363,11 @@ void Ukf::MeasurementNoise(const EverestMeasurement& everest, float R[UKF_N][UKF
 	}
 	R[0][0] = MaxF(R[0][0], everest.sigma * everest.sigma);
 #ifdef APF_PC_REPLAY
+	// Replay test: altitude R also follows how much the Dynamite sources disagree (k = 0 off)
+	if (spreadK > 0.0f) {
+		const float m = spreadPull ? everest.pull : everest.spread;
+		R[0][0] = MaxF(R[0][0], spreadK * m * m);
+	}
 	for (uint8_t i = 0; i < UKF_N; i++) {
 		for (uint8_t j = 0; j < UKF_N; j++) {
 			R[i][j] *= std::sqrt(rScale[i] * rScale[j]);
@@ -409,13 +377,12 @@ void Ukf::MeasurementNoise(const EverestMeasurement& everest, float R[UKF_N][UKF
 }
 
 #ifdef APF_PC_REPLAY
-void Ukf::SetNoiseTuning(const float q[UKF_N], const float r[UKF_N], bool inflateOn)
+void Ukf::SetNoiseTuning(const float q[UKF_N], const float r[UKF_N])
 {
 	for (uint8_t i = 0; i < UKF_N; i++) {
 		qScale[i] = q[i];
 		rScale[i] = r[i];
 	}
-	inflate = inflateOn;
 }
 #endif
 
@@ -443,10 +410,9 @@ void Ukf::PrintLine() const
 
 void Ukf::PrintStatus() const
 {
-	SOAR_PRINT("UKF: init=%d phase=%s updates=%lu resets=%lu model misfits (P inflated)=%lu nis=%ld/1000\n",
+	SOAR_PRINT("UKF: init=%d phase=%s updates=%lu resets=%lu\n",
 			   initialized ? 1 : 0, IsAfterApogee() ? "POST_APOGEE" : "PRE_APOGEE",
-			   static_cast<unsigned long>(status.updates), static_cast<unsigned long>(status.resets),
-			   static_cast<unsigned long>(status.inflations), ToMilli(status.nis));
+			   static_cast<unsigned long>(status.updates), static_cast<unsigned long>(status.resets));
 	SOAR_PRINT("  x: alt=%ld mm vel=%ld mm/s acc=%ld mm/s2\n",
 			   ToMilli(x[0]), ToMilli(x[1]), ToMilli(x[2]));
 	SOAR_PRINT("  sd: alt=%ld mm vel=%ld mm/s acc=%ld mm/s2\n",

@@ -34,6 +34,8 @@ const char* SourceName(ApogeeSource s)
 	{
 	case ApogeeSource::CONFIDENCE: return "confidence";
 	case ApogeeSource::BACKUP:     return "velocity backup";
+	case ApogeeSource::RESTORED:   return "restored after power loss";
+	case ApogeeSource::MISSED:     return "missed during power loss";
 	default:                       return "none";
 	}
 }
@@ -49,6 +51,18 @@ void ApogeeDetection::Reset()
 	maxAvgAltitude = -1e30f;
 	altitudeAccumulator = 0.0f;
 	status = ApogeeStatus{};
+}
+
+void ApogeeDetection::Restore(bool reached, float maxAltitude, uint32_t timestampMs)
+{
+	Reset();
+	status.maxAltitude = maxAltitude;
+	status.maxTimeMs = timestampMs;
+	if (reached) {
+		status.reached = true;
+		status.source = ApogeeSource::RESTORED;
+		status.detectTimeMs = timestampMs;
+	}
 }
 
 bool ApogeeDetection::Update(const float x[3], const float sd[3], uint32_t timestampMs)

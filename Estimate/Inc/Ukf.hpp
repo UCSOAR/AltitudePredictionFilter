@@ -24,16 +24,10 @@ constexpr float UKF_ALPHA = 1.0f;
 constexpr float UKF_BETA = 2.0f;
 constexpr float UKF_KAPPA = 0.0f;
 
-// Adaptive covariance inflation: an NIS this large (chi-square, 3 values, 99.9%) means the
-// scenario model does not fit this flight right now. P is scaled up so the filter listens to the
-// measurement again instead of following a wrong model (e.g. a rocket unlike the sims)
-constexpr float UKF_NIS_GATE = 16.27f;
-
 // Legacy scenario model (APF_SCENARIO_MODEL_LEGACY): the state snaps to the scenarios every step, so
 // the model error is per STEP, not per second. The legacy Q was measured per 1/3 s step (HALO ran at
 // 3 Hz) and FilterInit stores it per second (x3): Q * this is added once per predict at any rate
 constexpr float UKF_LEGACY_Q_STEP_S = 1.0f / 3.0f;
-constexpr float UKF_MAX_INFLATION = 1000.0f;
 
 /************************************
  * TYPEDEFS
@@ -46,9 +40,6 @@ struct UkfStatus
 	ScenarioMatch scenario;		// Scenario of the propagated mean
 	float innovation[UKF_N];	// Measurement - prediction
 	float gain[UKF_N];			// Kalman gain diagonal K[i][i]: 1 = follows the measurement, 0 = follows the model
-	float nis;					// innovation^T S^-1 innovation, averages ~3 when R / P are honest
-	float inflation;			// P scale applied this update (1 = model fits)
-	uint32_t inflations;		// Updates where the model did not fit and P was inflated
 	uint32_t updates;
 	uint32_t resets;			// Covariance resets after a failed Cholesky
 	uint8_t gainResets;			// Legacy model: sigma points whose scenario pair changed this predict (blended 50 / 50)
@@ -90,8 +81,11 @@ class Ukf
 
 #ifdef APF_PC_REPLAY
 		// Replay tuning only (Tools/apf_gui.py, before Init): scales the Q / R diagonals (off diagonals by
-		// the geometric mean, R after the live dynamite sigma), and turns the NIS inflation on / off
-		void SetNoiseTuning(const float q[UKF_N], const float r[UKF_N], bool inflate);
+		// the geometric mean, R after the live dynamite sigma)
+		void SetNoiseTuning(const float q[UKF_N], const float r[UKF_N]);
+		// Altitude R = max(R, k * Dynamite spread^2): R grows when the sources disagree (k = 0 off)
+		// pull = true: k * Dynamite pull^2 instead (how far the sources move the fused value)
+		void SetSpreadR(float k, bool pull = false) { spreadK = k; spreadPull = pull; }
 #endif
 
 		bool IsInitialized() const { return initialized; }
@@ -124,7 +118,8 @@ class Ukf
 #ifdef APF_PC_REPLAY
 		float qScale[UKF_N] = {1.0f, 1.0f, 1.0f};
 		float rScale[UKF_N] = {1.0f, 1.0f, 1.0f};
-		bool inflate = true;
+		float spreadK = 0.0f;		// SetSpreadR
+		bool spreadPull = false;
 #endif
 };
 

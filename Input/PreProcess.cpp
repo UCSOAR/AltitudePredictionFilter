@@ -80,6 +80,19 @@ void PreProcess::Reset()
 }
 
 /**
+ * @brief Takes a tare saved before a power loss (SensorFrameTask). Frames are calibrated from
+ *        the next one, no tare window
+ */
+void PreProcess::Restore(const TareResult& saved)
+{
+	tareStats.Reset();
+	result = saved;
+	filterInit = FilterInit::Build(result);
+	tared = true;
+	SOAR_PRINT("PreProcess: saved tare restored (ground %ld mm ASL)\n", ToMilli(filterInit.groundAltitude));
+}
+
+/**
  * @brief Turns the tare window into calibration results, checks the alignment
  *        and builds the filter initial conditions
  * @return false if the window has no usable baro or IMU (tare must restart)

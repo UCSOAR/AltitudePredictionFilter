@@ -49,6 +49,9 @@ class StateSelection
 		// Back to PRE_LAUNCH, called together with the re-tare
 		void Reset(uint32_t timestampMs);
 
+		// Power loss: start in the saved state (LAUNCH or LANDED)
+		void Restore(ApfState saved, uint32_t timestampMs) { Transition(saved, timestampMs); }
+
 		ApfState GetState() const { return state; }
 		uint32_t GetStateEntryMs() const { return stateEntryMs; }
 		static const char* Name(ApfState s);

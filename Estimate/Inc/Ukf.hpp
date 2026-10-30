@@ -86,6 +86,11 @@ class Ukf
 		// Altitude R = max(R, k * Dynamite spread^2): R grows when the sources disagree (k = 0 off)
 		// pull = true: k * Dynamite pull^2 instead (how far the sources move the fused value)
 		void SetSpreadR(float k, bool pull = false) { spreadK = k; spreadPull = pull; }
+		// R floor replaced by this symmetric matrix {r00, r01, r02, r11, r12, r22} (before Init)
+		void SetRFloor(const float r[6]);
+		// Q diagonal per flight phase {boost alt, vel, acc, coast ..., descent ...} as spectral densities,
+		// boost until the UKF acceleration first goes negative, descent after apogee (before Init)
+		void SetPhaseQ(const float q[3 * UKF_N]);
 #endif
 
 		bool IsInitialized() const { return initialized; }
@@ -104,7 +109,8 @@ class Ukf
 
 		float x[UKF_N] = {0.0f, 0.0f, 0.0f};
 		float P[UKF_N][UKF_N] = {};
-		Mat3 Q{};			// Spectral density, scaled by dt
+		Mat3 Q{};			// Spectral density, scaled by dt, before apogee
+		Mat3 Qafter{};		// ... after apogee
 		Mat3 Rfloor{};
 
 		float weightMean[UKF_SIGMA] = {};
@@ -120,6 +126,11 @@ class Ukf
 		float rScale[UKF_N] = {1.0f, 1.0f, 1.0f};
 		float spreadK = 0.0f;		// SetSpreadR
 		bool spreadPull = false;
+		bool rFloorOn = false;
+		float rFloor[6] = {};
+		bool phaseQOn = false;
+		float phaseQ[3][UKF_N] = {};
+		bool burnedOut = false;
 #endif
 };
 

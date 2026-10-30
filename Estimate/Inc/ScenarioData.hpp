@@ -25,7 +25,26 @@ constexpr uint8_t SCENARIO_COUNT = 8;
 #elif APF_PROFILE == APF_PROFILE_TABER_OWN	// Estimate/ScenarioDataTaber.cpp
 constexpr uint8_t SCENARIO_COUNT = 3;
 #else										// Estimate/ScenarioData.cpp
-constexpr uint8_t SCENARIO_COUNT = 9;
+constexpr uint8_t SCENARIO_COUNT = 3;
+#endif
+
+// Process noise before / after apogee: covariance of (alt, vel, acc) between every row and the
+// closest row of the other cases (Tools/preprocess_cases.py phase_q), per flight frame, as spectral
+// densities (m^2/s, (m/s)^2/s, (m/s^2)^2/s). FilterInit keeps DEFAULT_Q as the floor of the diagonal
+#if APF_PROFILE == APF_PROFILE_STORMFLY
+constexpr float SCENARIO_Q_BEFORE[3][3] = {	// 718 rows
+	{529.743f, 592.458f, -47.0299f},
+	{592.458f, 3093.35f, -113.904f},
+	{-47.0299f, -113.904f, 167.311f}
+};
+constexpr float SCENARIO_Q_AFTER[3][3] = {	// 830 rows
+	{380.216f, -10.046f, 0.987523f},
+	{-10.046f, 795.255f, -7.79299f},
+	{0.987523f, -7.79299f, 4.17774f}
+};
+#else										// Taber sets: DEFAULT_Q before and after apogee
+constexpr float SCENARIO_Q_BEFORE[3][3] = {};
+constexpr float SCENARIO_Q_AFTER[3][3] = {};
 #endif
 
 /************************************

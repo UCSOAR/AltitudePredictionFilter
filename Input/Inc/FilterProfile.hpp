@@ -37,6 +37,7 @@
 // set and the Q / R can be tested separately
 #define APF_COVARIANCE_DEFAULT		0	// Input/FilterInit.cpp DEFAULT_Q / DEFAULT_R
 #define APF_COVARIANCE_TABER		1	// Legacy HALO::initializeHALO (covarianceCalc.py)
+#define APF_COVARIANCE_SCENARIO		2	// DEFAULT_R, Q before / after apogee from the case spread (ScenarioData.hpp)
 
 // The legacy Taber Q / R (covarianceCalc.py) is the default for every profile, the board included.
 // APF_COVARIANCE_DEFAULT (Input/FilterInit.cpp DEFAULT_Q / DEFAULT_R) stays selectable with -DAPF_COVARIANCE=0

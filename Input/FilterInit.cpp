@@ -21,6 +21,7 @@
 #include "Inc/FilterInit.hpp"
 #include "Inc/AxisAlignment.hpp"
 #include "Inc/FilterProfile.hpp"
+#include "../Estimate/Inc/ScenarioData.hpp"
 #include <cmath>
 
 /************************************
@@ -128,13 +129,28 @@ FilterInitState FilterInit::Build(const TareResult& tare)
 		{1528.51f, 5005.79f, -469.20f},
 		{727.68f, -469.20f, 613.20f}
 	}};
+	init.Qafter = init.Q;
+#elif APF_COVARIANCE == APF_COVARIANCE_SCENARIO
+	// Q before / after apogee from how far the closest cases sit apart (Tools/preprocess_cases.py),
+	// never below DEFAULT_Q on the diagonal
+	for (uint8_t i = 0; i < 3; i++) {
+		for (uint8_t j = 0; j < 3; j++) {
+			init.Q.m[i][j] = SCENARIO_Q_BEFORE[i][j];
+			init.Qafter.m[i][j] = SCENARIO_Q_AFTER[i][j];
+		}
+		init.Q.m[i][i] = Floor(init.Q.m[i][i], DEFAULT_Q.m[i][i]);
+		init.Qafter.m[i][i] = Floor(init.Qafter.m[i][i], DEFAULT_Q.m[i][i]);
+	}
+	init.R = DEFAULT_R;
 #else
 	init.Q = DEFAULT_Q;
+	init.Qafter = DEFAULT_Q;
 	init.R = DEFAULT_R;
 #endif
 	for (uint8_t i = 0; i < 3; i++) {
 		for (uint8_t j = 0; j < 3; j++) {
 			init.Q.m[i][j] *= APF_Q_SCALE;	// Input/Inc/FilterProfile.hpp, 1 unless sweeping
+			init.Qafter.m[i][j] *= APF_Q_SCALE;
 			init.R.m[i][j] *= APF_R_SCALE;
 		}
 	}

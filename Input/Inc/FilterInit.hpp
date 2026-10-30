@@ -36,7 +36,8 @@ struct FilterInitState
 	float groundAltitude;
 	float x0[3];
 	Mat3 P0;
-	Mat3 Q;
+	Mat3 Q;			// Process noise before apogee
+	Mat3 Qafter;	// ... and after apogee (the UKF switches with the scenario mode)
 	Mat3 R;
 };
 

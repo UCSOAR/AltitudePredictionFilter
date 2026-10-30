@@ -138,13 +138,24 @@ void Ukf::Init(const FilterInitState& init, const EverestMeasurement& everest)
 #endif
 
 	Q = init.Q;
+	Qafter = init.Qafter;
 	Rfloor = init.R;
 #ifdef APF_PC_REPLAY
 	for (uint8_t i = 0; i < UKF_N; i++) {
 		for (uint8_t j = 0; j < UKF_N; j++) {
 			Q.m[i][j] *= std::sqrt(qScale[i] * qScale[j]);
+			Qafter.m[i][j] *= std::sqrt(qScale[i] * qScale[j]);
 		}
 	}
+	if (rFloorOn) {
+		const uint8_t k[UKF_N][UKF_N] = {{0, 1, 2}, {1, 3, 4}, {2, 4, 5}};
+		for (uint8_t i = 0; i < UKF_N; i++) {
+			for (uint8_t j = 0; j < UKF_N; j++) {
+				Rfloor.m[i][j] = rFloor[k[i][j]];
+			}
+		}
+	}
+	burnedOut = false;
 #endif
 
 	// Start where Dynamite says the rocket is at launch detection
@@ -261,11 +272,23 @@ void Ukf::Predict(float dt)
 			}
 		}
 	}
+	// Process noise of the scenario mode (before / after apogee)
+	const Mat3& q = scenarioModel.IsAfterApogee() ? Qafter : Q;
 	for (uint8_t i = 0; i < UKF_N; i++) {
 		for (uint8_t j = 0; j < UKF_N; j++) {
-			Pp[i][j] += Q.m[i][j] * qScale;
+			Pp[i][j] += q.m[i][j] * qScale;
 		}
 	}
+#ifdef APF_PC_REPLAY
+	// Replay test: the Q diagonal of the flight phase instead (SetPhaseQ)
+	if (phaseQOn) {
+		burnedOut = burnedOut || (x[2] < 0.0f);
+		const uint8_t phase = scenarioModel.IsAfterApogee() ? 2 : (burnedOut ? 1 : 0);
+		for (uint8_t i = 0; i < UKF_N; i++) {
+			Pp[i][i] += (phaseQ[phase][i] - q.m[i][i]) * qScale;
+		}
+	}
+#endif
 	Symmetrize(Pp);
 
 	for (uint8_t i = 0; i < UKF_N; i++) {
@@ -377,6 +400,24 @@ void Ukf::MeasurementNoise(const EverestMeasurement& everest, float R[UKF_N][UKF
 }
 
 #ifdef APF_PC_REPLAY
+void Ukf::SetRFloor(const float r[6])
+{
+	for (uint8_t i = 0; i < 6; i++) {
+		rFloor[i] = r[i];
+	}
+	rFloorOn = true;
+}
+
+void Ukf::SetPhaseQ(const float q[3 * UKF_N])
+{
+	for (uint8_t p = 0; p < 3; p++) {
+		for (uint8_t i = 0; i < UKF_N; i++) {
+			phaseQ[p][i] = q[p * UKF_N + i];
+		}
+	}
+	phaseQOn = true;
+}
+
 void Ukf::SetNoiseTuning(const float q[UKF_N], const float r[UKF_N])
 {
 	for (uint8_t i = 0; i < UKF_N; i++) {

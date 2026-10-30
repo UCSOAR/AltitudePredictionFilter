@@ -30,6 +30,14 @@ constexpr float APOGEE_CONF_MIN_SD[3] = {1.0f, 2.0f, 1.0f};
 // Ignore apogee below this altitude above the pad (launch transients, bench tests)
 constexpr float APOGEE_MIN_ALT_M = 10.0f;
 
+// Failsafe (not in legacy): no apogee until the MEASUREMENT (Dynamite, not the UKF) shows the rocket
+// really left the pad: altitude above APOGEE_MOVED_ALT_M or velocity above APOGEE_MOVED_VEL_MPS at
+// least once. A still board with launch forced (bench test) or a UKF that runs away on its own never
+// reaches apogee, so nothing downstream (airbrakes, recovery) acts on it. A real flight passes both
+// within the first second of the burn
+constexpr float APOGEE_MOVED_ALT_M = 50.0f;
+constexpr float APOGEE_MOVED_VEL_MPS = 30.0f;
+
 // Backup (not in legacy): velocity negative for this many frames in a row also means apogee,
 // in case the confidence never peaks the way legacy expects (~0.5 s at 40 Hz)
 constexpr uint8_t APOGEE_BACKUP_FRAMES = 20;
@@ -62,6 +70,7 @@ struct ApogeeStatus
 	float maxConfidence;
 	bool hitOne;
 	uint8_t negativeVelFrames;
+	bool moved;				// Measurement left the pad (failsafe, NoteMeasurement)
 };
 
 /************************************
@@ -91,6 +100,17 @@ class ApogeeDetection
 		bool Update(const float x[3], const float sd[3], uint32_t timestampMs);
 
 		bool IsReached() const { return status.reached; }
+
+		/**
+		 * @brief Failsafe input, every LAUNCH frame before Update: the Dynamite (Everest) measurement
+		 * @param altitude m above the pad
+		 * @param velocity m/s
+		 */
+		void NoteMeasurement(float altitude, float velocity)
+		{
+			status.moved = status.moved || (altitude > APOGEE_MOVED_ALT_M) || (velocity > APOGEE_MOVED_VEL_MPS);
+		}
+		bool HasMoved() const { return status.moved; }
 
 		// Power loss: carry the saved max altitude (and apogee) over the reboot
 		void Restore(bool reached, float maxAltitude, uint32_t timestampMs);

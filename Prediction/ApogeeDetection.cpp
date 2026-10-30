@@ -75,7 +75,8 @@ bool ApogeeDetection::Update(const float x[3], const float sd[3], uint32_t times
 		status.maxAltitude = x[0];
 		status.maxTimeMs = timestampMs;
 	}
-	const bool highEnough = status.maxAltitude > APOGEE_MIN_ALT_M;
+	// Failsafe: never apogee while the measurement says the board has not moved (NoteMeasurement)
+	const bool highEnough = (status.maxAltitude > APOGEE_MIN_ALT_M) && status.moved;
 
 	// Legacy updateBuffer(): moving window of the state
 	windowAlt[head] = x[0];
@@ -188,8 +189,8 @@ void ApogeeDetection::PrintStatus() const
 	SOAR_PRINT("Apogee: reached=%d by %s max=%ld mm at t=%lums detected t=%lums\n",
 			   status.reached ? 1 : 0, SourceName(status.source), ToMilli(status.maxAltitude),
 			   static_cast<unsigned long>(status.maxTimeMs), static_cast<unsigned long>(status.detectTimeMs));
-	SOAR_PRINT("  confidence (x1000): alt=%ld vel=%ld acc=%ld total=%ld peak=%ld hitOne=%d negVelFrames=%u/%u\n",
+	SOAR_PRINT("  confidence (x1000): alt=%ld vel=%ld acc=%ld total=%ld peak=%ld hitOne=%d negVelFrames=%u/%u moved=%d\n",
 			   ToMilli(status.altConfidence), ToMilli(status.velConfidence), ToMilli(status.accConfidence),
 			   ToMilli(status.totalConfidence), ToMilli(status.maxConfidence), status.hitOne ? 1 : 0,
-			   static_cast<unsigned int>(status.negativeVelFrames), static_cast<unsigned int>(APOGEE_BACKUP_FRAMES));
+			   static_cast<unsigned int>(status.negativeVelFrames), static_cast<unsigned int>(APOGEE_BACKUP_FRAMES), status.moved ? 1 : 0);
 }

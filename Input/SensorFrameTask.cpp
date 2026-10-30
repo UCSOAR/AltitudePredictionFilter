@@ -569,6 +569,7 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 
 		// PREDICTION: apogee detection switches the scenario mode once, the predictor projects ahead
 		const float sd[3] = {std::sqrt(ukf.Variance(0)), std::sqrt(ukf.Variance(1)), std::sqrt(ukf.Variance(2))};
+		apogeeDetection.NoteMeasurement(everest.altitude, everest.velocity);
 		if (apogeeDetection.Update(ukf.State(), sd, calibrated.timestampMs)) {
 			ukf.SetAfterApogee(true);
 			dynamite.DistrustBarosUntil(calibrated.timestampMs + DYNAMITE_EJECTION_DISTRUST_MS);

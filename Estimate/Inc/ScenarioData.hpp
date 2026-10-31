@@ -28,19 +28,20 @@ constexpr uint8_t SCENARIO_COUNT = 3;
 constexpr uint8_t SCENARIO_COUNT = 3;
 #endif
 
-// Process noise before / after apogee: covariance of (alt, vel, acc) between every row and the
-// closest row of the other cases (Tools/preprocess_cases.py phase_q), per flight frame, as spectral
-// densities (m^2/s, (m/s)^2/s, (m/s^2)^2/s). FilterInit keeps DEFAULT_Q as the floor of the diagonal
+// Process noise before / after apogee (APF_COVARIANCE_SCENARIO): Configuration B, the spread of the
+// complete Stormfly trajectories Undershoot 1 / Nominal 1 / Overshoot 2 (preprocess_cases.py phase_q,
+// acceleration raised to 100), chosen with Tools/replay/q_validation. Spectral densities (m^2/s,
+// (m/s)^2/s, (m/s^2)^2/s), the UKF adds Q * dt. FilterInit keeps DEFAULT_Q as the floor of the diagonal
 #if APF_PROFILE == APF_PROFILE_STORMFLY
-constexpr float SCENARIO_Q_BEFORE[3][3] = {	// 718 rows
-	{529.743f, 592.458f, -47.0299f},
-	{592.458f, 3093.35f, -113.904f},
-	{-47.0299f, -113.904f, 167.311f}
+constexpr float SCENARIO_Q_BEFORE[3][3] = {	// Configuration B
+	{379.346f, 221.534f, -0.465f},
+	{221.534f, 739.583f, -16.062f},
+	{-0.465f, -16.062f, 100.0f}
 };
-constexpr float SCENARIO_Q_AFTER[3][3] = {	// 830 rows
-	{380.216f, -10.046f, 0.987523f},
-	{-10.046f, 795.255f, -7.79299f},
-	{0.987523f, -7.79299f, 4.17774f}
+constexpr float SCENARIO_Q_AFTER[3][3] = {	// Configuration B
+	{552.281f, -8.591f, -0.215f},
+	{-8.591f, 41.674f, -15.05f},
+	{-0.215f, -15.05f, 100.0f}
 };
 #else										// Taber sets: DEFAULT_Q before and after apogee
 constexpr float SCENARIO_Q_BEFORE[3][3] = {};

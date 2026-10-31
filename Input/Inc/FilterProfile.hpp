@@ -39,10 +39,11 @@
 #define APF_COVARIANCE_TABER		1	// Legacy HALO::initializeHALO (covarianceCalc.py)
 #define APF_COVARIANCE_SCENARIO		2	// DEFAULT_R, Q before / after apogee from the case spread (ScenarioData.hpp)
 
-// The legacy Taber Q / R (covarianceCalc.py) is the default for every profile, the board included.
-// APF_COVARIANCE_DEFAULT (Input/FilterInit.cpp DEFAULT_Q / DEFAULT_R) stays selectable with -DAPF_COVARIANCE=0
+// The scenario Q (Configuration B, ScenarioData.hpp) with DEFAULT_R is the default for every profile, the board
+// included (Tools/replay/q_validation). Taber profiles have no scenario Q and fall back to DEFAULT_Q. The legacy
+// Taber Q / R (-DAPF_COVARIANCE=1) and DEFAULT_Q / DEFAULT_R (-DAPF_COVARIANCE=0) stay selectable
 #ifndef APF_COVARIANCE
-#define APF_COVARIANCE APF_COVARIANCE_TABER
+#define APF_COVARIANCE APF_COVARIANCE_SCENARIO
 #endif
 
 // Q scale (tuning sweeps, Tools/taber/taber_test.py --q-sweep): Q is multiplied by this.

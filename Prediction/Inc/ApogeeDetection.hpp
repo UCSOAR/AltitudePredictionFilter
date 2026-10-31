@@ -127,9 +127,15 @@ class ApogeeDetection
 		const ApogeeStatus& GetStatus() const { return status; }
 		void PrintStatus() const;
 
+		// Bench test (FlightTask force_flight): skip the APOGEE_MIN_ALT_M and moved failsafes so a
+		// still board can reach apogee. Set every frame, never on in a real flight
+		void SetGuardsBypassed(bool bypassed) { guardsBypassed = bypassed; }
+
 	private:
 		bool Confidence(float avgAlt, float avgVel, float avgAcc, const float sd[3]);
 		void Latch(ApogeeSource source, uint32_t timestampMs);
+
+		bool guardsBypassed = false;
 
 		// Moving window (legacy buffer)
 		float windowAlt[APOGEE_WINDOW] = {};

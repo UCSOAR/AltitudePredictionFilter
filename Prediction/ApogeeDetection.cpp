@@ -76,7 +76,7 @@ bool ApogeeDetection::Update(const float x[3], const float sd[3], uint32_t times
 		status.maxTimeMs = timestampMs;
 	}
 	// Failsafe: never apogee while the measurement says the board has not moved (NoteMeasurement)
-	const bool highEnough = (status.maxAltitude > APOGEE_MIN_ALT_M) && status.moved;
+	const bool highEnough = guardsBypassed || ((status.maxAltitude > APOGEE_MIN_ALT_M) && status.moved);
 
 	// Legacy updateBuffer(): moving window of the state
 	windowAlt[head] = x[0];

@@ -16,8 +16,6 @@
 #include "../../Process/Inc/Dynamite.hpp"
 #include "../../Estimate/Inc/Ukf.hpp"
 #include "../../Prediction/Inc/ApogeeDetection.hpp"
-#include "../../Prediction/Inc/ApogeePredictor.hpp"
-#include "../../Prediction/Inc/AirbrakeCheck.hpp"
 #include "../../Output/Inc/FilterOutput.hpp"
 #include "../../Output/Inc/FilterLog.hpp"
 
@@ -49,7 +47,6 @@ enum SENSORFRAME_TASK_COMMANDS
 	SF_CMD_PRINT_DYNAMITE,		// Prints the dynamite sources, trust weights and Madgwick attitude
 	SF_CMD_PRINT_UKF,			// Prints the UKF state, covariance and scenario match
 	SF_CMD_PRINT_APOGEE,		// Prints the apogee detection status (legacy confidences)
-	SF_CMD_PRINT_PREDICT,		// Prints the apogee / landing prediction and trajectory
 	SF_CMD_PRINT_OUTPUT,		// Prints the last published FilterData
 	SF_CMD_TOGGLE_OUT_PRINT,	// Toggles printing every published FilterData
 	SF_CMD_TOGGLE_LOG_STREAM,	// Toggles the CSV log stream (raw + calibrated + filter), saved on the PC by Tools/serial_log
@@ -120,10 +117,7 @@ class SensorFrameTask: public Task
 		ApogeeDetection apogeeDetection;
 
 		// PREDICTION stage: apogee / trajectory / landing predictor
-		ApogeePredictor apogeePredictor;
 
-		// PREDICTION stage: airbrake level from the predicted apogee (logged only, nothing actuated)
-		AirbrakeCheck airbrakeCheck;
 
 		// OUTPUT stage: FilterData for the DataBroker (logged to flash by the LoggingTask)
 		FilterOutput filterOutput;
@@ -140,6 +134,7 @@ class SensorFrameTask: public Task
 
 		void ResetFilter(uint32_t nowMs);			// back to a fresh pad tare (re-tare, false launch)
 		void QueueEvent(uint8_t code, int32_t value);
+		void ReleaseAirbrakes(uint32_t nowMs);
 
 		static constexpr uint32_t RESTORE_SETTLE_MS = 1500;		// Dynamite settles before the UKF restarts
 		static constexpr uint32_t RESTORED_FLAG_MS = 2000;		// RESTORED flag after the UKF restarts
@@ -175,7 +170,7 @@ class SensorFrameTask: public Task
 			uint32_t maxCycles = 0;
 			void Add(uint32_t cycles) { calls++; totalCycles += cycles; if (cycles > maxCycles) maxCycles = cycles; }
 		};
-		CpuTime frameTime, ukfTime, predictorTime;
+		CpuTime frameTime, ukfTime;
 		uint32_t timingStartMs = 0;
 		void PrintTiming();
 

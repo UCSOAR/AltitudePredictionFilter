@@ -37,7 +37,7 @@ bool FilterOutput::Due(ApfState state, uint32_t timestampMs)
 
 FilterData FilterOutput::Build(uint32_t timestampMs, ApfState state, float groundAltitude,
 							   const Dynamite& dynamite, const LaunchDetection& launch, const Ukf& ukf,
-							   const ApogeeDetection& apogee, const ApogeePredictor& predictor)
+							   const ApogeeDetection& apogee)
 {
 	FilterData d{};
 	d.timestampMs = timestampMs;
@@ -97,19 +97,7 @@ FilterData FilterOutput::Build(uint32_t timestampMs, ApfState state, float groun
 		d.flags |= FILTER_FLAG_APOGEE;
 	}
 
-	const ApogeePrediction& p = predictor.Get();
-	if (p.valid) {
-		d.flags |= FILTER_FLAG_PREDICTION;
-		// Time measured from when the prediction was made, so it stays right between predictions
-		const float since = (timestampMs - p.madeAtMs) / 1000.0f;
-		if (!p.afterApogee) {
-			d.predictedApogee = p.apogeeAltitude;
-			d.timeToEvent = p.timeToApogee - since;
-		} else {
-			d.predictedApogee = apogee.GetStatus().maxAltitude;
-			d.timeToEvent = p.timeToLanding - since;
-		}
-	}
+	// No apogee predictor: predictedApogee / timeToEvent stay 0 and FILTER_FLAG_PREDICTION is never set
 	return d;
 }
 

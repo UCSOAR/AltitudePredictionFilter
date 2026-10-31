@@ -14,7 +14,6 @@
 #include "../../Process/Inc/Dynamite.hpp"
 #include "../../Estimate/Inc/Ukf.hpp"
 #include "../../Prediction/Inc/ApogeeDetection.hpp"
-#include "../../Prediction/Inc/ApogeePredictor.hpp"
 
 /************************************
  * MACROS AND DEFINES
@@ -55,7 +54,7 @@ class FilterOutput
 
 		FilterData Build(uint32_t timestampMs, ApfState state, float groundAltitude,
 						 const Dynamite& dynamite, const LaunchDetection& launch, const Ukf& ukf,
-						 const ApogeeDetection& apogee, const ApogeePredictor& predictor);
+						 const ApogeeDetection& apogee);
 
 		// Remember what was published (for APF_Output)
 		void Published(const FilterData& data) { last = data; hasLast = true; published++; }

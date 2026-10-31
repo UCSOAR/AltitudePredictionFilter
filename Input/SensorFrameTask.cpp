@@ -115,7 +115,6 @@ constexpr ApfCommand APF_COMMANDS[] = {
 	{"APF_Dynamite",   SF_CMD_PRINT_DYNAMITE},
 	{"APF_UKF",        SF_CMD_PRINT_UKF},
 	{"APF_Apogee",     SF_CMD_PRINT_APOGEE},
-	{"APF_Predict",    SF_CMD_PRINT_PREDICT},
 	{"APF_Output",     SF_CMD_PRINT_OUTPUT},
 	{"APF_OutStream",  SF_CMD_TOGGLE_OUT_PRINT},
 	{"APF_LogStream",  SF_CMD_TOGGLE_LOG_STREAM},
@@ -276,11 +275,6 @@ void SensorFrameTask::HandleTaskCommand(uint16_t taskCommand)
 
 	case SF_CMD_PRINT_APOGEE:
 		apogeeDetection.PrintStatus();
-		airbrakeCheck.PrintStatus();
-		break;
-
-	case SF_CMD_PRINT_PREDICT:
-		apogeePredictor.PrintStatus();
 		break;
 
 	case SF_CMD_PRINT_OUTPUT:
@@ -570,24 +564,17 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 			ukfTime.Add(DWT->CYCCNT - start);
 		}
 
-		// PREDICTION: apogee detection switches the scenario mode once, the predictor projects ahead
+		// APOGEE: detection switches the scenario mode once and releases the airbrakes (no apogee predictor)
 		const float sd[3] = {std::sqrt(ukf.Variance(0)), std::sqrt(ukf.Variance(1)), std::sqrt(ukf.Variance(2))};
 		apogeeDetection.NoteMeasurement(everest.altitude, everest.velocity);
+		// force_flight bench test: let a still board reach apogee so the airbrake release can be tested
+		apogeeDetection.SetGuardsBypassed(FlightTask::Inst().IsForceFlight());
 		if (apogeeDetection.Update(ukf.State(), sd, calibrated.timestampMs)) {
 			ukf.SetAfterApogee(true);
 			dynamite.DistrustBarosUntil(calibrated.timestampMs + DYNAMITE_EJECTION_DISTRUST_MS);
 			QueueEvent(FilterLog::EVENT_APOGEE, FilterLog::Round(apogeeDetection.GetStatus().maxAltitude * 100.0f));
+			ReleaseAirbrakes(calibrated.timestampMs);
 			SaveState(savedPhase, calibrated.timestampMs);
-		}
-		if (PREDICT_ENABLED) {
-			const uint32_t start = DWT->CYCCNT;
-			apogeePredictor.Update(ukf, calibrated.timestampMs);
-			predictorTime.Add(DWT->CYCCNT - start);
-		}
-		if (airbrakeCheck.Update(apogeePredictor.Get(), ukf.State()[2] < 0.0f, apogeeDetection.HasMoved(),
-								 apogeeDetection.IsReached(), calibrated.timestampMs)) {
-			QueueEvent(airbrakeCheck.GetStatus().flagged ? FilterLog::EVENT_AIRBRAKE_FLAG : FilterLog::EVENT_AIRBRAKE_CHECK,
-					   airbrakeCheck.EventValue());
 		}
 		break;
 	}
@@ -603,7 +590,7 @@ void SensorFrameTask::RunStages(const SensorFrame& calibrated)
 	if (filterOutput.Due(stateSelection.GetState(), calibrated.timestampMs) || eventCount > 0) {
 		FilterData data = filterOutput.Build(calibrated.timestampMs, stateSelection.GetState(),
 											 preProcess.GetFilterInit().groundAltitude, dynamite, launchDetection,
-											 ukf, apogeeDetection, apogeePredictor);
+											 ukf, apogeeDetection);
 		if (restoredFlight && (!ukf.IsInitialized() || (calibrated.timestampMs - ukfStartMs) < RESTORED_FLAG_MS)) {
 			data.flags |= FILTER_FLAG_RESTORED;
 		}
@@ -649,11 +636,20 @@ void SensorFrameTask::ResetFilter(uint32_t nowMs)
 	launchDetection.Reset();
 	ukf.Reset();
 	apogeeDetection.Reset();
-	apogeePredictor.Reset();
-	airbrakeCheck.Reset();
 	filterOutput.Reset();
 	stateSelection.Reset(nowMs);
 	restoredFlight = false;
+}
+
+/**
+ * @brief Apogee detected: release the airbrakes. No airbrake output is wired up yet, so this prints
+ *        and logs EVENT_AIRBRAKE_RELEASE; drive the actuator from here once it exists
+ */
+void SensorFrameTask::ReleaseAirbrakes(uint32_t nowMs)
+{
+	SOAR_PRINT("AIRBRAKE: release (apogee detected) at t=%lums%s\n", static_cast<unsigned long>(nowMs),
+			   FlightTask::Inst().IsForceFlight() ? " [force_flight bench test]" : "");
+	QueueEvent(FilterLog::EVENT_AIRBRAKE_RELEASE, FilterLog::Round(apogeeDetection.GetStatus().maxAltitude * 100.0f));
 }
 
 void SensorFrameTask::QueueEvent(uint8_t code, int32_t value)
@@ -732,11 +728,6 @@ void SensorFrameTask::SaveState(uint8_t phase, uint32_t nowMs)
 	} else {
 		persisted.lastAltitude = dynamite.GetMeasurement().altitude;
 		persisted.lastVelocity = dynamite.GetMeasurement().velocity;
-	}
-	// Only a new pre-apogee prediction replaces the saved one (the predictor restarts empty after a reboot)
-	const ApogeePrediction& prediction = apogeePredictor.Get();
-	if (prediction.valid && !prediction.afterApogee) {
-		persisted.predictedApogee = prediction.apogeeAltitude;
 	}
 	persisted.tareValid = preProcess.IsTared() ? 1 : 0;
 	if (preProcess.IsTared()) {
@@ -899,17 +890,15 @@ void SensorFrameTask::PrintTiming()
 			   static_cast<unsigned long>(droppedFrames), StateSelection::Name(stateSelection.GetState()));
 	line("frame", frameTime);
 	line("UKF", ukfTime);
-	line("predictor", predictorTime);
 	frameTime = CpuTime{};
 	ukfTime = CpuTime{};
-	predictorTime = CpuTime{};
 	timingStartMs = nowMs;
 }
 
 void SensorFrameTask::PrintApfHelp() const
 {
 	SOAR_PRINT("APF commands: APF_Raw APF_Calibrated APF_Tare APF_Alignment APF_FilterInit\n");
-	SOAR_PRINT("  APF_State APF_Dynamite APF_Launch APF_UKF APF_Apogee APF_Predict APF_Output\n");
+	SOAR_PRINT("  APF_State APF_Dynamite APF_Launch APF_UKF APF_Apogee APF_Output\n");
 	SOAR_PRINT("  APF_Retare (pad only) APF_RawStream APF_AltStream APF_OutStream APF_LogStream (toggles) APF_Timing APF_Help\n");
 }
 
@@ -971,7 +960,7 @@ void SensorFrameTask::PrintLogFrame(const SensorFrame& raw)
 	if (stateSelection.GetState() != ApfState::PRE_LAUNCH) {
 		const FilterData d = filterOutput.Build(raw.timestampMs, stateSelection.GetState(),
 												preProcess.GetFilterInit().groundAltitude, dynamite, launchDetection,
-												ukf, apogeeDetection, apogeePredictor);
+												ukf, apogeeDetection);
 		const EverestMeasurement& ev = dynamite.GetMeasurement();
 		SOAR_PRINT("LF,%lu,%u,%u,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n", seq,
 				   static_cast<unsigned int>(d.apfState), static_cast<unsigned int>(d.flags),

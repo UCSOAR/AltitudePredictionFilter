@@ -67,8 +67,9 @@ enum Event : uint8_t
 	EVENT_IMU_CLIP,				// An IMU clipped (at most once a second)
 	EVENT_STATE_RESTORED,		// Booted into a saved FLIGHT / LANDED state, value = saved phase
 	EVENT_FALSE_LAUNCH,			// FlightTask went back to GROUND without the launch ever climbing: back to the pad, re-tare
-	EVENT_AIRBRAKE_CHECK,		// Airbrake check (log only), every 2 s from burnout, value = AirbrakeCheck::EventValue
-	EVENT_AIRBRAKE_FLAG			// First check with level >= 1 (latched, record time = time flagged), same value
+	EVENT_AIRBRAKE_CHECK,		// Unused: was the prediction based airbrake check (apogee predictor removed), kept so codes do not shift
+	EVENT_AIRBRAKE_FLAG,		// Unused, same as above
+	EVENT_AIRBRAKE_RELEASE		// Airbrakes released on apogee detection, value = apogee altitude (cm)
 };
 
 inline int32_t Round(float v) { return static_cast<int32_t>(v + ((v >= 0.0f) ? 0.5f : -0.5f)); }
